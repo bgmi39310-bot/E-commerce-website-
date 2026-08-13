@@ -7,12 +7,10 @@
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
         
-        /* Header & Menu Icon Styling */
         header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: relative; }
         .menu-icon { cursor: pointer; display: flex; flex-direction: column; gap: 5px; }
         .menu-icon span { width: 25px; height: 3px; background-color: white; border-radius: 2px; }
 
-        /* Side Menu Drawer */
         .side-menu { height: 100%; width: 0; position: fixed; z-index: 1000; top: 0; right: 0; background-color: #232f3e; overflow-x: hidden; transition: 0.3s; padding-top: 60px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); }
         .side-menu a { padding: 12px 25px; text-decoration: none; font-size: 18px; color: white; display: block; transition: 0.2s; }
         .side-menu a:hover { background-color: #37475a; }
@@ -24,12 +22,16 @@
         .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #eee; }
         .item-info { font-size: 16px; font-weight: bold; color: #333; }
         .item-price { color: #b12704; font-size: 16px; font-weight: bold; }
+        .qty-box { display: flex; align-items: center; gap: 8px; }
+        .qty-btn { background: #ddd; border: none; padding: 4px 10px; cursor: pointer; font-weight: bold; border-radius: 4px; }
+        .qty-btn:hover { background: #ccc; }
+        
         .btn-remove { background-color: #ff4d4d; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .btn-remove:hover { background-color: #e04343; }
 
         .cart-summary { margin-top: 20px; text-align: right; }
         .total-amount { font-size: 20px; font-weight: bold; color: #333; margin-bottom: 15px; }
-        .btn-checkout { background-color: #ffd814; border: 1px solid #fcd200; padding: 12px 25px; font-weight: bold; cursor: pointer; border-radius: 5px; font-size: 16px; }
+        .btn-checkout { background-color: #ffd814; border: 1px solid #fcd200; padding: 12px 25px; font-weight: bold; cursor: pointer; border-radius: 5px; font-size: 16px; text-decoration: none; display: inline-block; color: #111; }
         .btn-checkout:hover { background-color: #f7ca00; }
         .empty-cart { text-align: center; color: #775; padding: 30px; font-size: 18px; }
     </style>
@@ -38,7 +40,6 @@
 
     <header>
         <h2>DesiMarket</h2>
-        <!-- 3-Lines (Hamburger) Icon -->
         <div class="menu-icon" onclick="toggleMenu()">
             <span></span>
             <span></span>
@@ -46,7 +47,6 @@
         </div>
     </header>
 
-    <!-- Side Slide Menu -->
     <div id="sideMenu" class="side-menu">
         <a href="javascript:void(0)" class="close-btn" onclick="toggleMenu()">&times;</a>
         <a href="index.html">🏠 Home</a>
@@ -58,24 +58,18 @@
 
     <div class="container">
         <h2>Your Shopping Cart</h2>
-        <div id="cartItemsContainer">
-            <!-- Cart items will load here -->
-        </div>
+        <div id="cartItemsContainer"></div>
         
         <div class="cart-summary" id="cartSummary" style="display: none;">
             <div class="total-amount" id="totalAmount">Total: ₹0</div>
-            <button class="btn-checkout" onclick="proceedToCheckout()">Proceed to Checkout</button>
+            <a href="checkout.html" class="btn-checkout">Proceed to Checkout</a>
         </div>
     </div>
 
     <script>
         function toggleMenu() {
             const menu = document.getElementById('sideMenu');
-            if (menu.style.width === '250px') {
-                menu.style.width = '0';
-            } else {
-                menu.style.width = '250px';
-            }
+            menu.style.width = menu.style.width === '250px' ? '0' : '250px';
         }
 
         function loadCart() {
@@ -93,11 +87,17 @@
             
             let total = 0;
             cart.forEach((item, index) => {
-                total += Number(item.price);
+                let qty = item.quantity || 1;
+                total += Number(item.price) * qty;
                 container.innerHTML += `
                     <div class="cart-item">
                         <div class="item-info">${item.name}</div>
-                        <div class="item-price">₹${item.price}</div>
+                        <div class="item-price">₹${item.price * qty}</div>
+                        <div class="qty-box">
+                            <button class="qty-btn" onclick="changeQty(${index}, -1)">-</button>
+                            <span>${qty}</span>
+                            <button class="qty-btn" onclick="changeQty(${index}, 1)">+</button>
+                        </div>
                         <button class="btn-remove" onclick="removeItem(${index})">Remove</button>
                     </div>
                 `;
@@ -107,17 +107,21 @@
             summary.style.display = 'block';
         }
 
+        function changeQty(index, change) {
+            let cart = JSON.parse(localStorage.getItem('cart')) || [];
+            cart[index].quantity = (cart[index].quantity || 1) + change;
+            if (cart[index].quantity <= 0) {
+                cart.splice(index, 1);
+            }
+            localStorage.setItem('cart', JSON.stringify(cart));
+            loadCart();
+        }
+
         function removeItem(index) {
             let cart = JSON.parse(localStorage.getItem('cart')) || [];
             cart.splice(index, 1);
             localStorage.setItem('cart', JSON.stringify(cart));
             loadCart();
-        }
-
-        function proceedToCheckout() {
-            alert("Order placed successfully! Thank you for shopping with DesiMarket.");
-            localStorage.removeItem('cart');
-            window.location.href = 'orders.html';
         }
 
         window.onload = loadCart;
