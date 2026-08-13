@@ -5,25 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - DesiMarket</title>
     <style>
-                body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
-        header { background-color: #232f3e; color: white; padding: 12px 15px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
-        .nav-links { display: flex; gap: 12px; flex-wrap: wrap; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
+        header { background-color: #232f3e; color: white; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; }
+        .nav-links { display: flex; gap: 12px; }
         .nav-links a { color: white; text-decoration: none; font-weight: bold; font-size: 14px; }
-        .nav-links a:hover { text-decoration: underline; }
-        .container { max-width: 800px; margin: 30px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        h2 { color: #333; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
-        .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #eee; }
-        .cart-item img { width: 80px; height: 80px; object-fit: cover; border-radius: 4px; margin-right: 15px; }
-        .item-details { flex-grow: 1; }
-        .item-title { font-weight: bold; font-size: 18px; color: #333; }
-        .item-price { color: #b12704; font-size: 16px; font-weight: bold; margin-top: 5px; }
-        .remove-btn { background-color: #ff4d4d; color: white; border: none; padding: 8px 12px; cursor: pointer; border-radius: 4px; font-weight: bold; }
-        .remove-btn:hover { background-color: #cc0000; }
-        .cart-summary { margin-top: 20px; text-align: right; font-size: 20px; font-weight: bold; }
-        .checkout-btn { background-color: #ffd814; border: 1px solid #fcd200; padding: 12px 20px; font-weight: bold; cursor: pointer; border-radius: 4px; font-size: 16px; width: 100%; margin-top: 15px; }
-        .checkout-btn:hover { background-color: #f7ca00; }
-        .empty-cart { text-align: center; color: #777; font-size: 18px; margin: 40px 0; }
-
+        .container { max-width: 400px; margin: 50px auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #333; margin-top: 0; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+        .form-group input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .btn-login { background-color: #ffd814; border: 1px solid #fcd200; padding: 10px; font-weight: bold; cursor: pointer; border-radius: 4px; width: 100%; font-size: 16px; }
+        .btn-login:hover { background-color: #f7ca00; }
     </style>
 </head>
 <body>
@@ -32,53 +24,43 @@
         <h2>DesiMarket</h2>
         <div class="nav-links">
             <a href="index.html">Home</a>
-            <a href="seller-dashboard.html">Dashboard</a>
             <a href="cart.html">Cart</a>
             <a href="orders.html">Orders</a>
-            <a href="login.html">Login</a>
+            <a href="account.html">Account</a>
         </div>
     </header>
 
     <div class="container">
-        <h2>Login</h2>
-        <form id="loginForm" onsubmit="handleLogin(event)">
-            <div class="form-group">
-                <label for="email">Email</label>
-                <input type="email" id="email" required>
-            </div>
-            <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" required>
-            </div>
-            <button type="submit" class="btn">Login</button>
-        </form>
-        <div class="switch-link">
-            Don't have an account? <a href="signup.html">Sign up here</a>
+        <h2>Login to Your Account</h2>
+        <div class="form-group">
+            <label for="loginName">Your Name</label>
+            <input type="text" id="loginName" placeholder="Enter your name">
         </div>
+        <div class="form-group">
+            <label for="loginEmail">Email Address</label>
+            <input type="email" id="loginEmail" placeholder="Enter your email">
+        </div>
+        <button class="btn-login" onclick="handleLogin()">Login</button>
     </div>
 
     <script>
-        function handleLogin(event) {
-            event.preventDefault();
+        function handleLogin() {
+            const name = document.getElementById('loginName').value.trim();
+            const email = document.getElementById('loginEmail').value.trim();
 
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-
-            let users = JSON.parse(localStorage.getItem('users')) || [];
-
-            // Check if user exists and password matches
-            const validUser = users.find(u => u.email === email && u.password === password);
-
-            if (validUser) {
-                // Save currently logged in user info
-                localStorage.setItem('loggedInUser', JSON.stringify(validUser));
-                alert('Login successful! Welcome back, ' + validUser.name);
-                window.location.href = 'index.html';
-            } else {
-                alert('Invalid email or password! Please check or sign up first.');
+            if (name === '' || email === '') {
+                alert("Please fill in all fields!");
+                return;
             }
+
+            // Save user data to localStorage
+            const userData = { name: name, email: email };
+            localStorage.setItem('currentUser', JSON.stringify(userData));
+
+            alert("Login successful!");
+            window.location.href = 'account.html'; // Redirect to account page
         }
     </script>
-
 </body>
 </html>
+
