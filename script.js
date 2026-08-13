@@ -125,3 +125,61 @@ window.removeFromCart = function(index) {
     location.reload();
 };
 
+// Toggle between Login and Signup mode
+const toggleText = document.getElementById('toggleText');
+const formTitle = document.getElementById('formTitle');
+const nameField = document.getElementById('nameField');
+const submitBtn = document.getElementById('submitBtn');
+const authForm = document.getElementById('authForm');
+
+let isSignup = false;
+
+if (toggleText) {
+    toggleText.addEventListener('click', () => {
+        isSignup = !isSignup;
+        if (isSignup) {
+            formTitle.innerText = "Create a DesiMarket Account";
+            nameField.style.display = "block";
+            submitBtn.innerText = "Sign Up";
+            toggleText.innerText = "Already have an account? Login";
+        } else {
+            formTitle.innerText = "Login to Your Account";
+            nameField.style.display = "none";
+            submitBtn.innerText = "Login";
+            toggleText.innerText = "New to DesiMarket? Create an account";
+        }
+    });
+}
+
+// Handle Form Submission
+if (authForm) {
+    authForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+
+        if (isSignup) {
+            const fullName = document.getElementById('fullName').value;
+            localStorage.setItem('userName', fullName);
+            localStorage.setItem('userEmail', email);
+            localStorage.setItem('userPassword', password);
+            alert('Signup Successful! Please login now.');
+            isSignup = false;
+            formTitle.innerText = "Login to Your Account";
+            nameField.style.display = "none";
+            submitBtn.innerText = "Login";
+            toggleText.innerText = "New to DesiMarket? Create an account";
+            authForm.reset();
+        } else {
+            const savedEmail = localStorage.getItem('userEmail');
+            const savedPassword = localStorage.getItem('userPassword');
+
+            if (email === savedEmail && password === savedPassword) {
+                alert('Login Successful! Welcome back.');
+                window.location.href = 'index.html';
+            } else {
+                alert('Invalid email or password. Please sign up if you don\'t have an account.');
+            }
+        }
+    });
+}
