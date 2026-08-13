@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Account - DesiMarket</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
+        header { background-color: #232f3e; color: white; padding: 12px 15px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
+        .nav-links { display: flex; gap: 12px; flex-wrap: wrap; }
+        .nav-links a { color: white; text-decoration: none; font-weight: bold; font-size: 14px; }
+        .nav-links a:hover { text-decoration: underline; }
+        .container { max-width: 600px; margin: 30px auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h2 { color: #333; border-bottom: 2px solid #ddd; padding-bottom: 10px; margin-top: 0; }
+        .profile-info { margin: 20px 0; font-size: 16px; color: #444; }
+        .profile-info p { margin: 10px 0; }
+        .profile-info strong { color: #111; }
+        .logout-btn { background-color: #ff4d4d; color: white; border: none; padding: 12px 20px; font-weight: bold; cursor: pointer; border-radius: 4px; font-size: 16px; width: 100%; margin-top: 20px; }
+        .logout-btn:hover { background-color: #cc0000; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h2>DesiMarket</h2>
+        <div class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="seller-dashboard.html">Dashboard</a>
+            <a href="cart.html">Cart</a>
+            <a href="orders.html">Orders</a>
+            <a href="account.html">Account</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <h2>Account Settings & Profile</h2>
+        <div class="profile-info" id="profileDetails">
+            <!-- User details will load here -->
+        </div>
+        <button class="logout-btn" onclick="logoutUser()">Log Out</button>
+    </div>
+
+    <script>
+        function loadAccountDetails() {
+            const profileContainer = document.getElementById('profileDetails');
+            
+            // Check if user is logged in (using localStorage simulation)
+            const loggedInUser = JSON.parse(localStorage.getItem('currentUser'));
+
+            if (loggedInUser) {
+                profileContainer.innerHTML = `
+                    <p><strong>Name:</strong> ${loggedInUser.name || 'User'}</p>
+                    <p><strong>Email:</strong> ${loggedInUser.email || 'user@example.com'}</p>
+                    <p><strong>Account Type:</strong> Customer / Seller</p>
+                `;
+            } else {
+                profileContainer.innerHTML = `
+                    <p>You are not logged in.</p>
+                    <p><a href="login.html" style="color: #0066c0; font-weight: bold;">Click here to Login</a></p>
+                `;
+            }
+        }
+
+        function logoutUser() {
+            localStorage.removeItem('currentUser');
+            alert("You have been logged out successfully!");
+            window.location.href = 'login.html';
+        }
+
+        window.onload = loadAccountDetails;
+    </script>
+</body>
+</html>
+
