@@ -7,22 +7,18 @@
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
         
-        /* Header & Menu Icon Styling */
         header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: relative; }
         .menu-icon { cursor: pointer; display: flex; flex-direction: column; gap: 5px; }
         .menu-icon span { width: 25px; height: 3px; background-color: white; border-radius: 2px; }
 
-        /* Side Menu Drawer */
         .side-menu { height: 100%; width: 0; position: fixed; z-index: 1000; top: 0; right: 0; background-color: #232f3e; overflow-x: hidden; transition: 0.3s; padding-top: 60px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); }
         .side-menu a { padding: 12px 25px; text-decoration: none; font-size: 18px; color: white; display: block; transition: 0.2s; }
         .side-menu a:hover { background-color: #37475a; }
         .side-menu .close-btn { position: absolute; top: 10px; right: 20px; font-size: 30px; margin-left: 50px; }
 
-        /* Search Bar Section */
         .search-container { text-align: center; padding: 20px; background-color: #eaeded; }
         .search-box { width: 80%; max-width: 600px; padding: 12px; font-size: 16px; border: 1px solid #ccc; border-radius: 5px; outline: none; }
 
-        /* Product Grid */
         .container { max-width: 1100px; margin: 20px auto; padding: 0 20px; }
         .product-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
         .product-card { background: white; border-radius: 8px; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; flex-direction: column; justify-content: space-between; text-align: center; }
@@ -37,7 +33,6 @@
 
     <header>
         <h2>DesiMarket</h2>
-        <!-- 3-Lines (Hamburger) Icon -->
         <div class="menu-icon" onclick="toggleMenu()">
             <span></span>
             <span></span>
@@ -45,7 +40,6 @@
         </div>
     </header>
 
-    <!-- Side Slide Menu -->
     <div id="sideMenu" class="side-menu">
         <a href="javascript:void(0)" class="close-btn" onclick="toggleMenu()">&times;</a>
         <a href="index.html">🏠 Home</a>
@@ -55,47 +49,45 @@
         <a href="account.html">👤 Account</a>
     </div>
 
-    <!-- Search Bar -->
     <div class="search-container">
         <input type="text" id="searchInput" class="search-box" placeholder="Search for products..." onkeyup="searchProducts()">
     </div>
 
-    <!-- Product Display Area -->
     <div class="container">
         <h2>Trending Products</h2>
-        <div class="product-grid" id="productGrid">
-            <!-- Products will load here dynamically -->
-        </div>
+        <div class="product-grid" id="productGrid"></div>
     </div>
 
     <script>
         function toggleMenu() {
             const menu = document.getElementById('sideMenu');
-            if (menu.style.width === '250px') {
-                menu.style.width = '0';
-            } else {
-                menu.style.width = '250px';
-            }
+            menu.style.width = menu.style.width === '250px' ? '0' : '250px';
         }
 
-        // Reliable Image Links for Products
-        const products = [
-            { name: "Smart Watch", price: 1999, image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80" },
-            { name: "Running Shoes", price: 2499, image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=300&auto=format&fit=crop&q=80" },
-            { name: "Wireless Earbuds", price: 1299, image: "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=300&auto=format&fit=crop&q=80" },
-            { name: "Casual Backpack", price: 999, image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=300&auto=format&fit=crop&q=80" }
-        ];
+        // Default products + Products added from Seller Hub
+        function getAllProducts() {
+            const defaultProducts = [
+                { name: "Smart Watch", price: 1999, image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80" },
+                { name: "Running Shoes", price: 2499, image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=300&auto=format&fit=crop&q=80" },
+                { name: "Wireless Earbuds", price: 1299, image: "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=300&auto=format&fit=crop&q=80" },
+                { name: "Casual Backpack", price: 999, image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=300&auto=format&fit=crop&q=80" }
+            ];
+            
+            const sellerProducts = JSON.parse(localStorage.getItem('sellerProducts')) || [];
+            return [...defaultProducts, ...sellerProducts];
+        }
 
         function displayProducts(items) {
             const grid = document.getElementById('productGrid');
             grid.innerHTML = '';
             items.forEach((p) => {
+                let imgSource = p.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80";
                 grid.innerHTML += `
                     <div class="product-card">
-                        <img src="${p.image}" alt="${p.name}">
+                        <img src="${imgSource}" alt="${p.name}">
                         <div class="product-title">${p.name}</div>
                         <div class="product-price">₹${p.price}</div>
-                        <button class="btn-cart" onclick="addToCart('${p.name}', ${p.price})">Add to Cart</button>
+                        <button class="btn-cart" onclick="addToCart('${p.name}', ${p.price}, '${imgSource}')">Add to Cart</button>
                     </div>
                 `;
             });
@@ -103,19 +95,27 @@
 
         function searchProducts() {
             const query = document.getElementById('searchInput').value.toLowerCase();
-            const filtered = products.filter(p => p.name.toLowerCase().includes(query));
+            const allProducts = getAllProducts();
+            const filtered = allProducts.filter(p => p.name.toLowerCase().includes(query));
             displayProducts(filtered);
         }
 
-        function addToCart(name, price) {
+        function addToCart(name, price, image) {
             let cart = JSON.parse(localStorage.getItem('cart')) || [];
-            cart.push({ name, price });
+            let existingItem = cart.find(item => item.name === name);
+            
+            if (existingItem) {
+                existingItem.quantity += 1;
+            } else {
+                cart.push({ name, price: Number(price), image, quantity: 1 });
+            }
+            
             localStorage.setItem('cart', JSON.stringify(cart));
             alert(name + " has been added to your cart!");
         }
 
         window.onload = function() {
-            displayProducts(products);
+            displayProducts(getAllProducts());
         };
     </script>
 </body>
