@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order History - DesiMarket</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
+        header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
+        .nav-links a { color: white; text-decoration: none; margin-left: 20px; font-weight: bold; }
+        .container { max-width: 800px; margin: 30px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h2 { color: #333; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
+        .order-card { border: 1px solid #ddd; border-radius: 6px; padding: 15px; margin-bottom: 15px; background: #fafafa; }
+        .order-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 10px; color: #555; }
+        .order-item { display: flex; align-items: center; margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px; }
+        .order-item img { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; margin-right: 15px; }
+        .item-details { flex-grow: 1; }
+        .item-title { font-weight: bold; color: #333; }
+        .item-price { color: #b12704; font-weight: bold; }
+        .empty-orders { text-align: center; color: #777; font-size: 18px; margin: 40px 0; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h2>DesiMarket</h2>
+        <div class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="sell.html">Sell Item</a>
+            <a href="cart.html">Cart</a>
+            <a href="orders.html">Orders</a>
+            <a href="login.html">Login</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <h2>Your Order History</h2>
+        <div id="ordersContainer">
+            <!-- Orders will be loaded dynamically here -->
+        </div>
+    </div>
+
+    <script>
+        function loadOrders() {
+            let orders = JSON.parse(localStorage.getItem('orders')) || [];
+            const container = document.getElementById('ordersContainer');
+
+            container.innerHTML = '';
+
+            if (orders.length === 0) {
+                container.innerHTML = '<div class="empty-orders">You have no past orders!</div>';
+                return;
+            }
+
+            orders.reverse().forEach((order, index) => {
+                const orderDiv = document.createElement('div');
+                orderDiv.className = 'order-card';
+
+                let itemsHTML = '';
+                order.items.forEach(item => {
+                    itemsHTML += `
+                        <div class="order-item">
+                            <img src="${item.image}" alt="${item.name}">
+                            <div class="item-details">
+                                <div class="item-title">${item.name}</div>
+                                <div class="item-price">₹${item.price}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                orderDiv.innerHTML = `
+                    <div class="order-header">
+                        <span>Order Date: ${order.date}</span>
+                        <span>Total: ₹${order.total}</span>
+                    </div>
+                    ${itemsHTML}
+                `;
+                container.appendChild(orderDiv);
+            });
+        }
+
+        window.onload = loadOrders;
+    </script>
+
+</body>
+</html>
+
