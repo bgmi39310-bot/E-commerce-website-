@@ -90,10 +90,29 @@
         }
 
         function checkout() {
-            alert('Order placed successfully! Thank you for shopping with DesiMarket.');
-            localStorage.removeItem('cart');
-            loadCart();
-        }
+    let cart = JSON.parse(localStorage.getItem('cart')) || [];
+    if (cart.length === 0) {
+        alert('Your cart is empty!');
+        return;
+    }
+
+    // Get existing orders or empty array
+    let orders = JSON.parse(localStorage.getItem('orders')) || [];
+    
+    // Add current cart items with a timestamp
+    const newOrder = {
+        date: new Date().toLocaleDateString(),
+        items: cart,
+        total: cart.reduce((sum, item) => sum + Number(item.price), 0)
+    };
+
+    orders.push(newOrder);
+    localStorage.setItem('orders', JSON.stringify(orders));
+
+    alert('Order placed successfully! Thank you for shopping with DesiMarket.');
+    localStorage.removeItem('cart');
+    loadCart();
+}
 
         window.onload = loadCart;
     </script>
