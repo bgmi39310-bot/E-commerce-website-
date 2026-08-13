@@ -8,54 +8,95 @@
         body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
         header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
         .nav-links a { color: white; text-decoration: none; margin-left: 20px; font-weight: bold; }
-        .container { max-width: 900px; margin: 30px auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        h2 { color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .container { max-width: 800px; margin: 30px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h2 { color: #333; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
         .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #eee; }
         .cart-item img { width: 80px; height: 80px; object-fit: cover; border-radius: 4px; margin-right: 15px; }
         .item-details { flex-grow: 1; }
-        .item-title { font-weight: bold; font-size: 16px; color: #333; }
+        .item-title { font-weight: bold; font-size: 18px; color: #333; }
         .item-price { color: #b12704; font-weight: bold; margin-top: 5px; }
-        .cart-summary { margin-top: 30px; text-align: right; }
-        .total-amount { font-size: 20px; font-weight: bold; color: #333; margin-bottom: 15px; }
-        .btn { background-color: #ffd814; border: 1px solid #fcd200; padding: 12px 25px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 16px; }
-        .btn:hover { background-color: #f7ca00; }
-        .remove-btn { background-color: #ff4d4d; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+        .remove-btn { background-color: #ff4d4d; color: white; border: none; padding: 8px 12px; cursor: pointer; border-radius: 4px; font-weight: bold; }
         .remove-btn:hover { background-color: #cc0000; }
+        .cart-summary { margin-top: 20px; text-align: right; font-size: 20px; font-weight: bold; }
+        .checkout-btn { background-color: #ffd814; border: 1px solid #fcd200; padding: 12px 20px; font-size: 16px; font-weight: bold; cursor: pointer; border-radius: 4px; margin-top: 15px; display: inline-block; text-decoration: none; color: black; }
+        .checkout-btn:hover { background-color: #f7ca00; }
+        .empty-cart { text-align: center; color: #777; font-size: 18px; margin: 40px 0; }
     </style>
 </head>
 <body>
 
     <header>
-        <div><h2>DesiMarket</h2></div>
+        <h2>DesiMarket</h2>
         <div class="nav-links">
             <a href="index.html">Home</a>
             <a href="sell.html">Sell Item</a>
             <a href="cart.html">Cart</a>
+            <a href="login.html">Login</a>
         </div>
     </header>
 
     <div class="container">
         <h2>Your Shopping Cart</h2>
-        
         <div id="cartItemsContainer">
-            <!-- Sample Cart Item -->
-            <div class="cart-item">
-                <img src="https://via.placeholder.com/80" alt="Product">
-                <div class="item-details">
-                    <div class="item-title">Smart Watch</div>
-                    <div class="item-price">₹1,999</div>
-                </div>
-                <button class="remove-btn">Remove</button>
-            </div>
+            <!-- Cart items will be loaded dynamically here -->
         </div>
-
-        <div class="cart-summary">
-            <div class="total-amount">Total: ₹1,999</div>
-            <button class="btn">Proceed to Checkout</button>
+        <div id="cartSummary" class="cart-summary" style="display: none;">
+            Total: ₹<span id="totalPrice">0</span><br>
+            <button class="checkout-btn" onclick="checkout()">Proceed to Checkout</button>
         </div>
     </div>
-<script src="script.js"></script>
+
+    <script>
+        function loadCart() {
+            let cart = JSON.parse(localStorage.getItem('cart')) || [];
+            const container = document.getElementById('cartItemsContainer');
+            const summary = document.getElementById('cartSummary');
+            const totalPriceElem = document.getElementById('totalPrice');
+
+            container.innerHTML = '';
+
+            if (cart.length === 0) {
+                container.innerHTML = '<div class="empty-cart">Your cart is empty!</div>';
+                summary.style.display = 'none';
+                return;
+            }
+
+            summary.style.display = 'block';
+            let total = 0;
+
+            cart.forEach((item, index) => {
+                total += Number(item.price);
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'cart-item';
+                itemDiv.innerHTML = `
+                    <img src="${item.image}" alt="${item.name}">
+                    <div class="item-details">
+                        <div class="item-title">${item.name}</div>
+                        <div class="item-price">₹${item.price}</div>
+                    </div>
+                    <button class="remove-btn" onclick="removeItem(${index})">Remove</button>
+                `;
+                container.appendChild(itemDiv);
+            });
+
+            totalPriceElem.innerText = total;
+        }
+
+        function removeItem(index) {
+            let cart = JSON.parse(localStorage.getItem('cart')) || [];
+            cart.splice(index, 1);
+            localStorage.setItem('cart', JSON.stringify(cart));
+            loadCart();
+        }
+
+        function checkout() {
+            alert('Order placed successfully! Thank you for shopping with DesiMarket.');
+            localStorage.removeItem('cart');
+            loadCart();
+        }
+
+        window.onload = loadCart;
+    </script>
 
 </body>
 </html>
-
