@@ -1,20 +1,129 @@
-<!-- setup-profile.html का संक्षिप्त हिस्सा -->
-<input type="file" id="profilePic" accept="image/*">
-<img id="preview" style="width: 100px; border-radius: 50%;">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup Profile - DesiMarket</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
+        header { background-color: #232f3e; color: white; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; }
+        .nav-links { display: flex; gap: 12px; }
+        .nav-links a { color: white; text-decoration: none; font-weight: bold; font-size: 14px; }
+        .container { max-width: 500px; margin: 30px auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #333; margin-top: 0; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+        .form-group input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .photo-section { text-align: center; margin-bottom: 20px; }
+        .preview-img { width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 2px solid #ccc; margin-bottom: 10px; background-color: #eee; display: inline-block; }
+        .btn-save { background-color: #ffd814; border: 1px solid #fcd200; padding: 10px; font-weight: bold; cursor: pointer; border-radius: 4px; width: 100%; font-size: 16px; margin-top: 10px; }
+        .btn-save:hover { background-color: #f7ca00; }
+        .btn-skip { background-color: #e7e7e7; border: 1px solid #ccc; padding: 10px; font-weight: bold; cursor: pointer; border-radius: 4px; width: 100%; font-size: 16px; margin-top: 10px; color: #333; }
+        .btn-skip:hover { background-color: #d8d8d8; }
+    </style>
+</head>
+<body>
 
-<script>
-    // फोटो को Base64 में बदलने का फंक्शन
-    document.getElementById('profilePic').onchange = function(evt) {
-        const reader = new FileReader();
-        reader.onload = function() {
-            document.getElementById('preview').src = reader.result;
-            localStorage.setItem('userPhoto', reader.result);
+    <header>
+        <h2>DesiMarket</h2>
+        <div class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="cart.html">Cart</a>
+            <a href="orders.html">Orders</a>
+            <a href="account.html">Account</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <h2>Complete Your Profile</h2>
+        
+        <!-- Profile Picture Upload Section -->
+        <div class="photo-section">
+            <div>
+                <img id="profilePreview" class="preview-img" src="" alt="Photo">
+            </div>
+            <label for="profileImageInput" style="cursor: pointer; color: #0066c0; font-weight: bold; font-size: 14px;">Upload Profile Photo / Logo</label>
+            <input type="file" id="profileImageInput" accept="image/*" style="display: none;" onchange="previewPhoto(event)">
+        </div>
+
+        <div class="form-group">
+            <label>First Name</label>
+            <input type="text" id="setupName" placeholder="Enter first name">
+        </div>
+        <div class="form-group">
+            <label>Surname / Last Name</label>
+            <input type="text" id="setupSurname" placeholder="Enter surname">
+        </div>
+        <div class="form-group">
+            <label>Phone Number (Optional)</label>
+            <input type="tel" id="setupPhone" placeholder="Enter phone number">
+        </div>
+        <div class="form-group">
+            <label>Pradesh / State</label>
+            <input type="text" id="setupState" placeholder="e.g. Madhya Pradesh">
+        </div>
+        <div class="form-group">
+            <label>Zila / District</label>
+            <input type="text" id="setupDistrict" placeholder="Enter district">
+        </div>
+        <div class="form-group">
+            <label>City / Village Name</label>
+            <input type="text" id="setupCity" placeholder="Enter city or village name">
+        </div>
+
+        <button class="btn-save" onclick="saveFullProfile()">Save and Continue</button>
+        <button class="btn-skip" onclick="skipProfileSetup()">Skip for now</button>
+    </div>
+
+    <script>
+        let base64Image = "";
+
+        // Load existing name if saved from login page
+        window.onload = function() {
+            const user = JSON.parse(localStorage.getItem('currentUser'));
+            if (user) {
+                if (user.name) document.getElementById('setupName').value = user.name;
+                if (user.photo) {
+                    base64Image = user.photo;
+                    document.getElementById('profilePreview').src = user.photo;
+                }
+            }
         };
-        reader.readAsDataURL(evt.target.files[0]);
-    };
 
-    function skipProfile() {
-        window.location.href = 'index.html';
-    }
-</script>
+        // Convert image to Base64 so it can be saved in localStorage
+        function previewPhoto(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    base64Image = e.target.result;
+                    document.getElementById('profilePreview').src = base64Image;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
 
+        function saveFullProfile() {
+            let user = JSON.parse(localStorage.getItem('currentUser')) || {};
+
+            user.name = document.getElementById('setupName').value.trim();
+            user.surname = document.getElementById('setupSurname').value.trim();
+            user.phone = document.getElementById('setupPhone').value.trim();
+            user.state = document.getElementById('setupState').value.trim();
+            user.district = document.getElementById('setupDistrict').value.trim();
+            user.city = document.getElementById('setupCity').value.trim();
+            if (base64Image) {
+                user.photo = base64Image;
+            }
+
+            localStorage.setItem('currentUser', JSON.stringify(user));
+            alert("Profile saved successfully!");
+            window.location.href = 'index.html';
+        }
+
+        function skipProfileSetup() {
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>
