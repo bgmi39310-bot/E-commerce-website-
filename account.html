@@ -5,130 +5,135 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Account - DesiMarket</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
-        header { background-color: #232f3e; color: white; padding: 12px 15px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
-        .nav-links { display: flex; gap: 12px; flex-wrap: wrap; }
-        .nav-links a { color: white; text-decoration: none; font-weight: bold; font-size: 14px; }
-        .nav-links a:hover { text-decoration: underline; }
-        .container { max-width: 600px; margin: 30px auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        h2 { color: #333; border-bottom: 2px solid #ddd; padding-bottom: 10px; margin-top: 0; }
-        .profile-info { margin: 20px 0; font-size: 16px; color: #444; }
-        .profile-info p { margin: 10px 0; }
-        .profile-info strong { color: #111; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
         
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
-        .form-group input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        /* Header & Menu Icon Styling */
+        header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: relative; }
+        .menu-icon { cursor: pointer; display: flex; flex-direction: column; gap: 5px; }
+        .menu-icon span { width: 25px; height: 3px; background-color: white; border-radius: 2px; }
+
+        /* Side Menu Drawer */
+        .side-menu { height: 100%; width: 0; position: fixed; z-index: 1000; top: 0; right: 0; background-color: #232f3e; overflow-x: hidden; transition: 0.3s; padding-top: 60px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); }
+        .side-menu a { padding: 12px 25px; text-decoration: none; font-size: 18px; color: white; display: block; transition: 0.2s; }
+        .side-menu a:hover { background-color: #37475a; }
+        .side-menu .close-btn { position: absolute; top: 10px; right: 20px; font-size: 30px; margin-left: 50px; }
+
+        .container { max-width: 600px; margin: 30px auto; padding: 25px; background: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h2 { color: #232f3e; margin-top: 0; text-align: center; }
+
+        .profile-header { text-align: center; margin-bottom: 25px; }
+        .profile-img { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid #232f3e; margin-bottom: 10px; background-color: #eee; }
+        .profile-name { font-size: 20px; font-weight: bold; color: #333; }
         
-        .btn { background-color: #ffd814; border: 1px solid #fcd200; padding: 10px 15px; font-weight: bold; cursor: pointer; border-radius: 4px; font-size: 15px; width: 100%; margin-top: 10px; }
-        .btn:hover { background-color: #f7ca00; }
-        .logout-btn { background-color: #ff4d4d; color: white; border: none; padding: 10px 15px; font-weight: bold; cursor: pointer; border-radius: 4px; font-size: 15px; width: 100%; margin-top: 15px; }
-        .logout-btn:hover { background-color: #cc0000; }
-        
-        .section-title { margin-top: 25px; font-size: 18px; color: #232f3e; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .info-card { background: #fdfdfd; border: 1px solid #eee; border-radius: 6px; padding: 15px; margin-bottom: 15px; }
+        .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f2f2f2; font-size: 15px; }
+        .info-row:last-child { border-bottom: none; }
+        .label { font-weight: bold; color: #555; }
+        .value { color: #333; }
+
+        .btn-container { display: flex; gap: 10px; margin-top: 20px; }
+        .btn-action { flex: 1; padding: 12px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 15px; text-align: center; text-decoration: none; display: inline-block; }
+        .btn-edit { background-color: #ffd814; color: #111; border: 1px solid #fcd200; }
+        .btn-edit:hover { background-color: #f7ca00; }
+        .btn-logout { background-color: #ff4d4d; color: white; }
+        .btn-logout:hover { background-color: #e04343; }
     </style>
 </head>
 <body>
 
     <header>
         <h2>DesiMarket</h2>
-        <div class="nav-links">
-            <a href="index.html">Home</a>
-            <a href="seller-dashboard.html">Dashboard</a>
-            <a href="cart.html">Cart</a>
-            <a href="orders.html">Orders</a>
-            <a href="account.html">Account</a>
+        <!-- 3-Lines (Hamburger) Icon -->
+        <div class="menu-icon" onclick="toggleMenu()">
+            <span></span>
+            <span></span>
+            <span></span>
         </div>
     </header>
 
+    <!-- Side Slide Menu -->
+    <div id="sideMenu" class="side-menu">
+        <a href="javascript:void(0)" class="close-btn" onclick="toggleMenu()">&times;</a>
+        <a href="index.html">🏠 Home</a>
+        <a href="seller-dashboard.html">🛒 Seller Hub</a>
+        <a href="cart.html">🛍️ Cart</a>
+        <a href="orders.html">📦 Orders</a>
+        <a href="account.html">👤 Account</a>
+    </div>
+
     <div class="container">
-        <h2>Account Settings & Profile</h2>
+        <h2>My Account Details</h2>
         
-        <div class="profile-info" id="profileDetails">
-            <!-- Saved details will show here -->
+        <div class="profile-header">
+            <img id="accPhoto" class="profile-img" src="" alt="Profile Photo">
+            <div class="profile-name" id="accFullName">User Name</div>
         </div>
 
-        <div class="section-title">Edit Profile & Address</div>
-        
-        <div class="form-group" style="margin-top: 15px;">
-            <label>First Name</label>
-            <input type="text" id="editName" placeholder="Enter first name">
-        </div>
-        <div class="form-group">
-            <label>Surname / Last Name</label>
-            <input type="text" id="editSurname" placeholder="Enter surname">
-        </div>
-        <div class="form-group">
-            <label>Phone Number (Optional)</label>
-            <input type="tel" id="editPhone" placeholder="Enter phone number">
-        </div>
-        <div class="form-group">
-            <label>Pradesh / State</label>
-            <input type="text" id="editState" placeholder="e.g. Madhya Pradesh">
-        </div>
-        <div class="form-group">
-            <label>Zila / District</label>
-            <input type="text" id="editDistrict" placeholder="Enter district">
-        </div>
-        <div class="form-group">
-            <label>City / Village Name</label>
-            <input type="text" id="editCity" placeholder="Enter city or village name">
+        <div class="info-card">
+            <div class="info-row">
+                <span class="label">Email:</span>
+                <span class="value" id="accEmail">N/A</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Phone Number:</span>
+                <span class="value" id="accPhone">N/A</span>
+            </div>
+            <div class="info-row">
+                <span class="label">State (Pradesh):</span>
+                <span class="value" id="accState">N/A</span>
+            </div>
+            <div class="info-row">
+                <span class="label">District (Zila):</span>
+                <span class="value" id="accDistrict">N/A</span>
+            </div>
+            <div class="info-row">
+                <span class="label">City / Village:</span>
+                <span class="value" id="accCity">N/A</span>
+            </div>
         </div>
 
-        <button class="btn" onclick="saveProfile()">Save Changes</button>
-        <button class="logout-btn" onclick="logoutUser()">Log Out</button>
+        <div class="btn-container">
+            <a href="setup-profile.html" class="btn-action btn-edit">Edit Profile</a>
+            <button class="btn-action btn-logout" onclick="logoutUser()">Log Out</button>
+        </div>
     </div>
 
     <script>
-        function loadAccountDetails() {
-            const profileContainer = document.getElementById('profileDetails');
-            const loggedInUser = JSON.parse(localStorage.getItem('currentUser'));
-
-            if (loggedInUser) {
-                profileContainer.innerHTML = `
-                    <p><strong>Name:</strong> ${loggedInUser.name || ''} ${loggedInUser.surname || ''}</p>
-                    <p><strong>Email:</strong> ${loggedInUser.email || 'Not provided'}</p>
-                    <p><strong>Phone:</strong> ${loggedInUser.phone || 'Not provided'}</p>
-                    <p><strong>Address:</strong> ${loggedInUser.city || ''}, ${loggedInUser.district || ''}, ${loggedInUser.state || ''}</p>
-                `;
-
-                // Fill form fields with existing data if present
-                document.getElementById('editName').value = loggedInUser.name || '';
-                document.getElementById('editSurname').value = loggedInUser.surname || '';
-                document.getElementById('editPhone').value = loggedInUser.phone || '';
-                document.getElementById('editState').value = loggedInUser.state || '';
-                document.getElementById('editDistrict').value = loggedInUser.district || '';
-                document.getElementById('editCity').value = loggedInUser.city || '';
+        function toggleMenu() {
+            const menu = document.getElementById('sideMenu');
+            if (menu.style.width === '250px') {
+                menu.style.width = '0';
             } else {
-                profileContainer.innerHTML = `
-                    <p>You are not logged in.</p>
-                    <p><a href="login.html" style="color: #0066c0; font-weight: bold;">Click here to Login</a></p>
-                `;
+                menu.style.width = '250px';
             }
         }
 
-        function saveProfile() {
-            let loggedInUser = JSON.parse(localStorage.getItem('currentUser')) || {};
-
-            loggedInUser.name = document.getElementById('editName').value.trim();
-            loggedInUser.surname = document.getElementById('editSurname').value.trim();
-            loggedInUser.phone = document.getElementById('editPhone').value.trim();
-            loggedInUser.state = document.getElementById('editState').value.trim();
-            loggedInUser.district = document.getElementById('editDistrict').value.trim();
-            loggedInUser.city = document.getElementById('editCity').value.trim();
-
-            localStorage.setItem('currentUser', JSON.stringify(loggedInUser));
-            alert("Profile updated successfully!");
-            loadAccountDetails();
-        }
+        window.onload = function() {
+            const user = JSON.parse(localStorage.getItem('currentUser'));
+            if (user) {
+                if (user.name || user.surname) {
+                    document.getElementById('accFullName').innerText = (user.name || '') + ' ' + (user.surname || '');
+                }
+                if (user.email) document.getElementById('accEmail').innerText = user.email;
+                if (user.phone) document.getElementById('accPhone').innerText = user.phone;
+                if (user.state) document.getElementById('accState').innerText = user.state;
+                if (user.district) document.getElementById('accDistrict').innerText = user.district;
+                if (user.city) document.getElementById('accCity').innerText = user.city;
+                if (user.photo) {
+                    document.getElementById('accPhoto').src = user.photo;
+                } else {
+                    document.getElementById('accPhoto').src = 'https://via.placeholder.com/100?text=No+Photo';
+                }
+            } else {
+                document.getElementById('accFullName').innerText = "Guest User";
+            }
+        };
 
         function logoutUser() {
             localStorage.removeItem('currentUser');
-            alert("You have been logged out successfully!");
+            alert("Logged out successfully!");
             window.location.href = 'login.html';
         }
-
-        window.onload = loadAccountDetails;
     </script>
 </body>
 </html>
