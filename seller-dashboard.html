@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seller Dashboard - DesiMarket</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
+        header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
+        .nav-links a { color: white; text-decoration: none; margin-left: 20px; font-weight: bold; }
+        .container { max-width: 900px; margin: 20px auto; padding: 20px; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+        th { background-color: #f8f8f8; }
+        .btn-delete { color: red; cursor: pointer; font-weight: bold; }
+        .add-form input { display: block; width: 100%; padding: 8px; margin-bottom: 10px; }
+        .btn-add { background-color: #28a745; color: white; padding: 10px; border: none; cursor: pointer; width: 100%; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h2>Seller Hub</h2>
+        <div class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="seller-dashboard.html">Dashboard</a>
+            <a href="orders.html">Orders</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Add New Product -->
+        <div class="card">
+            <h3>Add New Product</h3>
+            <div class="add-form">
+                <input type="text" id="pName" placeholder="Product Name">
+                <input type="number" id="pPrice" placeholder="Price">
+                <input type="text" id="pImage" placeholder="Image URL">
+                <input type="text" id="pDesc" placeholder="Description">
+                <button class="btn-add" onclick="addProduct()">List Product</button>
+            </div>
+        </div>
+
+        <!-- My Inventory -->
+        <div class="card">
+            <h3>My Listed Products</h3>
+            <table id="inventoryTable">
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Price</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="inventoryBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        function loadInventory() {
+            let products = JSON.parse(localStorage.getItem('products')) || [];
+            const body = document.getElementById('inventoryBody');
+            body.innerHTML = '';
+            products.forEach((p, index) => {
+                body.innerHTML += `<tr>
+                    <td>${p.name}</td>
+                    <td>₹${p.price}</td>
+                    <td><span class="btn-delete" onclick="deleteProduct(${index})">Delete</span></td>
+                </tr>`;
+            });
+        }
+
+        function addProduct() {
+            const name = document.getElementById('pName').value;
+            const price = document.getElementById('pPrice').value;
+            const image = document.getElementById('pImage').value;
+            const desc = document.getElementById('pDesc').value;
+
+            if(!name || !price) return alert("Please fill details");
+
+            let products = JSON.parse(localStorage.getItem('products')) || [];
+            products.push({name, price, image, desc});
+            localStorage.setItem('products', JSON.stringify(products));
+            loadInventory();
+            alert("Product added!");
+        }
+
+        function deleteProduct(index) {
+            let products = JSON.parse(localStorage.getItem('products')) || [];
+            products.splice(index, 1);
+            localStorage.setItem('products', JSON.stringify(products));
+            loadInventory();
+        }
+
+        window.onload = loadInventory;
+    </script>
+</body>
+</html>
+
