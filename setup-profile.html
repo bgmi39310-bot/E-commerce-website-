@@ -1,0 +1,20 @@
+<!-- setup-profile.html का संक्षिप्त हिस्सा -->
+<input type="file" id="profilePic" accept="image/*">
+<img id="preview" style="width: 100px; border-radius: 50%;">
+
+<script>
+    // फोटो को Base64 में बदलने का फंक्शन
+    document.getElementById('profilePic').onchange = function(evt) {
+        const reader = new FileReader();
+        reader.onload = function() {
+            document.getElementById('preview').src = reader.result;
+            localStorage.setItem('userPhoto', reader.result);
+        };
+        reader.readAsDataURL(evt.target.files[0]);
+    };
+
+    function skipProfile() {
+        window.location.href = 'index.html';
+    }
+</script>
+
