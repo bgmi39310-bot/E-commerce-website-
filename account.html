@@ -15,8 +15,17 @@
         .profile-info { margin: 20px 0; font-size: 16px; color: #444; }
         .profile-info p { margin: 10px 0; }
         .profile-info strong { color: #111; }
-        .logout-btn { background-color: #ff4d4d; color: white; border: none; padding: 12px 20px; font-weight: bold; cursor: pointer; border-radius: 4px; font-size: 16px; width: 100%; margin-top: 20px; }
+        
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+        .form-group input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        
+        .btn { background-color: #ffd814; border: 1px solid #fcd200; padding: 10px 15px; font-weight: bold; cursor: pointer; border-radius: 4px; font-size: 15px; width: 100%; margin-top: 10px; }
+        .btn:hover { background-color: #f7ca00; }
+        .logout-btn { background-color: #ff4d4d; color: white; border: none; padding: 10px 15px; font-weight: bold; cursor: pointer; border-radius: 4px; font-size: 15px; width: 100%; margin-top: 15px; }
         .logout-btn:hover { background-color: #cc0000; }
+        
+        .section-title { margin-top: 25px; font-size: 18px; color: #232f3e; border-bottom: 1px solid #eee; padding-bottom: 5px; }
     </style>
 </head>
 <body>
@@ -34,31 +43,83 @@
 
     <div class="container">
         <h2>Account Settings & Profile</h2>
+        
         <div class="profile-info" id="profileDetails">
-            <!-- User details will load here -->
+            <!-- Saved details will show here -->
         </div>
+
+        <div class="section-title">Edit Profile & Address</div>
+        
+        <div class="form-group" style="margin-top: 15px;">
+            <label>First Name</label>
+            <input type="text" id="editName" placeholder="Enter first name">
+        </div>
+        <div class="form-group">
+            <label>Surname / Last Name</label>
+            <input type="text" id="editSurname" placeholder="Enter surname">
+        </div>
+        <div class="form-group">
+            <label>Phone Number (Optional)</label>
+            <input type="tel" id="editPhone" placeholder="Enter phone number">
+        </div>
+        <div class="form-group">
+            <label>Pradesh / State</label>
+            <input type="text" id="editState" placeholder="e.g. Madhya Pradesh">
+        </div>
+        <div class="form-group">
+            <label>Zila / District</label>
+            <input type="text" id="editDistrict" placeholder="Enter district">
+        </div>
+        <div class="form-group">
+            <label>City / Village Name</label>
+            <input type="text" id="editCity" placeholder="Enter city or village name">
+        </div>
+
+        <button class="btn" onclick="saveProfile()">Save Changes</button>
         <button class="logout-btn" onclick="logoutUser()">Log Out</button>
     </div>
 
     <script>
         function loadAccountDetails() {
             const profileContainer = document.getElementById('profileDetails');
-            
-            // Check if user is logged in (using localStorage simulation)
             const loggedInUser = JSON.parse(localStorage.getItem('currentUser'));
 
             if (loggedInUser) {
                 profileContainer.innerHTML = `
-                    <p><strong>Name:</strong> ${loggedInUser.name || 'User'}</p>
-                    <p><strong>Email:</strong> ${loggedInUser.email || 'user@example.com'}</p>
-                    <p><strong>Account Type:</strong> Customer / Seller</p>
+                    <p><strong>Name:</strong> ${loggedInUser.name || ''} ${loggedInUser.surname || ''}</p>
+                    <p><strong>Email:</strong> ${loggedInUser.email || 'Not provided'}</p>
+                    <p><strong>Phone:</strong> ${loggedInUser.phone || 'Not provided'}</p>
+                    <p><strong>Address:</strong> ${loggedInUser.city || ''}, ${loggedInUser.district || ''}, ${loggedInUser.state || ''}</p>
                 `;
+
+                // Fill form fields with existing data if present
+                document.getElementById('editName').value = loggedInUser.name || '';
+                document.getElementById('editSurname').value = loggedInUser.surname || '';
+                document.getElementById('editPhone').value = loggedInUser.phone || '';
+                document.getElementById('editState').value = loggedInUser.state || '';
+                document.getElementById('editDistrict').value = loggedInUser.district || '';
+                document.getElementById('editCity').value = loggedInUser.city || '';
             } else {
                 profileContainer.innerHTML = `
                     <p>You are not logged in.</p>
                     <p><a href="login.html" style="color: #0066c0; font-weight: bold;">Click here to Login</a></p>
                 `;
             }
+        }
+
+        function saveProfile() {
+            let loggedInUser = JSON.parse(localStorage.getItem('currentUser')) || {};
+
+            loggedInUser.name = document.getElementById('editName').value.trim();
+            loggedInUser.surname = document.getElementById('editSurname').value.trim();
+            loggedInUser.phone = document.getElementById('editPhone').value.trim();
+            loggedInUser.state = document.getElementById('editState').value.trim();
+            loggedInUser.district = document.getElementById('editDistrict').value.trim();
+            loggedInUser.city = document.getElementById('editCity').value.trim();
+
+            localStorage.setItem('currentUser', JSON.stringify(loggedInUser));
+            alert("Profile updated successfully!");
+            loadAccountDetails();
         }
 
         function logoutUser() {
