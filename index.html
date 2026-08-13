@@ -73,6 +73,20 @@
                 grid.appendChild(card);
             });
         }
+// Search Bar Functionality
+document.getElementById('searchInput').addEventListener('input', function() {
+    const searchTerm = this.value.toLowerCase();
+    const productCards = document.querySelectorAll('.product-card');
+
+    productCards.forEach(card => {
+        const title = card.querySelector('.product-title').innerText.toLowerCase();
+        if (title.includes(searchTerm)) {
+            card.style.display = 'flex';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+});
 
         function addToCart(product) {
             let cart = JSON.parse(localStorage.getItem('cart')) || [];
