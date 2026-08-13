@@ -13,7 +13,12 @@
         h2 { text-align: center; color: #333; margin-top: 0; }
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
-        .form-group input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .form-group input[type="text"], .form-group input[type="email"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .terms-container { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+        .terms-container input { width: auto; }
+        .terms-container label { font-size: 13px; font-weight: normal; color: #444; margin-bottom: 0; cursor: pointer; }
+        .terms-container a { color: #0066c0; text-decoration: none; }
+        .terms-container a:hover { text-decoration: underline; }
         .btn-login { background-color: #ffd814; border: 1px solid #fcd200; padding: 10px; font-weight: bold; cursor: pointer; border-radius: 4px; width: 100%; font-size: 16px; }
         .btn-login:hover { background-color: #f7ca00; }
     </style>
@@ -31,7 +36,7 @@
     </header>
 
     <div class="container">
-        <h2>Login to Your Account</h2>
+        <h2>Login / Register</h2>
         <div class="form-group">
             <label for="loginName">Your Name</label>
             <input type="text" id="loginName" placeholder="Enter your name">
@@ -40,16 +45,34 @@
             <label for="loginEmail">Email Address</label>
             <input type="email" id="loginEmail" placeholder="Enter your email">
         </div>
-        <button class="btn-login" onclick="handleLogin()">Login</button>
+
+        <!-- Terms and Conditions Checkbox -->
+        <div class="terms-container">
+            <input type="checkbox" id="termsCheck">
+            <label for="termsCheck">I agree to the <a href="#" onclick="showTerms(event)">Terms and Conditions</a></label>
+        </div>
+
+        <button class="btn-login" onclick="handleLogin()">Login / Proceed</button>
     </div>
 
     <script>
+        function showTerms(event) {
+            event.preventDefault();
+            alert("Terms & Conditions:\n1. Users must provide correct information.\n2. Do not share or edit other users' private details.\n3. Maintain safe behavior on the platform.");
+        }
+
         function handleLogin() {
             const name = document.getElementById('loginName').value.trim();
             const email = document.getElementById('loginEmail').value.trim();
+            const termsChecked = document.getElementById('termsCheck').checked;
 
             if (name === '' || email === '') {
                 alert("Please fill in all fields!");
+                return;
+            }
+
+            if (!termsChecked) {
+                alert("You must agree to the Terms and Conditions before proceeding!");
                 return;
             }
 
@@ -58,9 +81,8 @@
             localStorage.setItem('currentUser', JSON.stringify(userData));
 
             alert("Login successful!");
-            window.location.href = 'account.html'; // Redirect to account page
+            window.location.href = 'account.html';
         }
     </script>
 </body>
 </html>
-
