@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout - DesiMarket</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
+        
+        header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: relative; }
+        .menu-icon { cursor: pointer; display: flex; flex-direction: column; gap: 5px; }
+        .menu-icon span { width: 25px; height: 3px; background-color: white; border-radius: 2px; }
+
+        .side-menu { height: 100%; width: 0; position: fixed; z-index: 1000; top: 0; right: 0; background-color: #232f3e; overflow-x: hidden; transition: 0.3s; padding-top: 60px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); }
+        .side-menu a { padding: 12px 25px; text-decoration: none; font-size: 18px; color: white; display: block; transition: 0.2s; }
+        .side-menu a:hover { background-color: #37475a; }
+        .side-menu .close-btn { position: absolute; top: 10px; right: 20px; font-size: 30px; margin-left: 50px; }
+
+        .container { max-width: 600px; margin: 30px auto; padding: 25px; background: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h2 { color: #232f3e; margin-top: 0; }
+        
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; color: #444; }
+        input, textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        
+        .btn-place { background-color: #ffd814; border: 1px solid #fcd200; width: 100%; padding: 12px; font-weight: bold; cursor: pointer; border-radius: 5px; font-size: 16px; margin-top: 10px; }
+        .btn-place:hover { background-color: #f7ca00; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h2>DesiMarket</h2>
+        <div class="menu-icon" onclick="toggleMenu()">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+    </header>
+
+    <div id="sideMenu" class="side-menu">
+        <a href="javascript:void(0)" class="close-btn" onclick="toggleMenu()">&times;</a>
+        <a href="index.html">🏠 Home</a>
+        <a href="seller-dashboard.html">🛒 Seller Hub</a>
+        <a href="cart.html">🛍️ Cart</a>
+        <a href="orders.html">📦 Orders</a>
+        <a href="account.html">👤 Account</a>
+    </div>
+
+    <div class="container">
+        <h2>Shipping & Checkout</h2>
+        <div class="form-group">
+            <label>Full Name</label>
+            <input type="text" id="cName" placeholder="Enter your name">
+        </div>
+        <div class="form-group">
+            <label>Phone Number</label>
+            <input type="text" id="cPhone" placeholder="10-digit mobile number">
+        </div>
+        <div class="form-group">
+            <label>Delivery Address (House No, Street, Village/City)</label>
+            <textarea id="cAddress" rows="3" placeholder="Enter complete address"></textarea>
+        </div>
+        <button class="btn-place" onclick="placeOrder()">Place Order Now</button>
+    </div>
+
+    <script>
+        function toggleMenu() {
+            const menu = document.getElementById('sideMenu');
+            menu.style.width = menu.style.width === '250px' ? '0' : '250px';
+        }
+
+        window.onload = function() {
+            const user = JSON.parse(localStorage.getItem('currentUser'));
+            if (user) {
+                if (user.name) document.getElementById('cName').value = user.name + (user.surname ? ' ' + user.surname : '');
+                if (user.phone) document.getElementById('cPhone').value = user.phone;
+                if (user.city || user.district) {
+                    document.getElementById('cAddress').value = `${user.city || ''}, ${user.district || ''}, ${user.state || ''}`;
+                }
+            }
+        };
+
+        function placeOrder() {
+            const name = document.getElementById('cName').value.trim();
+            const phone = document.getElementById('cPhone').value.trim();
+            const address = document.getElementById('cAddress').value.trim();
+
+            if (!name || !phone || !address) {
+                alert("Please fill in all delivery details!");
+                return;
+            }
+
+            let cart = JSON.parse(localStorage.getItem('cart')) || [];
+            if (cart.length === 0) {
+                alert("Your cart is empty!");
+                window.location.href = 'index.html';
+                return;
+            }
+
+            let orders = JSON.parse(localStorage.getItem('myOrders')) || [];
+            
+            cart.forEach(item => {
+                orders.unshift({
+                    id: "ORD" + Math.floor(100000 + Math.random() * 900000),
+                    name: item.name,
+                    price: item.price * (item.quantity || 1),
+                    date: new Date().toLocaleDateString(),
+                    status: "Order Placed"
+                });
+            });
+
+            localStorage.setItem('myOrders', JSON.stringify(orders));
+            localStorage.removeItem('cart');
+
+            alert("Order placed successfully!");
+            window.location.href = 'orders.html';
+        }
+    </script>
+</body>
+</html>
+
