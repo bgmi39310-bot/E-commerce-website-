@@ -6,8 +6,18 @@
     <title>Seller Dashboard - DesiMarket</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
-        header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
-        .nav-links a { color: white; text-decoration: none; margin-left: 15px; font-weight: bold; }
+        
+        /* Header & Menu Icon Styling */
+        header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: relative; }
+        .menu-icon { cursor: pointer; display: flex; flex-direction: column; gap: 5px; }
+        .menu-icon span { width: 25px; height: 3px; background-color: white; border-radius: 2px; }
+
+        /* Side Menu Drawer */
+        .side-menu { height: 100%; width: 0; position: fixed; z-index: 1000; top: 0; right: 0; background-color: #232f3e; overflow-x: hidden; transition: 0.3s; padding-top: 60px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); }
+        .side-menu a { padding: 12px 25px; text-decoration: none; font-size: 18px; color: white; display: block; transition: 0.2s; }
+        .side-menu a:hover { background-color: #37475a; }
+        .side-menu .close-btn { position: absolute; top: 10px; right: 20px; font-size: 30px; margin-left: 50px; }
+
         .container { max-width: 900px; margin: 20px auto; padding: 20px; }
         .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
         h2 { color: #232f3e; margin-top: 0; }
@@ -16,8 +26,8 @@
         input, textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
         .full-width { grid-column: span 2; }
         
-        button { background-color: #232f3e; color: white; padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; }
-        button:hover { background-color: #37475a; }
+        button.action-btn { background-color: #232f3e; color: white; padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; }
+        button.action-btn:hover { background-color: #37475a; }
 
         table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; }
         th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
@@ -27,65 +37,83 @@
 </head>
 <body>
 
-<header>
-    <h2>DesiMarket</h2>
-    <!-- 3-Lines (Hamburger) Icon -->
-    <div class="menu-icon" onclick="toggleMenu()">
-        <span></span>
-        <span></span>
-        <span></span>
+    <header>
+        <h2>Seller Hub</h2>
+        <!-- 3-Lines (Hamburger) Icon -->
+        <div class="menu-icon" onclick="toggleMenu()">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+    </header>
+
+    <!-- Side Slide Menu -->
+    <div id="sideMenu" class="side-menu">
+        <a href="javascript:void(0)" class="close-btn" onclick="toggleMenu()">&times;</a>
+        <a href="index.html">🏠 Home</a>
+        <a href="seller-dashboard.html">🛒 Seller Hub</a>
+        <a href="cart.html">🛍️ Cart</a>
+        <a href="orders.html">📦 Orders</a>
+        <a href="account.html">👤 Account</a>
     </div>
-</header>
 
-<!-- Side Slide Menu -->
-<div id="sideMenu" class="side-menu">
-    <a href="javascript:void(0)" class="close-btn" onclick="toggleMenu()">&times;</a>
-    <a href="index.html">🏠 Home</a>
-    <a href="seller-dashboard.html">🛒 Seller Hub</a>
-    <a href="cart.html">🛍️ Cart</a>
-    <a href="orders.html">📦 Orders</a>
-    <a href="account.html">👤 Account</a>
-</div>
+    <div class="container">
+        <div class="card">
+            <h2>Add New Product</h2>
+            <div class="form-grid">
+                <input type="text" id="pName" placeholder="Product Name">
+                <input type="number" id="pPrice" placeholder="Price (₹)">
+                <input type="text" id="pImage" placeholder="Image URL" class="full-width">
+                <textarea id="pDesc" placeholder="Product Description" class="full-width" rows="3"></textarea>
+                <button onclick="addProduct()" class="action-btn full-width">List Product</button>
+            </div>
+        </div>
 
-<style>
-    /* Header & Menu Icon Styling */
-    header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: relative; }
-    .menu-icon { cursor: pointer; display: flex; flex-direction: column; gap: 5px; }
-    .menu-icon span { width: 25px; height: 3px; background-color: white; border-radius: 2px; }
+        <div class="card">
+            <h2>My Listed Products</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Price</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="productTable">
+                    <!-- Data will appear here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
 
-    /* Side Menu Drawer */
-    .side-menu { height: 100%; width: 0; position: fixed; z-index: 1000; top: 0; right: 0; background-color: #232f3e; overflow-x: hidden; transition: 0.3s; padding-top: 60px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); }
-    .side-menu a { padding: 12px 25px; text-decoration: none; font-size: 18px; color: white; display: block; transition: 0.2s; }
-    .side-menu a:hover { background-color: #37475a; }
-    .side-menu .close-btn { position: absolute; top: 10px; right: 20px; font-size: 30px; margin-left: 50px; }
-
-<script>
-    function toggleMenu() {
-        const menu = document.getElementById('sideMenu');
-        if (menu.style.width === '250px') {
-            menu.style.width = '0';
-        } else {
-            menu.style.width = '250px';
+    <script>
+        function toggleMenu() {
+            const menu = document.getElementById('sideMenu');
+            if (menu.style.width === '250px') {
+                menu.style.width = '0';
+            } else {
+                menu.style.width = '250px';
+            }
         }
-    }
-</script>
 
-<script>
-    function addProduct() {
-        const name = document.getElementById('pName').value;
-        const price = document.getElementById('pPrice').value;
-        
-        if (!name || !price) return alert("Fill in name and price!");
-        
-        const row = `<tr><td>${name}</td><td>₹${price}</td><td><span class="delete-btn" onclick="this.parentElement.parentElement.remove()">Delete</span></td></tr>`;
-        document.getElementById('productTable').innerHTML += row;
-        
-        document.getElementById('pName').value = '';
-        document.getElementById('pPrice').value = '';
-        document.getElementById('pImage').value = '';
-        document.getElementById('pDesc').value = '';
-    }
-</script>
+        function addProduct() {
+            const name = document.getElementById('pName').value.trim();
+            const price = document.getElementById('pPrice').value.trim();
+            
+            if (!name || !price) {
+                alert("Please fill in name and price!");
+                return;
+            }
+            
+            const row = `<tr><td>${name}</td><td>₹${price}</td><td><span class="delete-btn" onclick="this.parentElement.parentElement.remove()">Delete</span></td></tr>`;
+            document.getElementById('productTable').innerHTML += row;
+            
+            document.getElementById('pName').value = '';
+            document.getElementById('pPrice').value = '';
+            document.getElementById('pImage').value = '';
+            document.getElementById('pDesc').value = '';
+        }
+    </script>
 </body>
 </html>
 
