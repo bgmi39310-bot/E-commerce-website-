@@ -1,3 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seller Hub - DesiMarket</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
+        
+        /* Header */
+        header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: relative; }
+        .menu-icon { cursor: pointer; display: flex; flex-direction: column; gap: 5px; }
+        .menu-icon span { width: 25px; height: 3px; background-color: white; border-radius: 2px; }
+
+        /* Side Menu */
+        .side-menu { height: 100%; width: 0; position: fixed; z-index: 1000; top: 0; right: 0; background-color: #232f3e; overflow-x: hidden; transition: 0.3s; padding-top: 60px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); }
+        .side-menu a { padding: 12px 25px; text-decoration: none; font-size: 18px; color: white; display: block; transition: 0.2s; }
+        .side-menu a:hover { background-color: #37475a; }
+        .side-menu .close-btn { position: absolute; top: 10px; right: 20px; font-size: 30px; margin-left: 50px; }
+
+        .container { max-width: 900px; margin: 20px auto; padding: 20px; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h2 { color: #232f3e; margin-top: 0; }
+        
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        input, textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        .full-width { grid-column: span 2; }
+        
+        button.action-btn { background-color: #232f3e; color: white; padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; }
+        button.action-btn:hover { background-color: #37475a; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background-color: #f2f2f2; }
+        .delete-btn { color: #ff4d4d; cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h2>Seller Hub</h2>
+        <div class="menu-icon" onclick="toggleMenu()">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+    </header>
+
+    <div id="sideMenu" class="side-menu">
+        <a href="javascript:void(0)" class="close-btn" onclick="toggleMenu()">&times;</a>
+        <a href="index.html">🏠 Home</a>
+        <a href="seller-dashboard.html">🛒 Seller Hub</a>
+        <a href="cart.html">🛍️ Cart</a>
+        <a href="orders.html">📦 Orders</a>
+        <a href="account.html">👤 Account</a>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <h2>Add New Product</h2>
+            <div class="form-grid">
+                <input type="text" id="pName" placeholder="Product Name">
+                <input type="number" id="pPrice" placeholder="Price (₹)">
+                <input type="text" id="pImage" placeholder="Image URL (Optional)" class="full-width">
+                <textarea id="pDesc" placeholder="Product Description" class="full-width" rows="3"></textarea>
+                <button onclick="addProduct()" class="action-btn full-width">List Product</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>My Listed Products</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Price</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="productTable">
+                    <!-- Products will load here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <script>
         function toggleMenu() {
             const menu = document.getElementById('sideMenu');
@@ -52,4 +138,5 @@
 
         window.onload = loadSellerProducts;
     </script>
-
+</body>
+</html>
