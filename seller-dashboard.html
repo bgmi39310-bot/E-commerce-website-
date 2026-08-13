@@ -28,41 +28,47 @@
 <body>
 
 <header>
-    <h2>Seller Hub</h2>
-    <div class="nav-links">
-        <a href="index.html">Home</a>
-        <a href="account.html">Account</a>
+    <h2>DesiMarket</h2>
+    <!-- 3-Lines (Hamburger) Icon -->
+    <div class="menu-icon" onclick="toggleMenu()">
+        <span></span>
+        <span></span>
+        <span></span>
     </div>
 </header>
 
-<div class="container">
-    <div class="card">
-        <h2>Add New Product</h2>
-        <div class="form-grid">
-            <input type="text" id="pName" placeholder="Product Name">
-            <input type="number" id="pPrice" placeholder="Price (₹)">
-            <input type="text" id="pImage" placeholder="Image URL" class="full-width">
-            <textarea id="pDesc" placeholder="Product Description" class="full-width" rows="3"></textarea>
-            <button onclick="addProduct()" class="full-width">List Product</button>
-        </div>
-    </div>
-
-    <div class="card">
-        <h2>My Listed Products</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Product</th>
-                    <th>Price</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody id="productTable">
-                <!-- Data will appear here -->
-            </tbody>
-        </table>
-    </div>
+<!-- Side Slide Menu -->
+<div id="sideMenu" class="side-menu">
+    <a href="javascript:void(0)" class="close-btn" onclick="toggleMenu()">&times;</a>
+    <a href="index.html">🏠 Home</a>
+    <a href="seller-dashboard.html">🛒 Seller Hub</a>
+    <a href="cart.html">🛍️ Cart</a>
+    <a href="orders.html">📦 Orders</a>
+    <a href="account.html">👤 Account</a>
 </div>
+
+<style>
+    /* Header & Menu Icon Styling */
+    header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: relative; }
+    .menu-icon { cursor: pointer; display: flex; flex-direction: column; gap: 5px; }
+    .menu-icon span { width: 25px; height: 3px; background-color: white; border-radius: 2px; }
+
+    /* Side Menu Drawer */
+    .side-menu { height: 100%; width: 0; position: fixed; z-index: 1000; top: 0; right: 0; background-color: #232f3e; overflow-x: hidden; transition: 0.3s; padding-top: 60px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); }
+    .side-menu a { padding: 12px 25px; text-decoration: none; font-size: 18px; color: white; display: block; transition: 0.2s; }
+    .side-menu a:hover { background-color: #37475a; }
+    .side-menu .close-btn { position: absolute; top: 10px; right: 20px; font-size: 30px; margin-left: 50px; }
+
+<script>
+    function toggleMenu() {
+        const menu = document.getElementById('sideMenu');
+        if (menu.style.width === '250px') {
+            menu.style.width = '0';
+        } else {
+            menu.style.width = '250px';
+        }
+    }
+</script>
 
 <script>
     function addProduct() {
