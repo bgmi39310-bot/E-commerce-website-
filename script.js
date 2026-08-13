@@ -1,4 +1,4 @@
-// LocalStorage based E-Commerce Logic
+// LocalStorage based E-Commerce Logic with Live Search
 
 // Initialize default products if none exist
 if (!localStorage.getItem('products')) {
@@ -32,21 +32,48 @@ if (sellForm) {
     });
 }
 
-// Function to display products on the homepage
-const productGrid = document.getElementById('productGrid');
-if (productGrid) {
+// Function to display products on the homepage with search filter
+function displayProducts(filterText = "") {
+    const productGrid = document.getElementById('productGrid');
+    if (!productGrid) return;
+
     const products = JSON.parse(localStorage.getItem('products'));
     productGrid.innerHTML = '';
-    products.forEach((product, index) => {
+
+    const filteredProducts = products.filter(product => 
+        product.name.toLowerCase().includes(filterText.toLowerCase())
+    );
+
+    if (filteredProducts.length === 0) {
+        productGrid.innerHTML = '<p>No products found.</p>';
+        return;
+    }
+
+    filteredProducts.forEach((product, index) => {
+        // Find original index for cart mapping
+        const originalIndex = products.findIndex(p => p.name === product.name);
         productGrid.innerHTML += `
             <div class="product-card">
                 <img src="${product.image}" alt="${product.name}">
                 <h3>${product.name}</h3>
                 <div class="price">₹${product.price}</div>
                 <p style="font-size: 13px; color: #666;">${product.desc}</p>
-                <button class="btn" onclick="addToCart(${index})">Add to Cart</button>
+                <button class="btn" onclick="addToCart(${originalIndex})">Add to Cart</button>
             </div>
         `;
+    });
+}
+
+// Initial display on load
+if (document.getElementById('productGrid')) {
+    displayProducts();
+}
+
+// Live Search Event Listener
+const searchInput = document.getElementById('searchInput');
+if (searchInput) {
+    searchInput.addEventListener('input', function(e) {
+        displayProducts(e.target.value);
     });
 }
 
