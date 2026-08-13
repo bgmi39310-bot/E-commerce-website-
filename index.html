@@ -78,18 +78,18 @@
             }
         }
 
-        // Sample products (Later we can link this with Seller Hub storage)
+        // Reliable Image Links for Products
         const products = [
-            { name: "Smart Watch", price: 1999, image: "https://via.placeholder.com/250x180?text=Smart+Watch" },
-            { name: "Running Shoes", price: 2499, image: "https://via.placeholder.com/250x180?text=Running+Shoes" },
-            { name: "Wireless Earbuds", price: 1299, image: "https://via.placeholder.com/250x180?text=Earbuds" },
-            { name: "Casual Backpack", price: 999, image: "https://via.placeholder.com/250x180?text=Backpack" }
+            { name: "Smart Watch", price: 1999, image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80" },
+            { name: "Running Shoes", price: 2499, image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=300&auto=format&fit=crop&q=80" },
+            { name: "Wireless Earbuds", price: 1299, image: "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=300&auto=format&fit=crop&q=80" },
+            { name: "Casual Backpack", price: 999, image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=300&auto=format&fit=crop&q=80" }
         ];
 
         function displayProducts(items) {
             const grid = document.getElementById('productGrid');
             grid.innerHTML = '';
-            items.forEach((p, index) => {
+            items.forEach((p) => {
                 grid.innerHTML += `
                     <div class="product-card">
                         <img src="${p.image}" alt="${p.name}">
@@ -114,7 +114,6 @@
             alert(name + " has been added to your cart!");
         }
 
-        // Load products on page load
         window.onload = function() {
             displayProducts(products);
         };
