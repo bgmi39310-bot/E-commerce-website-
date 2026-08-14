@@ -7,12 +7,10 @@
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
         
-        /* Header */
         header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: relative; }
         .menu-icon { cursor: pointer; display: flex; flex-direction: column; gap: 5px; }
         .menu-icon span { width: 25px; height: 3px; background-color: white; border-radius: 2px; }
 
-        /* Side Menu */
         .side-menu { height: 100%; width: 0; position: fixed; z-index: 1000; top: 0; right: 0; background-color: #232f3e; overflow-x: hidden; transition: 0.3s; padding-top: 60px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); }
         .side-menu a { padding: 12px 25px; text-decoration: none; font-size: 18px; color: white; display: block; transition: 0.2s; }
         .side-menu a:hover { background-color: #37475a; }
@@ -26,19 +24,20 @@
         input, textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
         .full-width { grid-column: span 2; }
         
-        button.action-btn { background-color: #232f3e; color: white; padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; }
-        button.action-btn:hover { background-color: #37475a; }
+        button.action-btn { background-color: #ffd814; color: #111; border: 1px solid #fcd200; padding: 12px 20px; font-weight: bold; border-radius: 5px; cursor: pointer; width: 100%; font-size: 15px; }
+        button.action-btn:hover { background-color: #f7ca00; }
 
         table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; }
         th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
         th { background-color: #f2f2f2; }
         .delete-btn { color: #ff4d4d; cursor: pointer; font-weight: bold; }
+        .success-msg { color: green; font-weight: bold; margin-bottom: 10px; display: none; }
     </style>
 </head>
 <body>
 
     <header>
-        <h2>Seller Hub</h2>
+        <h2>Seller Hub & Profile</h2>
         <div class="menu-icon" onclick="toggleMenu()">
             <span></span>
             <span></span>
@@ -56,19 +55,35 @@
     </div>
 
     <div class="container">
+        <!-- Seller Shop Profile Setup -->
         <div class="card">
-            <h2>Add New Product</h2>
+            <h2>1. Seller / Shop Profile (दुकानदार की पहचान)</h2>
+            <div id="profileMsg" class="success-msg">Profile Saved Successfully!</div>
             <div class="form-grid">
-                <input type="text" id="pName" placeholder="Product Name">
-                <input type="number" id="pPrice" placeholder="Price (₹)">
-                <input type="text" id="pImage" placeholder="Image URL (Optional)" class="full-width">
-                <textarea id="pDesc" placeholder="Product Description" class="full-width" rows="3"></textarea>
-                <button onclick="addProduct()" class="action-btn full-width">List Product</button>
+                <input type="text" id="shopName" placeholder="Shop / Business Name (दुकान का नाम)">
+                <input type="text" id="ownerName" placeholder="Owner Full Name (दुकानदार का नाम)">
+                <input type="text" id="shopPhone" placeholder="Contact Number">
+                <input type="text" id="shopLogo" placeholder="Shop Logo / Photo URL">
+                <textarea id="shopAddress" placeholder="Complete Shop Address (दुकान का पूरा पता)" class="full-width" rows="2"></textarea>
+                <button onclick="saveSellerProfile()" class="action-btn full-width">Save Shop Profile</button>
             </div>
         </div>
 
+        <!-- Add Product -->
         <div class="card">
-            <h2>My Listed Products</h2>
+            <h2>2. Add New Product</h2>
+            <div class="form-grid">
+                <input type="text" id="pName" placeholder="Product Name">
+                <input type="number" id="pPrice" placeholder="Price (₹)">
+                <input type="text" id="pImage" placeholder="Product Image URL" class="full-width">
+                <textarea id="pDesc" placeholder="Product Description" class="full-width" rows="2"></textarea>
+                <button onclick="addProduct()" class="action-btn full-width">List Product on Market</button>
+            </div>
+        </div>
+
+        <!-- My Listed Products -->
+        <div class="card">
+            <h2>3. My Listed Products</h2>
             <table>
                 <thead>
                     <tr>
@@ -90,7 +105,36 @@
             menu.style.width = menu.style.width === '250px' ? '0' : '250px';
         }
 
-        function loadSellerProducts() {
+        function saveSellerProfile() {
+            const profile = {
+                shopName: document.getElementById('shopName').value.trim(),
+                ownerName: document.getElementById('ownerName').value.trim(),
+                phone: document.getElementById('shopPhone.value' || 'shopPhone').value.trim(),
+                logo: document.getElementById('shopLogo').value.trim(),
+                address: document.getElementById('shopAddress').value.trim()
+            };
+
+            if (!profile.shopName || !profile.ownerName) {
+                alert("Please enter Shop Name and Owner Name!");
+                return;
+            }
+
+            localStorage.setItem('sellerProfile', JSON.stringify(profile));
+            const msg = document.getElementById('profileMsg');
+            msg.style.display = 'block';
+            setTimeout(() => { msg.style.display = 'none'; }, 3000);
+        }
+
+        function loadSellerData() {
+            const profile = JSON.parse(localStorage.getItem('sellerProfile'));
+            if (profile) {
+                document.getElementById('shopName').value = profile.shopName || '';
+                document.getElementById('ownerName').value = profile.ownerName || '';
+                document.getElementById('shopPhone').value = profile.phone || '';
+                document.getElementById('shopLogo').value = profile.logo || '';
+                document.getElementById('shopAddress').value = profile.address || '';
+            }
+
             const sellerProducts = JSON.parse(localStorage.getItem('sellerProducts')) || [];
             const table = document.getElementById('productTable');
             table.innerHTML = '';
@@ -107,36 +151,54 @@
         }
 
         function addProduct() {
+            const profile = JSON.parse(localStorage.getItem('sellerProfile'));
+            if (!profile || !profile.shopName) {
+                alert("Please first save your Shop Profile above before listing a product!");
+                return;
+            }
+
             const name = document.getElementById('pName').value.trim();
             const price = document.getElementById('pPrice').value.trim();
             const image = document.getElementById('pImage').value.trim();
             
             if (!name || !price) {
-                alert("Please fill in name and price!");
+                alert("Please fill in Product Name and Price!");
                 return;
             }
             
             let sellerProducts = JSON.parse(localStorage.getItem('sellerProducts')) || [];
-            sellerProducts.push({ name, price: Number(price), image });
+            
+            // Product ke sath dukan ki jankari bhi store hogi
+            sellerProducts.push({ 
+                name, 
+                price: Number(price), 
+                image,
+                shopName: profile.shopName,
+                ownerName: profile.ownerName,
+                shopAddress: profile.address,
+                shopLogo: profile.logo || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
+            });
+
             localStorage.setItem('sellerProducts', JSON.stringify(sellerProducts));
             
-            loadSellerProducts();
+            loadSellerData();
             
             document.getElementById('pName').value = '';
             document.getElementById('pPrice').value = '';
             document.getElementById('pImage').value = '';
             document.getElementById('pDesc').value = '';
-            alert("Product listed successfully!");
+            alert("Product listed successfully with your shop details!");
         }
 
         function deleteProduct(index) {
             let sellerProducts = JSON.parse(localStorage.getItem('sellerProducts')) || [];
             sellerProducts.splice(index, 1);
             localStorage.setItem('sellerProducts', JSON.stringify(sellerProducts));
-            loadSellerProducts();
+            loadSellerData();
         }
 
-        window.onload = loadSellerProducts;
+        window.onload = loadSellerData;
     </script>
 </body>
 </html>
+
