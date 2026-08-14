@@ -132,7 +132,7 @@
             menu.style.width = menu.style.width === '250px' ? '0' : '250px';
         }
 
-        // इमेज को छोटा (Compress) करने वाला स्मार्ट फंक्शन ताकि स्टोरेज फुल न हो
+        // इमेज को छोटा (Compress) करने वाला स्मार्ट फंक्शन
         function compressImage(fileInputId, callback) {
             const fileInput = document.getElementById(fileInputId);
             if (!fileInput.files || !fileInput.files[0]) {
@@ -145,7 +145,7 @@
                 const img = new Image();
                 img.onload = function() {
                     const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 400; // साइज को कंट्रोल में रखने के लिए
+                    const MAX_WIDTH = 400;
                     const MAX_HEIGHT = 400;
                     let width = img.width;
                     let height = img.height;
@@ -167,7 +167,6 @@
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
 
-                    // कंप्रेस करके Base64 में बदलना (Quality: 0.7)
                     const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
                     callback(dataUrl);
                 };
@@ -254,14 +253,19 @@
             compressImage('pImageFile', function(base64Image) {
                 let sellerProducts = JSON.parse(localStorage.getItem('sellerProducts')) || [];
                 
+                // ऑटोमैटिक स्मार्ट डिफ़ॉल्ट्स यदि खाली छोड़ा जाए
+                const finalMaterial = material !== "" ? material : "100% Original & Local Quality";
+                const finalWarranty = warranty !== "" ? warranty : "Checked & Verified by Shop Owner";
+                const finalDesc = description !== "" ? description : `${name} उपलब्ध है ताज़ा और बेहतरीन गुणवत्ता में। अधिक जानकारी के लिए दुकान पर संपर्क करें या सीधे आर्डर करें।`;
+
                 sellerProducts.push({ 
                     name, 
                     price: Number(price), 
                     unit: unit,
-                    material: material || "Standard Material",
-                    warranty: warranty || "Standard Quality",
+                    material: finalMaterial,
+                    warranty: finalWarranty,
                     image: base64Image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80",
-                    description: description || "No detailed description provided.",
+                    description: finalDesc,
                     shopName: profile.shopName,
                     ownerName: profile.ownerName,
                     shopAddress: profile.address,
@@ -277,7 +281,7 @@
                 document.getElementById('pWarranty').value = '';
                 document.getElementById('pImageFile').value = '';
                 document.getElementById('pDesc').value = '';
-                alert("Product listed successfully with image!");
+                alert("Product listed successfully with rich details and image!");
             });
         }
 
