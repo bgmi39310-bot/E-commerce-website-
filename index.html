@@ -25,11 +25,14 @@
         .product-card img { width: 100%; height: 170px; object-fit: cover; border-radius: 5px; margin-bottom: 10px; background-color: #eee; cursor: pointer; }
         
         .product-title { font-size: 16px; font-weight: bold; color: #333; margin-bottom: 5px; }
-        .product-price { color: #b12704; font-size: 18px; font-weight: bold; margin-bottom: 8px; }
+        .product-price { color: #b12704; font-size: 18px; font-weight: bold; margin-bottom: 5px; }
         
         .seller-info { display: flex; align-items: center; gap: 8px; background: #f8f9fa; padding: 8px; border-radius: 5px; margin-bottom: 12px; border: 1px solid #eee; font-size: 13px; color: #555; }
         .seller-logo { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: #ddd; }
         .seller-details div { font-weight: bold; color: #333; }
+
+        .qty-box { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; background: #fdfdfd; padding: 6px; border: 1px solid #ddd; border-radius: 5px; font-size: 13px; }
+        .qty-box input { width: 60px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; text-align: center; font-weight: bold; }
 
         .btn-group { display: flex; gap: 8px; }
         .btn-view { background-color: #e7e9ec; border: 1px solid #adb1b8; padding: 8px; font-weight: bold; cursor: pointer; border-radius: 5px; flex: 1; font-size: 13px; }
@@ -37,7 +40,6 @@
         .btn-cart:hover { background-color: #f7ca00; }
         .btn-view:hover { background-color: #d8dadf; }
 
-        /* Modal / Popup Styling for Product Details */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 2000; }
         .modal-content { background: white; width: 90%; max-width: 550px; border-radius: 10px; padding: 20px; position: relative; max-height: 85vh; overflow-y: auto; }
         .close-modal { position: absolute; top: 12px; right: 18px; font-size: 28px; cursor: pointer; font-weight: bold; color: #555; }
@@ -100,7 +102,13 @@
                 </div>
             </div>
 
-            <button id="mCartBtn" class="btn-cart" style="width: 100%; padding: 12px; font-size: 15px; margin-top: 15px;">Add to Cart</button>
+            <div class="qty-box" style="margin-top: 15px;">
+                <span>मात्रा (Quantity):</span>
+                <input type="number" id="mQtyInput" value="1" min="1">
+                <span id="mUnitLabel">Piece</span>
+            </div>
+
+            <button id="mCartBtn" class="btn-cart" style="width: 100%; padding: 12px; font-size: 15px; margin-top: 10px;">Add to Cart</button>
         </div>
     </div>
 
@@ -115,22 +123,24 @@
         function getAllProducts() {
             const defaultProducts = [
                 { 
-                    name: "Smart Watch", 
-                    price: 1999, 
-                    material: "Silicone Strap & Alloy Dial",
-                    warranty: "1 Year Manufacturer Warranty",
-                    description: "High-definition display smart watch with heart rate sensor, waterproof body, and long battery life up to 7 days.",
-                    image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80",
-                    shopName: "Tech Gadgets Store",
-                    ownerName: "Rahul Sharma",
-                    shopAddress: "Main Market, Bhopal"
+                    name: "Desi Wheat (गेहूं)", 
+                    price: 30, 
+                    unit: "Per Kg",
+                    material: "Pure Organic Grain",
+                    warranty: "Fresh Crop Quality",
+                    description: "High quality clean local wheat, best for daily flour (aata) and meals.",
+                    image: "https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=300&auto=format&fit=crop&q=80",
+                    shopName: "Kisan Anaj Bhandar",
+                    ownerName: "Ramesh Singh",
+                    shopAddress: "Main Mandi Road"
                 },
                 { 
                     name: "Running Shoes", 
                     price: 2499, 
+                    unit: "Per Piece",
                     material: "Breathable Mesh & EVA Sole",
                     warranty: "6 Months Sole Warranty",
-                    description: "Lightweight and comfortable sports shoes, ideal for daily running, gym, and outdoor sports. Durable rubber grip.",
+                    description: "Lightweight and comfortable sports shoes, ideal for daily running and gym.",
                     image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=300&auto=format&fit=crop&q=80",
                     shopName: "Desi Sports Hub",
                     ownerName: "Amit Verma",
@@ -152,13 +162,20 @@
                 let shopName = p.shopName || "Verified Local Shop";
                 let ownerName = p.ownerName || "Trusted Seller";
                 let shopLogo = p.shopLogo || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80";
+                let unitText = p.unit || "Per Piece";
 
                 grid.innerHTML += `
                     <div class="product-card">
                         <img src="${imgSource}" alt="${p.name}" onclick="openModal(${index})">
                         <div class="product-title">${p.name}</div>
-                        <div class="product-price">₹${p.price}</div>
+                        <div class="product-price">₹${p.price} <span style="font-size:12px; color:#666; font-weight:normal;">/ ${unitText}</span></div>
                         
+                        <div class="qty-box">
+                            <label>Qty:</label>
+                            <input type="number" id="qty_${index}" value="1" min="1">
+                            <span style="font-size:11px; color:#555;">${unitText.replace('Per ', '')}</span>
+                        </div>
+
                         <div class="seller-info">
                             <img src="${shopLogo}" class="seller-logo" alt="Shop">
                             <div class="seller-details">
@@ -169,7 +186,7 @@
 
                         <div class="btn-group">
                             <button class="btn-view" onclick="openModal(${index})">🔍 Details</button>
-                            <button class="btn-cart" onclick="addToCart('${p.name}', ${p.price}, '${imgSource}', '${shopName}')">Add to Cart</button>
+                            <button class="btn-cart" onclick="addToCartFromHome(${index})">Add to Cart</button>
                         </div>
                     </div>
                 `;
@@ -178,9 +195,11 @@
 
         function openModal(index) {
             const p = currentProductsList[index];
+            let unitText = p.unit || "Per Piece";
+
             document.getElementById('mImg').src = p.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80";
             document.getElementById('mTitle').innerText = p.name;
-            document.getElementById('mPrice').innerText = "₹" + p.price;
+            document.getElementById('mPrice').innerText = "₹" + p.price + " / " + unitText;
             document.getElementById('mMaterial').innerText = "🧵 Material: " + (p.material || 'Standard');
             document.getElementById('mWarranty').innerText = "⏳ Validity: " + (p.warranty || 'Standard Quality');
             document.getElementById('mDesc').innerText = p.description || "No specific details provided.";
@@ -189,9 +208,13 @@
             document.getElementById('mShopOwner').innerText = "By: " + (p.ownerName || 'Verified Seller');
             document.getElementById('mShopAddr').innerText = p.shopAddress || '';
             document.getElementById('mShopLogo').src = p.shopLogo || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80";
+            
+            document.getElementById('mQtyInput').value = 1;
+            document.getElementById('mUnitLabel').innerText = unitText.replace('Per ', '');
 
             document.getElementById('mCartBtn').onclick = function() {
-                addToCart(p.name, p.price, p.image, p.shopName);
+                const qty = Number(document.getElementById('mQtyInput').value) || 1;
+                saveToCart(p, qty);
                 closeModal();
             };
 
@@ -202,6 +225,36 @@
             document.getElementById('productModal').style.display = 'none';
         }
 
+        function addToCartFromHome(index) {
+            const p = currentProductsList[index];
+            const qty = Number(document.getElementById('qty_' + index).value) || 1;
+            saveToCart(p, qty);
+        }
+
+        function saveToCart(p, qty) {
+            let cart = JSON.parse(localStorage.getItem('cart')) || [];
+            let unitText = p.unit || "Per Piece";
+            
+            // Check if same item already exists
+            let existingItem = cart.find(item => item.name === p.name && item.shopName === p.shopName);
+            
+            if (existingItem) {
+                existingItem.quantity += qty;
+            } else {
+                cart.push({ 
+                    name: p.name, 
+                    price: Number(p.price), 
+                    unit: unitText,
+                    quantity: qty, 
+                    image: p.image, 
+                    shopName: p.shopName || 'Local Shop' 
+                });
+            }
+            
+            localStorage.setItem('cart', JSON.stringify(cart));
+            alert(qty + " " + unitText.replace('Per ', '') + " of " + p.name + " added to your cart! (Total: ₹" + (p.price * qty) + ")");
+        }
+
         function searchProducts() {
             const query = document.getElementById('searchInput').value.toLowerCase();
             const filtered = getAllProducts().filter(p => 
@@ -210,20 +263,6 @@
                 (p.material && p.material.toLowerCase().includes(query))
             );
             displayProducts(filtered);
-        }
-
-        function addToCart(name, price, image, shopName) {
-            let cart = JSON.parse(localStorage.getItem('cart')) || [];
-            let existingItem = cart.find(item => item.name === name);
-            
-            if (existingItem) {
-                existingItem.quantity += 1;
-            } else {
-                cart.push({ name, price: Number(price), image, shopName: shopName || 'Local Shop', quantity: 1 });
-            }
-            
-            localStorage.setItem('cart', JSON.stringify(cart));
-            alert(name + " added to your cart!");
         }
 
         window.onload = function() {
