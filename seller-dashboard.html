@@ -35,6 +35,7 @@
         th { background-color: #f2f2f2; }
         .delete-btn { color: #ff4d4d; cursor: pointer; font-weight: bold; }
         .success-msg { color: green; font-weight: bold; margin-bottom: 10px; display: none; }
+        .preview-img { width: 50px; height: 50px; object-fit: cover; border-radius: 50%; border: 1px solid #ccc; }
     </style>
 </head>
 <body>
@@ -84,7 +85,6 @@
                 <input type="text" id="pName" placeholder="Product Name (सामान का नाम)">
                 <input type="number" id="pPrice" placeholder="Price per unit (कीमत ₹)">
                 
-                <!-- यूनिट चयन बॉक्स -->
                 <select id="pUnit">
                     <option value="Per Piece">Per Piece (प्रति पीस)</option>
                     <option value="Per Kg">Per Kg (प्रति किलो)</option>
@@ -113,9 +113,9 @@
             <table>
                 <thead>
                     <tr>
+                        <th>Image</th>
                         <th>Product</th>
                         <th>Price</th>
-                        <th>Material</th>
                         <th>Action</th>
                     </tr>
                 </thead>
@@ -132,17 +132,48 @@
             menu.style.width = menu.style.width === '250px' ? '0' : '250px';
         }
 
-        function convertImageToBase64(fileInputId, callback) {
+        // इमेज को छोटा (Compress) करने वाला स्मार्ट फंक्शन ताकि स्टोरेज फुल न हो
+        function compressImage(fileInputId, callback) {
             const fileInput = document.getElementById(fileInputId);
-            if (fileInput.files && fileInput.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    callback(e.target.result);
-                };
-                reader.readAsDataURL(fileInput.files[0]);
-            } else {
+            if (!fileInput.files || !fileInput.files[0]) {
                 callback(null);
+                return;
             }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 400; // साइज को कंट्रोल में रखने के लिए
+                    const MAX_HEIGHT = 400;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // कंप्रेस करके Base64 में बदलना (Quality: 0.7)
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                    callback(dataUrl);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(fileInput.files[0]);
         }
 
         function saveSellerProfile() {
@@ -158,7 +189,7 @@
 
             const existingProfile = JSON.parse(localStorage.getItem('sellerProfile')) || {};
 
-            convertImageToBase64('shopLogoFile', function(base64Logo) {
+            compressImage('shopLogoFile', function(base64Logo) {
                 const profile = {
                     shopName,
                     ownerName,
@@ -171,6 +202,7 @@
                 const msg = document.getElementById('profileMsg');
                 msg.style.display = 'block';
                 setTimeout(() => { msg.style.display = 'none'; }, 3000);
+                alert("Shop Profile Saved Successfully!");
             });
         }
 
@@ -188,10 +220,11 @@
             table.innerHTML = '';
             
             sellerProducts.forEach((p, index) => {
+                let pImg = p.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80";
                 table.innerHTML += `
                     <tr>
-                        <td>${p.name}</td>
-                        <td>₹${p.price} (${p.unit || 'Per Piece'})</td>
+                        <td><img src="${pImg}" class="preview-img" alt="Product"></td>
+                        <td><b>${p.name}</b><br><small>₹${p.price} / ${p.unit || 'Piece'}</small></td>
                         <td>${p.material || 'N/A'}</td>
                         <td><span class="delete-btn" onclick="deleteProduct(${index})">Delete</span></td>
                     </tr>
@@ -218,7 +251,7 @@
                 return;
             }
 
-            convertImageToBase64('pImageFile', function(base64Image) {
+            compressImage('pImageFile', function(base64Image) {
                 let sellerProducts = JSON.parse(localStorage.getItem('sellerProducts')) || [];
                 
                 sellerProducts.push({ 
@@ -244,7 +277,7 @@
                 document.getElementById('pWarranty').value = '';
                 document.getElementById('pImageFile').value = '';
                 document.getElementById('pDesc').value = '';
-                alert("Product listed successfully with unit price!");
+                alert("Product listed successfully with image!");
             });
         }
 
@@ -259,3 +292,4 @@
     </script>
 </body>
 </html>
+
