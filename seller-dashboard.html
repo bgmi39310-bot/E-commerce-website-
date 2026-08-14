@@ -69,14 +69,16 @@
             </div>
         </div>
 
-        <!-- Add Product -->
+        <!-- Add Product with Details -->
         <div class="card">
-            <h2>2. Add New Product</h2>
+            <h2>2. Add New Product (उत्पाद की पूरी जानकारी भरे)</h2>
             <div class="form-grid">
-                <input type="text" id="pName" placeholder="Product Name">
-                <input type="number" id="pPrice" placeholder="Price (₹)">
+                <input type="text" id="pName" placeholder="Product Name (सामान का नाम)">
+                <input type="number" id="pPrice" placeholder="Price (कीमत ₹)">
+                <input type="text" id="pMaterial" placeholder="Material (किस चीज़ से बना है? e.g. Leather, Cotton, Metal)">
+                <input type="text" id="pWarranty" placeholder="Warranty / Validity (कब तक चलेगा? e.g. 1 Year Warranty)">
                 <input type="text" id="pImage" placeholder="Product Image URL" class="full-width">
-                <textarea id="pDesc" placeholder="Product Description" class="full-width" rows="2"></textarea>
+                <textarea id="pDesc" placeholder="Full Details (उत्पाद के बारे में विस्तार से बताये)" class="full-width" rows="3"></textarea>
                 <button onclick="addProduct()" class="action-btn full-width">List Product on Market</button>
             </div>
         </div>
@@ -89,6 +91,7 @@
                     <tr>
                         <th>Product</th>
                         <th>Price</th>
+                        <th>Material</th>
                         <th>Action</th>
                     </tr>
                 </thead>
@@ -109,7 +112,7 @@
             const profile = {
                 shopName: document.getElementById('shopName').value.trim(),
                 ownerName: document.getElementById('ownerName').value.trim(),
-                phone: document.getElementById('shopPhone.value' || 'shopPhone').value.trim(),
+                phone: document.getElementById('shopPhone').value.trim(),
                 logo: document.getElementById('shopLogo').value.trim(),
                 address: document.getElementById('shopAddress').value.trim()
             };
@@ -144,6 +147,7 @@
                     <tr>
                         <td>${p.name}</td>
                         <td>₹${p.price}</td>
+                        <td>${p.material || 'N/A'}</td>
                         <td><span class="delete-btn" onclick="deleteProduct(${index})">Delete</span></td>
                     </tr>
                 `;
@@ -159,7 +163,10 @@
 
             const name = document.getElementById('pName').value.trim();
             const price = document.getElementById('pPrice').value.trim();
+            const material = document.getElementById('pMaterial').value.trim();
+            const warranty = document.getElementById('pWarranty').value.trim();
             const image = document.getElementById('pImage').value.trim();
+            const description = document.getElementById('pDesc').value.trim();
             
             if (!name || !price) {
                 alert("Please fill in Product Name and Price!");
@@ -168,11 +175,13 @@
             
             let sellerProducts = JSON.parse(localStorage.getItem('sellerProducts')) || [];
             
-            // Product ke sath dukan ki jankari bhi store hogi
             sellerProducts.push({ 
                 name, 
                 price: Number(price), 
+                material: material || "Standard Material",
+                warranty: warranty || "Standard Quality",
                 image,
+                description: description || "No detailed description provided.",
                 shopName: profile.shopName,
                 ownerName: profile.ownerName,
                 shopAddress: profile.address,
@@ -185,9 +194,11 @@
             
             document.getElementById('pName').value = '';
             document.getElementById('pPrice').value = '';
+            document.getElementById('pMaterial').value = '';
+            document.getElementById('pWarranty').value = '';
             document.getElementById('pImage').value = '';
             document.getElementById('pDesc').value = '';
-            alert("Product listed successfully with your shop details!");
+            alert("Product listed successfully with detailed specs!");
         }
 
         function deleteProduct(index) {
