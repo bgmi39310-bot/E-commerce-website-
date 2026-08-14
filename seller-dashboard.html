@@ -21,9 +21,13 @@
         h2 { color: #232f3e; margin-top: 0; }
         
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        input, textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        input, textarea, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; background: #fff; }
         .full-width { grid-column: span 2; }
         
+        /* File input styling */
+        .file-upload-box { border: 2px dashed #ccc; padding: 10px; border-radius: 5px; text-align: center; background: #fafafa; }
+        .file-upload-box label { font-size: 13px; color: #666; display: block; margin-bottom: 5px; font-weight: bold; }
+
         button.action-btn { background-color: #ffd814; color: #111; border: 1px solid #fcd200; padding: 12px 20px; font-weight: bold; border-radius: 5px; cursor: pointer; width: 100%; font-size: 15px; }
         button.action-btn:hover { background-color: #f7ca00; }
 
@@ -63,7 +67,12 @@
                 <input type="text" id="shopName" placeholder="Shop / Business Name (दुकान का नाम)">
                 <input type="text" id="ownerName" placeholder="Owner Full Name (दुकानदार का नाम)">
                 <input type="text" id="shopPhone" placeholder="Contact Number">
-                <input type="text" id="shopLogo" placeholder="Shop Logo / Photo URL">
+                
+                <div class="file-upload-box">
+                    <label>Shop Logo / Photo (गैलरी से चुनें):</label>
+                    <input type="file" id="shopLogoFile" accept="image/*">
+                </div>
+
                 <textarea id="shopAddress" placeholder="Complete Shop Address (दुकान का पूरा पता)" class="full-width" rows="2"></textarea>
                 <button onclick="saveSellerProfile()" class="action-btn full-width">Save Shop Profile</button>
             </div>
@@ -75,9 +84,14 @@
             <div class="form-grid">
                 <input type="text" id="pName" placeholder="Product Name (सामान का नाम)">
                 <input type="number" id="pPrice" placeholder="Price (कीमत ₹)">
-                <input type="text" id="pMaterial" placeholder="Material (किस चीज़ से बना है? e.g. Leather, Cotton, Metal)">
-                <input type="text" id="pWarranty" placeholder="Warranty / Validity (कब तक चलेगा? e.g. 1 Year Warranty)">
-                <input type="text" id="pImage" placeholder="Product Image URL" class="full-width">
+                <input type="text" id="pMaterial" placeholder="Material (e.g. Cotton, Leather)">
+                <input type="text" id="pWarranty" placeholder="Warranty / Validity (e.g. 1 Year)">
+                
+                <div class="file-upload-box full-width">
+                    <label>Product Image (मोबाइल गैलरी से फोटो चुनें):</label>
+                    <input type="file" id="pImageFile" accept="image/*">
+                </div>
+
                 <textarea id="pDesc" placeholder="Full Details (उत्पाद के बारे में विस्तार से बताये)" class="full-width" rows="3"></textarea>
                 <button onclick="addProduct()" class="action-btn full-width">List Product on Market</button>
             </div>
@@ -108,24 +122,47 @@
             menu.style.width = menu.style.width === '250px' ? '0' : '250px';
         }
 
-        function saveSellerProfile() {
-            const profile = {
-                shopName: document.getElementById('shopName').value.trim(),
-                ownerName: document.getElementById('ownerName').value.trim(),
-                phone: document.getElementById('shopPhone').value.trim(),
-                logo: document.getElementById('shopLogo').value.trim(),
-                address: document.getElementById('shopAddress').value.trim()
-            };
+        // Helper function to convert uploaded image file into safe local Base64 string
+        function convertImageToBase64(fileInputId, callback) {
+            const fileInput = document.getElementById(fileInputId);
+            if (fileInput.files && fileInput.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    callback(e.target.result); // Returns Base64 image string
+                };
+                reader.readAsDataURL(fileInput.files[0]);
+            } else {
+                callback(null);
+            }
+        }
 
-            if (!profile.shopName || !profile.ownerName) {
+        function saveSellerProfile() {
+            const shopName = document.getElementById('shopName').value.trim();
+            const ownerName = document.getElementById('ownerName').value.trim();
+            const phone = document.getElementById('shopPhone').value.trim();
+            const address = document.getElementById('shopAddress').value.trim();
+
+            if (!shopName || !ownerName) {
                 alert("Please enter Shop Name and Owner Name!");
                 return;
             }
 
-            localStorage.setItem('sellerProfile', JSON.stringify(profile));
-            const msg = document.getElementById('profileMsg');
-            msg.style.display = 'block';
-            setTimeout(() => { msg.style.display = 'none'; }, 3000);
+            const existingProfile = JSON.parse(localStorage.getItem('sellerProfile')) || {};
+
+            convertImageToBase64('shopLogoFile', function(base64Logo) {
+                const profile = {
+                    shopName,
+                    ownerName,
+                    phone,
+                    address,
+                    logo: base64Logo || existingProfile.logo || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
+                };
+
+                localStorage.setItem('sellerProfile', JSON.stringify(profile));
+                const msg = document.getElementById('profileMsg');
+                msg.style.display = 'block';
+                setTimeout(() => { msg.style.display = 'none'; }, 3000);
+            });
         }
 
         function loadSellerData() {
@@ -134,7 +171,6 @@
                 document.getElementById('shopName').value = profile.shopName || '';
                 document.getElementById('ownerName').value = profile.ownerName || '';
                 document.getElementById('shopPhone').value = profile.phone || '';
-                document.getElementById('shopLogo').value = profile.logo || '';
                 document.getElementById('shopAddress').value = profile.address || '';
             }
 
@@ -165,40 +201,41 @@
             const price = document.getElementById('pPrice').value.trim();
             const material = document.getElementById('pMaterial').value.trim();
             const warranty = document.getElementById('pWarranty').value.trim();
-            const image = document.getElementById('pImage').value.trim();
             const description = document.getElementById('pDesc').value.trim();
             
             if (!name || !price) {
                 alert("Please fill in Product Name and Price!");
                 return;
             }
-            
-            let sellerProducts = JSON.parse(localStorage.getItem('sellerProducts')) || [];
-            
-            sellerProducts.push({ 
-                name, 
-                price: Number(price), 
-                material: material || "Standard Material",
-                warranty: warranty || "Standard Quality",
-                image,
-                description: description || "No detailed description provided.",
-                shopName: profile.shopName,
-                ownerName: profile.ownerName,
-                shopAddress: profile.address,
-                shopLogo: profile.logo || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
-            });
 
-            localStorage.setItem('sellerProducts', JSON.stringify(sellerProducts));
-            
-            loadSellerData();
-            
-            document.getElementById('pName').value = '';
-            document.getElementById('pPrice').value = '';
-            document.getElementById('pMaterial').value = '';
-            document.getElementById('pWarranty').value = '';
-            document.getElementById('pImage').value = '';
-            document.getElementById('pDesc').value = '';
-            alert("Product listed successfully with detailed specs!");
+            convertImageToBase64('pImageFile', function(base64Image) {
+                let sellerProducts = JSON.parse(localStorage.getItem('sellerProducts')) || [];
+                
+                sellerProducts.push({ 
+                    name, 
+                    price: Number(price), 
+                    material: material || "Standard Material",
+                    warranty: warranty || "Standard Quality",
+                    image: base64Image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80",
+                    description: description || "No detailed description provided.",
+                    shopName: profile.shopName,
+                    ownerName: profile.ownerName,
+                    shopAddress: profile.address,
+                    shopLogo: profile.logo
+                });
+
+                localStorage.setItem('sellerProducts', JSON.stringify(sellerProducts));
+                loadSellerData();
+                
+                // Reset form
+                document.getElementById('pName').value = '';
+                document.getElementById('pPrice').value = '';
+                document.getElementById('pMaterial').value = '';
+                document.getElementById('pWarranty').value = '';
+                document.getElementById('pImageFile').value = '';
+                document.getElementById('pDesc').value = '';
+                alert("Product listed successfully with your gallery image!");
+            });
         }
 
         function deleteProduct(index) {
