@@ -7,11 +7,14 @@
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
         
-        header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: relative; }
+        header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; align-items: center; position: sticky; top: 0; z-index: 998; }
+        .back-arrow { font-size: 22px; cursor: pointer; margin-right: 15px; }
+        .header-title { flex-grow: 1; font-size: 18px; font-weight: bold; }
+        
         .menu-icon { cursor: pointer; display: flex; flex-direction: column; gap: 5px; }
         .menu-icon span { width: 25px; height: 3px; background-color: white; border-radius: 2px; }
 
-        .side-menu { height: 100%; width: 0; position: fixed; z-index: 1000; top: 0; right: 0; background-color: #232f3e; overflow-x: hidden; transition: 0.3s; padding-top: 60px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); }
+        .side-menu { height: 100%; width: 0; position: fixed; z-index: 2000; top: 0; right: 0; background-color: #232f3e; overflow-x: hidden; transition: 0.3s; padding-top: 60px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); }
         .side-menu a { padding: 12px 25px; text-decoration: none; font-size: 18px; color: white; display: block; transition: 0.2s; }
         .side-menu a:hover { background-color: #37475a; }
         .side-menu .close-btn { position: absolute; top: 10px; right: 20px; font-size: 30px; margin-left: 50px; }
@@ -27,7 +30,6 @@
         .product-title { font-size: 16px; font-weight: bold; color: #333; margin-bottom: 5px; }
         .product-price { color: #b12704; font-size: 18px; font-weight: bold; margin-bottom: 5px; }
         
-        /* एकदम छोटा और सही दुकानदार का बैज */
         .seller-info { display: flex; align-items: center; gap: 8px; background: #f8f9fa; padding: 6px 8px; border-radius: 5px; margin-bottom: 12px; border: 1px solid #eee; font-size: 12px; color: #555; }
         .seller-logo { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; background: #ddd; flex-shrink: 0; border: 1px solid #ccc; }
         .seller-details div { font-weight: bold; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
@@ -41,19 +43,20 @@
         .btn-cart:hover { background-color: #f7ca00; }
         .btn-view:hover { background-color: #d8dadf; }
 
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 2000; padding: 10px; box-sizing: border-box; }
-        .modal-content { background: white; width: 100%; max-width: 500px; border-radius: 10px; padding: 20px; position: relative; max-height: 90vh; overflow-y: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        /* Overlay & Modal */
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: none; z-index: 1000; }
+        .modal-content { background: white; width: 90%; max-width: 500px; border-radius: 10px; padding: 20px; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); max-height: 90vh; overflow-y: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.2); display: none; z-index: 1001; box-sizing: border-box; }
         .close-modal { position: absolute; top: 12px; right: 18px; font-size: 28px; cursor: pointer; font-weight: bold; color: #555; }
         .modal-img { width: 100%; height: 200px; object-fit: cover; border-radius: 8px; margin-bottom: 15px; }
         .spec-badge { display: inline-block; background: #f0f2f2; border: 1px solid #d5d9d9; padding: 6px 12px; border-radius: 15px; font-size: 13px; font-weight: bold; margin-right: 5px; margin-bottom: 10px; }
         .btn-back { background-color: #eaeded; border: 1px solid #d5d9d9; color: #111; padding: 10px; font-weight: bold; cursor: pointer; border-radius: 5px; width: 100%; font-size: 14px; margin-top: 8px; }
-        .btn-back:hover { background-color: #d8dadf; }
     </style>
 </head>
 <body>
 
     <header>
-        <h2>DesiMarket</h2>
+        <div class="back-arrow" onclick="history.back()">⬅️</div>
+        <div class="header-title">DesiMarket</div>
         <div class="menu-icon" onclick="toggleMenu()">
             <span></span>
             <span></span>
@@ -79,41 +82,40 @@
         <div class="product-grid" id="productGrid"></div>
     </div>
 
-    <!-- Details Modal Pop-Up -->
-    <div class="modal-overlay" id="productModal">
-        <div class="modal-content">
-            <span class="close-modal" onclick="closeModal()">&times;</span>
-            <img id="mImg" class="modal-img" src="" alt="Product">
-            <h2 id="mTitle" style="margin-bottom: 5px; font-size: 20px;">Product Title</h2>
-            <div id="mPrice" style="color: #b12704; font-size: 20px; font-weight: bold; margin-bottom: 12px;">₹0</div>
-            
-            <div>
-                <span class="spec-badge" id="mMaterial">🧵 Material: N/A</span>
-                <span class="spec-badge" id="mWarranty">⏳ Warranty: N/A</span>
-            </div>
-
-            <div style="margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px;">
-                <h4 style="margin-bottom: 5px; color: #232f3e;">Product Description (विवरण):</h4>
-                <p id="mDesc" style="color: #555; line-height: 1.4; margin-top: 0; font-size: 14px;">Description goes here...</p>
-            </div>
-
-            <div class="seller-info" style="margin-top: 12px;">
-                <img id="mShopLogo" class="seller-logo" src="" alt="Shop">
-                <div class="seller-details">
-                    <div id="mShopName" style="font-size: 13px;">🏪 Shop Name</div>
-                    <small id="mShopOwner" style="font-size: 11px;">By: Owner</small> | <small id="mShopAddr" style="font-size: 11px;">Address</small>
-                </div>
-            </div>
-
-            <div class="qty-box" style="margin-top: 12px;">
-                <span>मात्रा (Quantity):</span>
-                <input type="number" id="mQtyInput" value="1" min="1">
-                <span id="mUnitLabel">Piece</span>
-            </div>
-
-            <button id="mCartBtn" class="btn-cart" style="width: 100%; padding: 12px; font-size: 15px; margin-top: 5px;">Add to Cart</button>
-            <button class="btn-back" onclick="closeModal()">⬅️ Back / Close</button>
+    <!-- Outside Click Overlay & Modal -->
+    <div id="clickOverlay" class="overlay" onclick="closeModal()"></div>
+    <div class="modal-content" id="productModal">
+        <span class="close-modal" onclick="closeModal()">&times;</span>
+        <img id="mImg" class="modal-img" src="" alt="Product">
+        <h2 id="mTitle" style="margin-bottom: 5px; font-size: 20px;">Product Title</h2>
+        <div id="mPrice" style="color: #b12704; font-size: 20px; font-weight: bold; margin-bottom: 12px;">₹0</div>
+        
+        <div>
+            <span class="spec-badge" id="mMaterial">🧵 Material: N/A</span>
+            <span class="spec-badge" id="mWarranty">⏳ Warranty: N/A</span>
         </div>
+
+        <div style="margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px;">
+            <h4 style="margin-bottom: 5px; color: #232f3e;">Product Description (विवरण):</h4>
+            <p id="mDesc" style="color: #555; line-height: 1.4; margin-top: 0; font-size: 14px;">Description goes here...</p>
+        </div>
+
+        <div class="seller-info" style="margin-top: 12px;">
+            <img id="mShopLogo" class="seller-logo" src="" alt="Shop">
+            <div class="seller-details">
+                <div id="mShopName" style="font-size: 13px;">🏪 Shop Name</div>
+                <small id="mShopOwner" style="font-size: 11px;">By: Owner</small> | <small id="mShopAddr" style="font-size: 11px;">Address</small>
+            </div>
+        </div>
+
+        <div class="qty-box" style="margin-top: 12px;">
+            <span>मात्रा (Quantity):</span>
+            <input type="number" id="mQtyInput" value="1" min="1">
+            <span id="mUnitLabel">Piece</span>
+        </div>
+
+        <button id="mCartBtn" class="btn-cart" style="width: 100%; padding: 12px; font-size: 15px; margin-top: 5px;">Add to Cart</button>
+        <button class="btn-back" onclick="closeModal()">⬅️ Back / Close</button>
     </div>
 
     <script>
@@ -138,22 +140,8 @@
                     ownerName: "Ramesh Singh",
                     shopAddress: "Main Mandi Road",
                     shopLogo: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
-                },
-                { 
-                    name: "Running Shoes", 
-                    price: 2499, 
-                    unit: "Per Piece",
-                    material: "Breathable Mesh & EVA Sole",
-                    warranty: "6 Months Sole Warranty",
-                    description: "Lightweight and comfortable sports shoes, ideal for daily running and gym.",
-                    image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=300&auto=format&fit=crop&q=80",
-                    shopName: "Desi Sports Hub",
-                    ownerName: "Amit Verma",
-                    shopAddress: "Station Road, Indore",
-                    shopLogo: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"
                 }
             ];
-            
             const sellerProducts = JSON.parse(localStorage.getItem('sellerProducts')) || [];
             currentProductsList = [...defaultProducts, ...sellerProducts];
             return currentProductsList;
@@ -162,7 +150,6 @@
         function displayProducts(items) {
             const grid = document.getElementById('productGrid');
             grid.innerHTML = '';
-            
             items.forEach((p, index) => {
                 let imgSource = p.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80";
                 let shopName = p.shopName || "Verified Local Shop";
@@ -181,7 +168,6 @@
                             <span style="font-size:11px; color:#555;">${unitText.replace('Per ', '')}</span>
                         </div>
 
-                        <!-- सही और छोटा दुकानदार का लोगो -->
                         <div class="seller-info">
                             <img src="${shopLogo}" class="seller-logo" alt="Shop">
                             <div class="seller-details">
@@ -223,11 +209,13 @@
                 closeModal();
             };
 
-            document.getElementById('productModal').style.display = 'flex';
+            document.getElementById('productModal').style.display = 'block';
+            document.getElementById('clickOverlay').style.display = 'block';
         }
 
         function closeModal() {
             document.getElementById('productModal').style.display = 'none';
+            document.getElementById('clickOverlay').style.display = 'none';
         }
 
         function addToCartFromHome(index) {
@@ -239,39 +227,24 @@
         function saveToCart(p, qty) {
             let cart = JSON.parse(localStorage.getItem('cart')) || [];
             let unitText = p.unit || "Per Piece";
-            
             let existingItem = cart.find(item => item.name === p.name && item.shopName === p.shopName);
             
             if (existingItem) {
                 existingItem.quantity += qty;
             } else {
-                cart.push({ 
-                    name: p.name, 
-                    price: Number(p.price), 
-                    unit: unitText,
-                    quantity: qty, 
-                    image: p.image, 
-                    shopName: p.shopName || 'Local Shop' 
-                });
+                cart.push({ name: p.name, price: Number(p.price), unit: unitText, quantity: qty, image: p.image, shopName: p.shopName || 'Local Shop' });
             }
-            
             localStorage.setItem('cart', JSON.stringify(cart));
-            alert(qty + " " + unitText.replace('Per ', '') + " of " + p.name + " added to your cart! (Total: ₹" + (p.price * qty) + ")");
+            alert(qty + " " + unitText.replace('Per ', '') + " of " + p.name + " added to cart! (Total: ₹" + (p.price * qty) + ")");
         }
 
         function searchProducts() {
             const query = document.getElementById('searchInput').value.toLowerCase();
-            const filtered = getAllProducts().filter(p => 
-                p.name.toLowerCase().includes(query) || 
-                p.shopName.toLowerCase().includes(query) ||
-                (p.material && p.material.toLowerCase().includes(query))
-            );
+            const filtered = getAllProducts().filter(p => p.name.toLowerCase().includes(query) || p.shopName.toLowerCase().includes(query));
             displayProducts(filtered);
         }
 
-        window.onload = function() {
-            displayProducts(getAllProducts());
-        };
+        window.onload = function() { displayProducts(getAllProducts()); };
     </script>
 </body>
 </html>
