@@ -7,11 +7,14 @@
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
         
-        header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: relative; }
+        header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; align-items: center; position: sticky; top: 0; z-index: 998; }
+        .back-arrow { font-size: 22px; cursor: pointer; margin-right: 15px; }
+        .header-title { flex-grow: 1; font-size: 18px; font-weight: bold; }
+        
         .menu-icon { cursor: pointer; display: flex; flex-direction: column; gap: 5px; }
         .menu-icon span { width: 25px; height: 3px; background-color: white; border-radius: 2px; }
 
-        .side-menu { height: 100%; width: 0; position: fixed; z-index: 1000; top: 0; right: 0; background-color: #232f3e; overflow-x: hidden; transition: 0.3s; padding-top: 60px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); }
+        .side-menu { height: 100%; width: 0; position: fixed; z-index: 2000; top: 0; right: 0; background-color: #232f3e; overflow-x: hidden; transition: 0.3s; padding-top: 60px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); }
         .side-menu a { padding: 12px 25px; text-decoration: none; font-size: 18px; color: white; display: block; transition: 0.2s; }
         .side-menu a:hover { background-color: #37475a; }
         .side-menu .close-btn { position: absolute; top: 10px; right: 20px; font-size: 30px; margin-left: 50px; }
@@ -41,7 +44,8 @@
 <body>
 
     <header>
-        <h2>Seller Hub & Profile</h2>
+        <div class="back-arrow" onclick="history.back()">⬅️</div>
+        <div class="header-title">Seller Hub & Profile</div>
         <div class="menu-icon" onclick="toggleMenu()">
             <span></span>
             <span></span>
@@ -59,55 +63,52 @@
     </div>
 
     <div class="container">
-        <!-- Seller Shop Profile Setup -->
         <div class="card">
-            <h2>1. Seller / Shop Profile (दुकानदार की पहचान)</h2>
+            <h2>1. Seller / Shop Profile</h2>
             <div id="profileMsg" class="success-msg">Profile Saved Successfully!</div>
             <div class="form-grid">
-                <input type="text" id="shopName" placeholder="Shop / Business Name (दुकान का नाम)">
-                <input type="text" id="ownerName" placeholder="Owner Full Name (दुकानदार का नाम)">
+                <input type="text" id="shopName" placeholder="Shop Name">
+                <input type="text" id="ownerName" placeholder="Owner Name">
                 <input type="text" id="shopPhone" placeholder="Contact Number">
                 
                 <div class="file-upload-box">
-                    <label>Shop Logo / Photo (गैलरी से चुनें):</label>
+                    <label>Shop Logo / Photo:</label>
                     <input type="file" id="shopLogoFile" accept="image/*">
                 </div>
 
-                <textarea id="shopAddress" placeholder="Complete Shop Address (दुकान का पूरा पता)" class="full-width" rows="2"></textarea>
+                <textarea id="shopAddress" placeholder="Complete Shop Address" class="full-width" rows="2"></textarea>
                 <button onclick="saveSellerProfile()" class="action-btn full-width">Save Shop Profile</button>
             </div>
         </div>
 
-        <!-- Add Product with Details -->
         <div class="card">
-            <h2>2. Add New Product (उत्पाद की पूरी जानकारी भरे)</h2>
+            <h2>2. Add New Product</h2>
             <div class="form-grid">
-                <input type="text" id="pName" placeholder="Product Name (सामान का नाम)">
-                <input type="number" id="pPrice" placeholder="Price per unit (कीमत ₹)">
+                <input type="text" id="pName" placeholder="Product Name">
+                <input type="number" id="pPrice" placeholder="Price per unit (₹)">
                 
                 <select id="pUnit">
-                    <option value="Per Piece">Per Piece (प्रति पीस)</option>
-                    <option value="Per Kg">Per Kg (प्रति किलो)</option>
-                    <option value="Per 250g">Per 250g (प्रति पाव)</option>
-                    <option value="Per Litre">Per Litre (प्रति लीटर)</option>
-                    <option value="Per Packet">Per Packet (प्रति पैकेट)</option>
-                    <option value="Per Dozen">Per Dozen (प्रति दर्जन)</option>
+                    <option value="Per Piece">Per Piece</option>
+                    <option value="Per Kg">Per Kg</option>
+                    <option value="Per 250g">Per 250g</option>
+                    <option value="Per Litre">Per Litre</option>
+                    <option value="Per Packet">Per Packet</option>
+                    <option value="Per Dozen">Per Dozen</option>
                 </select>
 
-                <input type="text" id="pMaterial" placeholder="Material (e.g. Cotton, Leather)">
-                <input type="text" id="pWarranty" placeholder="Warranty / Validity (e.g. 1 Year)">
+                <input type="text" id="pMaterial" placeholder="Material (e.g. Cotton)">
+                <input type="text" id="pWarranty" placeholder="Warranty / Validity">
                 
                 <div class="file-upload-box full-width">
-                    <label>Product Image (मोबाइल गैलरी से फोटो चुनें):</label>
+                    <label>Product Image:</label>
                     <input type="file" id="pImageFile" accept="image/*">
                 </div>
 
-                <textarea id="pDesc" placeholder="Full Details (उत्पाद के बारे में विस्तार से बताये)" class="full-width" rows="3"></textarea>
+                <textarea id="pDesc" placeholder="Full Details Description" class="full-width" rows="3"></textarea>
                 <button onclick="addProduct()" class="action-btn full-width">List Product on Market</button>
             </div>
         </div>
 
-        <!-- My Listed Products -->
         <div class="card">
             <h2>3. My Listed Products</h2>
             <table>
@@ -119,9 +120,7 @@
                         <th>Action</th>
                     </tr>
                 </thead>
-                <tbody id="productTable">
-                    <!-- Products will load here -->
-                </tbody>
+                <tbody id="productTable"></tbody>
             </table>
         </div>
     </div>
@@ -132,43 +131,22 @@
             menu.style.width = menu.style.width === '250px' ? '0' : '250px';
         }
 
-        // इमेज को छोटा (Compress) करने वाला स्मार्ट फंक्शन
         function compressImage(fileInputId, callback) {
             const fileInput = document.getElementById(fileInputId);
-            if (!fileInput.files || !fileInput.files[0]) {
-                callback(null);
-                return;
-            }
-
+            if (!fileInput.files || !fileInput.files[0]) { callback(null); return; }
             const reader = new FileReader();
             reader.onload = function(e) {
                 const img = new Image();
                 img.onload = function() {
                     const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 400;
-                    const MAX_HEIGHT = 400;
-                    let width = img.width;
-                    let height = img.height;
-
-                    if (width > height) {
-                        if (width > MAX_WIDTH) {
-                            height *= MAX_WIDTH / width;
-                            width = MAX_WIDTH;
-                        }
-                    } else {
-                        if (height > MAX_HEIGHT) {
-                            width *= MAX_HEIGHT / height;
-                            height = MAX_HEIGHT;
-                        }
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
+                    let width = img.width, height = img.height;
+                    const MAX = 400;
+                    if (width > height) { if (width > MAX) { height *= MAX / width; width = MAX; } }
+                    else { if (height > MAX) { width *= MAX / height; height = MAX; } }
+                    canvas.width = width; canvas.height = height;
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
-
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-                    callback(dataUrl);
+                    callback(canvas.toDataURL('image/jpeg', 0.7));
                 };
                 img.src = e.target.result;
             };
@@ -178,30 +156,21 @@
         function saveSellerProfile() {
             const shopName = document.getElementById('shopName').value.trim();
             const ownerName = document.getElementById('ownerName').value.trim();
-            const phone = document.getElementById('shopPhone').value.trim();
-            const address = document.getElementById('shopAddress').value.trim();
-
-            if (!shopName || !ownerName) {
-                alert("Please enter Shop Name and Owner Name!");
-                return;
-            }
-
+            if (!shopName || !ownerName) { alert("Please enter Shop and Owner Name!"); return; }
             const existingProfile = JSON.parse(localStorage.getItem('sellerProfile')) || {};
 
             compressImage('shopLogoFile', function(base64Logo) {
                 const profile = {
-                    shopName,
-                    ownerName,
-                    phone,
-                    address,
+                    shopName, ownerName,
+                    phone: document.getElementById('shopPhone').value.trim(),
+                    address: document.getElementById('shopAddress').value.trim(),
                     logo: base64Logo || existingProfile.logo || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
                 };
-
                 localStorage.setItem('sellerProfile', JSON.stringify(profile));
                 const msg = document.getElementById('profileMsg');
                 msg.style.display = 'block';
                 setTimeout(() => { msg.style.display = 'none'; }, 3000);
-                alert("Shop Profile Saved Successfully!");
+                alert("Profile Saved!");
             });
         }
 
@@ -213,75 +182,35 @@
                 document.getElementById('shopPhone').value = profile.phone || '';
                 document.getElementById('shopAddress').value = profile.address || '';
             }
-
             const sellerProducts = JSON.parse(localStorage.getItem('sellerProducts')) || [];
             const table = document.getElementById('productTable');
             table.innerHTML = '';
-            
             sellerProducts.forEach((p, index) => {
                 let pImg = p.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80";
-                table.innerHTML += `
-                    <tr>
-                        <td><img src="${pImg}" class="preview-img" alt="Product"></td>
-                        <td><b>${p.name}</b><br><small>₹${p.price} / ${p.unit || 'Piece'}</small></td>
-                        <td>${p.material || 'N/A'}</td>
-                        <td><span class="delete-btn" onclick="deleteProduct(${index})">Delete</span></td>
-                    </tr>
-                `;
+                table.innerHTML += `<tr><td><img src="${pImg}" class="preview-img"></td><td><b>${p.name}</b><br><small>₹${p.price} / ${p.unit || 'Piece'}</small></td><td>${p.material || 'N/A'}</td><td><span class="delete-btn" onclick="deleteProduct(${index})">Delete</span></td></tr>`;
             });
         }
 
         function addProduct() {
             const profile = JSON.parse(localStorage.getItem('sellerProfile'));
-            if (!profile || !profile.shopName) {
-                alert("Please first save your Shop Profile above before listing a product!");
-                return;
-            }
-
+            if (!profile || !profile.shopName) { alert("Please save Shop Profile first!"); return; }
             const name = document.getElementById('pName').value.trim();
             const price = document.getElementById('pPrice').value.trim();
-            const unit = document.getElementById('pUnit').value;
-            const material = document.getElementById('pMaterial').value.trim();
-            const warranty = document.getElementById('pWarranty').value.trim();
-            const description = document.getElementById('pDesc').value.trim();
-            
-            if (!name || !price) {
-                alert("Please fill in Product Name and Price!");
-                return;
-            }
+            if (!name || !price) { alert("Please enter Product Name and Price!"); return; }
 
             compressImage('pImageFile', function(base64Image) {
                 let sellerProducts = JSON.parse(localStorage.getItem('sellerProducts')) || [];
-                
-                // ऑटोमैटिक स्मार्ट डिफ़ॉल्ट्स यदि खाली छोड़ा जाए
-                const finalMaterial = material !== "" ? material : "100% Original & Local Quality";
-                const finalWarranty = warranty !== "" ? warranty : "Checked & Verified by Shop Owner";
-                const finalDesc = description !== "" ? description : `${name} उपलब्ध है ताज़ा और बेहतरीन गुणवत्ता में। अधिक जानकारी के लिए दुकान पर संपर्क करें या सीधे आर्डर करें।`;
-
-                sellerProducts.push({ 
-                    name, 
-                    price: Number(price), 
-                    unit: unit,
-                    material: finalMaterial,
-                    warranty: finalWarranty,
+                sellerProducts.push({
+                    name, price: Number(price), unit: document.getElementById('pUnit').value,
+                    material: document.getElementById('pMaterial').value.trim() || "100% Original",
+                    warranty: document.getElementById('pWarranty').value.trim() || "Verified Quality",
                     image: base64Image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80",
-                    description: finalDesc,
-                    shopName: profile.shopName,
-                    ownerName: profile.ownerName,
-                    shopAddress: profile.address,
-                    shopLogo: profile.logo
+                    description: document.getElementById('pDesc').value.trim() || `${name} available in best quality.`,
+                    shopName: profile.shopName, ownerName: profile.ownerName, shopAddress: profile.address, shopLogo: profile.logo
                 });
-
                 localStorage.setItem('sellerProducts', JSON.stringify(sellerProducts));
                 loadSellerData();
-                
-                document.getElementById('pName').value = '';
-                document.getElementById('pPrice').value = '';
-                document.getElementById('pMaterial').value = '';
-                document.getElementById('pWarranty').value = '';
-                document.getElementById('pImageFile').value = '';
-                document.getElementById('pDesc').value = '';
-                alert("Product listed successfully with rich details and image!");
+                alert("Product Added Successfully!");
             });
         }
 
