@@ -80,7 +80,9 @@
 
     <div class="container">
         <h2>Trending Products & Verified Shops</h2>
-        <div class="product-grid" id="productGrid"></div>
+        <div class="product-grid" id="productGrid">
+            <p style="text-align:center; color:#666; grid-column: 1/-1;">डेटाबेस से प्रोडक्ट्स लोड हो रहे हैं...</p>
+        </div>
     </div>
 
     <!-- Outside Click Overlay & Modal -->
@@ -119,33 +121,79 @@
         <button class="btn-back" onclick="closeModal()">⬅️ Back / Close</button>
     </div>
 
-    <script>
+    <!-- Firebase SDKs & Integration -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // TODO: अपनी असली Firebase Config यहाँ डालें
+        const firebaseConfig = {
+            apiKey: "YAHAN_APNI_API_KEY_DAALEIN",
+            authDomain: "YAHAN_APNI_AUTH_DOMAIN_DAALEIN",
+            projectId: "YAHAN_APNI_PROJECT_ID_DAALEIN",
+            storageBucket: "YAHAN_APNI_STORAGE_BUCKET_DAALEIN",
+            messagingSenderId: "YAHAN_APNI_MESSAGING_SENDER_ID_DAALEIN",
+            appId: "YAHAN_APNI_APP_ID_DAALEIN"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        let currentProductsList = [];
+
         function toggleMenu() {
             const menu = document.getElementById('sideMenu');
             menu.style.width = menu.style.width === '250px' ? '0' : '250px';
         }
+        window.toggleMenu = toggleMenu;
 
-        let currentProductsList = [];
+        async function fetchProductsFromFirebase() {
+            const grid = document.getElementById('productGrid');
+            try {
+                const querySnapshot = await getDocs(collection(db, "vendors"));
+                let firebaseProducts = [];
+                
+                querySnapshot.forEach((doc) => {
+                    let data = doc.data();
+                    firebaseProducts.push({
+                        name: data.shopName || "Local Product",
+                        price: data.price || 50,
+                        unit: data.unit || "Per Kg",
+                        material: data.material || "Standard Quality",
+                        warranty: data.warranty || "Fresh",
+                        description: data.description || "Local verified item.",
+                        image: data.image || "https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=300&auto=format&fit=crop&q=80",
+                        shopName: data.shopName || "Desi Store",
+                        ownerName: data.ownerName || "Seller",
+                        shopAddress: data.address || "Local Market",
+                        shopLogo: data.shopLogo || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
+                    });
+                });
 
-        function getAllProducts() {
-            const defaultProducts = [
-                { 
-                    name: "Desi Wheat (गेहूं)", 
-                    price: 30, 
-                    unit: "Per Kg",
-                    material: "Pure Organic Grain",
-                    warranty: "Fresh Crop Quality",
-                    description: "High quality clean local wheat, best for daily flour (aata) and meals.",
-                    image: "https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=300&auto=format&fit=crop&q=80",
-                    shopName: "Kisan Anaj Bhandar",
-                    ownerName: "Ramesh Singh",
-                    shopAddress: "Main Mandi Road",
-                    shopLogo: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
-                }
-            ];
-            const sellerProducts = JSON.parse(localStorage.getItem('sellerProducts')) || [];
-            currentProductsList = [...defaultProducts, ...sellerProducts];
-            return currentProductsList;
+                // अगर डेटाबेस खाली है तो डिफॉल्ट आइटम दिखाएं
+                const defaultProducts = [
+                    { 
+                        name: "Desi Wheat (गेहूं)", 
+                        price: 30, 
+                        unit: "Per Kg",
+                        material: "Pure Organic Grain",
+                        warranty: "Fresh Crop Quality",
+                        description: "High quality clean local wheat, best for daily flour (aata) and meals.",
+                        image: "https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=300&auto=format&fit=crop&q=80",
+                        shopName: "Kisan Anaj Bhandar",
+                        ownerName: "Ramesh Singh",
+                        shopAddress: "Main Mandi Road",
+                        shopLogo: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
+                    }
+                ];
+
+                currentProductsList = firebaseProducts.length > 0 ? firebaseProducts : defaultProducts;
+                displayProducts(currentProductsList);
+
+            } catch (error) {
+                console.error("Error fetching products: ", error);
+                grid.innerHTML = `<p style="text-align:center; color:red; grid-column: 1/-1;">डेटा लोड करने में त्रुटि: ${error.message}</p>`;
+            }
         }
 
         function displayProducts(items) {
@@ -185,7 +233,7 @@
             });
         }
 
-        function openModal(index) {
+        window.openModal = function(index) {
             const p = currentProductsList[index];
             let unitText = p.unit || "Per Piece";
 
@@ -212,18 +260,18 @@
 
             document.getElementById('productModal').style.display = 'block';
             document.getElementById('clickOverlay').style.display = 'block';
-        }
+        };
 
-        function closeModal() {
+        window.closeModal = function() {
             document.getElementById('productModal').style.display = 'none';
             document.getElementById('clickOverlay').style.display = 'none';
-        }
+        };
 
-        function addToCartFromHome(index) {
+        window.addToCartFromHome = function(index) {
             const p = currentProductsList[index];
             const qty = Number(document.getElementById('qty_' + index).value) || 1;
             saveToCart(p, qty);
-        }
+        };
 
         function saveToCart(p, qty) {
             let cart = JSON.parse(localStorage.getItem('cart')) || [];
@@ -239,14 +287,16 @@
             alert(qty + " " + unitText.replace('Per ', '') + " of " + p.name + " added to cart! (Total: ₹" + (p.price * qty) + ")");
         }
 
-        function searchProducts() {
+        window.searchProducts = function() {
             const query = document.getElementById('searchInput').value.toLowerCase();
-            const filtered = getAllProducts().filter(p => p.name.toLowerCase().includes(query) || p.shopName.toLowerCase().includes(query));
+            const filtered = currentProductsList.filter(p => p.name.toLowerCase().includes(query) || p.shopName.toLowerCase().includes(query));
             displayProducts(filtered);
-        }
+        };
 
-        window.onload = function() { displayProducts(getAllProducts()); };
+        // पेज लोड होते ही डेटाबेस से प्रोडक्ट्स फेच करें
+        window.onload = function() {
+            fetchProductsFromFirebase();
+        };
     </script>
 </body>
 </html>
-
