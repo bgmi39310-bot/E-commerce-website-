@@ -106,31 +106,39 @@
                 </div>
 
                 <textarea id="pDesc" placeholder="Full Details Description" class="full-width" rows="3"></textarea>
-                <button onclick="addProduct()" class="action-btn full-width">List Product on Market</button>
+                <button onclick="addProductToFirebase()" class="action-btn full-width">List Product on Market</button>
             </div>
         </div>
 
         <div class="card">
-            <h2>3. My Listed Products</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Image</th>
-                        <th>Product</th>
-                        <th>Price</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody id="productTable"></tbody>
-            </table>
+            <h2>3. Live Database Status</h2>
+            <p style="color: #666; font-size: 14px;">आपके द्वारा जोड़े गए प्रोडक्ट्स सीधे Firebase Firestore डेटाबेस में सेव हो रहे हैं और होमपेज (`index.html`) पर लाइव दिखेंगे।</p>
         </div>
     </div>
 
-    <script>
+    <!-- Firebase SDKs & Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // TODO: अपनी असली Firebase Config यहाँ डालें
+        const firebaseConfig = {
+            apiKey: "AIzaSyD7cgnLiY8yuc3EPiCvmDkpfwhgltR-x-g",
+            authDomain: "desimarket-4b8a5.firebaseapp.com",
+            projectId: "desimarket-4b8a5",
+            storageBucket: "desimarket-4b8a5.firebasestorage.app",
+            messagingSenderId: "761756037231",
+            appId: "1:761756037231:web:f09e5b6abb55947cf85d9a"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
         function toggleMenu() {
             const menu = document.getElementById('sideMenu');
             menu.style.width = menu.style.width === '250px' ? '0' : '250px';
         }
+        window.toggleMenu = toggleMenu;
 
         function compressImage(fileInputId, callback) {
             const fileInput = document.getElementById(fileInputId);
@@ -154,7 +162,7 @@
             reader.readAsDataURL(fileInput.files[0]);
         }
 
-        function saveSellerProfile() {
+        window.saveSellerProfile = function() {
             const shopName = document.getElementById('shopName').value.trim();
             const ownerName = document.getElementById('ownerName').value.trim();
             if (!shopName || !ownerName) { alert("Please enter Shop and Owner Name!"); return; }
@@ -171,11 +179,51 @@
                 const msg = document.getElementById('profileMsg');
                 msg.style.display = 'block';
                 setTimeout(() => { msg.style.display = 'none'; }, 3000);
-                alert("Profile Saved!");
+                alert("Profile Saved Locally!");
             });
-        }
+        };
 
-        function loadSellerData() {
+        window.addProductToFirebase = async function() {
+            const profile = JSON.parse(localStorage.getItem('sellerProfile'));
+            if (!profile || !profile.shopName) { alert("Please save Shop Profile first!"); return; }
+            
+            const name = document.getElementById('pName').value.trim();
+            const priceVal = document.getElementById('pPrice').value.trim();
+            if (!name || !priceVal) { alert("Please enter Product Name and Price!"); return; }
+
+            alert("प्रॉडक्ट डेटाबेस में अपलोड हो रहा है...");
+
+            compressImage('pImageFile', async function(base64Image) {
+                try {
+                    await addDoc(collection(db, "vendors"), {
+                        name: name,
+                        price: Number(priceVal),
+                        unit: document.getElementById('pUnit').value,
+                        material: document.getElementById('pMaterial').value.trim() || "100% Original",
+                        warranty: document.getElementById('pWarranty').value.trim() || "Verified Quality",
+                        image: base64Image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80",
+                        description: document.getElementById('pDesc').value.trim() || `${name} available in best quality.`,
+                        shopName: profile.shopName,
+                        ownerName: profile.ownerName,
+                        address: profile.address,
+                        shopLogo: profile.logo,
+                        createdAt: new Date()
+                    });
+
+                    alert("Product Added Successfully to Firebase! 🎉");
+                    document.getElementById('pName').value = '';
+                    document.getElementById('pPrice').value = '';
+                    document.getElementById('pMaterial').value = '';
+                    document.getElementById('pWarranty').value = '';
+                    document.getElementById('pDesc').value = '';
+                } catch (error) {
+                    console.error("Error adding document: ", error);
+                    alert("Error: " + error.message);
+                }
+            });
+        };
+
+        window.onload = function() {
             const profile = JSON.parse(localStorage.getItem('sellerProfile'));
             if (profile) {
                 document.getElementById('shopName').value = profile.shopName || '';
@@ -183,47 +231,7 @@
                 document.getElementById('shopPhone').value = profile.phone || '';
                 document.getElementById('shopAddress').value = profile.address || '';
             }
-            const sellerProducts = JSON.parse(localStorage.getItem('sellerProducts')) || [];
-            const table = document.getElementById('productTable');
-            table.innerHTML = '';
-            sellerProducts.forEach((p, index) => {
-                let pImg = p.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80";
-                table.innerHTML += `<tr><td><img src="${pImg}" class="preview-img"></td><td><b>${p.name}</b><br><small>₹${p.price} / ${p.unit || 'Piece'}</small></td><td>${p.material || 'N/A'}</td><td><span class="delete-btn" onclick="deleteProduct(${index})">Delete</span></td></tr>`;
-            });
-        }
-
-        function addProduct() {
-            const profile = JSON.parse(localStorage.getItem('sellerProfile'));
-            if (!profile || !profile.shopName) { alert("Please save Shop Profile first!"); return; }
-            const name = document.getElementById('pName').value.trim();
-            const price = document.getElementById('pPrice').value.trim();
-            if (!name || !price) { alert("Please enter Product Name and Price!"); return; }
-
-            compressImage('pImageFile', function(base64Image) {
-                let sellerProducts = JSON.parse(localStorage.getItem('sellerProducts')) || [];
-                sellerProducts.push({
-                    name, price: Number(price), unit: document.getElementById('pUnit').value,
-                    material: document.getElementById('pMaterial').value.trim() || "100% Original",
-                    warranty: document.getElementById('pWarranty').value.trim() || "Verified Quality",
-                    image: base64Image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80",
-                    description: document.getElementById('pDesc').value.trim() || `${name} available in best quality.`,
-                    shopName: profile.shopName, ownerName: profile.ownerName, shopAddress: profile.address, shopLogo: profile.logo
-                });
-                localStorage.setItem('sellerProducts', JSON.stringify(sellerProducts));
-                loadSellerData();
-                alert("Product Added Successfully!");
-            });
-        }
-
-        function deleteProduct(index) {
-            let sellerProducts = JSON.parse(localStorage.getItem('sellerProducts')) || [];
-            sellerProducts.splice(index, 1);
-            localStorage.setItem('sellerProducts', JSON.stringify(sellerProducts));
-            loadSellerData();
-        }
-
-        window.onload = loadSellerData;
+        };
     </script>
 </body>
 </html>
-
