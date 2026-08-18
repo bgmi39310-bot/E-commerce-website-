@@ -27,18 +27,13 @@
         input, textarea, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; background: #fff; }
         .full-width { grid-column: span 2; }
         
-        .file-upload-box { border: 2px dashed #ccc; padding: 10px; border-radius: 5px; text-align: center; background: #fafafa; }
+        .file-upload-box { border: 1px solid #ddd; padding: 12px; border-radius: 5px; background: #fafafa; }
         .file-upload-box label { font-size: 13px; color: #666; display: block; margin-bottom: 5px; font-weight: bold; }
 
         button.action-btn { background-color: #ffd814; color: #111; border: 1px solid #fcd200; padding: 12px 20px; font-weight: bold; border-radius: 5px; cursor: pointer; width: 100%; font-size: 15px; }
         button.action-btn:hover { background-color: #f7ca00; }
 
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; }
-        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background-color: #f2f2f2; }
-        .delete-btn { color: #ff4d4d; cursor: pointer; font-weight: bold; }
         .success-msg { color: green; font-weight: bold; margin-bottom: 10px; display: none; }
-        .preview-img { width: 50px; height: 50px; object-fit: cover; border-radius: 50%; border: 1px solid #ccc; }
     </style>
 </head>
 <body>
@@ -64,6 +59,7 @@
     </div>
 
     <div class="container">
+        <!-- 1. Shop Profile Section -->
         <div class="card">
             <h2>1. Seller / Shop Profile</h2>
             <div id="profileMsg" class="success-msg">Profile Saved Successfully!</div>
@@ -73,8 +69,8 @@
                 <input type="text" id="shopPhone" placeholder="Contact Number">
                 
                 <div class="file-upload-box">
-                    <label>Shop Logo / Photo:</label>
-                    <input type="file" id="shopLogoFile" accept="image/*">
+                    <label>Shop Logo Link (Postimages URL):</label>
+                    <input type="url" id="shopLogoFile" placeholder="https://i.postimg.cc/...">
                 </div>
 
                 <textarea id="shopAddress" placeholder="Complete Shop Address" class="full-width" rows="2"></textarea>
@@ -82,6 +78,7 @@
             </div>
         </div>
 
+        <!-- 2. Add New Product Section -->
         <div class="card">
             <h2>2. Add New Product</h2>
             <div class="form-grid">
@@ -101,8 +98,8 @@
                 <input type="text" id="pWarranty" placeholder="Warranty / Validity">
                 
                 <div class="file-upload-box full-width">
-                    <label>Product Image:</label>
-                    <input type="file" id="pImageFile" accept="image/*">
+                    <label>Product Image Link (Postimages URL):</label>
+                    <input type="url" id="pImageFile" placeholder="https://i.postimg.cc/...">
                 </div>
 
                 <textarea id="pDesc" placeholder="Full Details Description" class="full-width" rows="3"></textarea>
@@ -112,7 +109,7 @@
 
         <div class="card">
             <h2>3. Live Database Status</h2>
-            <p style="color: #666; font-size: 14px;">आपके द्वारा जोड़े गए प्रोडक्ट्स सीधे Firebase Firestore डेटाबेस में सेव हो रहे हैं और होमपेज (`index.html`) पर लाइव दिखेंगे।</p>
+            <p style="color: #666; font-size: 14px;">प्रोडक्ट इमेज अब डायरेक्ट लिंक के जरिए सीधे Firebase Firestore डेटाबेस में सेव होगी।</p>
         </div>
     </div>
 
@@ -121,7 +118,6 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // TODO: अपनी असली Firebase Config यहाँ डालें
         const firebaseConfig = {
             apiKey: "AIzaSyD7cgnLiY8yuc3EPiCvmDkpfwhgltR-x-g",
             authDomain: "desimarket-4b8a5.firebaseapp.com",
@@ -140,47 +136,27 @@
         }
         window.toggleMenu = toggleMenu;
 
-        function compressImage(fileInputId, callback) {
-            const fileInput = document.getElementById(fileInputId);
-            if (!fileInput.files || !fileInput.files[0]) { callback(null); return; }
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const img = new Image();
-                img.onload = function() {
-                    const canvas = document.createElement('canvas');
-                    let width = img.width, height = img.height;
-                    const MAX = 400;
-                    if (width > height) { if (width > MAX) { height *= MAX / width; width = MAX; } }
-                    else { if (height > MAX) { width *= MAX / height; height = MAX; } }
-                    canvas.width = width; canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    callback(canvas.toDataURL('image/jpeg', 0.7));
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(fileInput.files[0]);
-        }
-
         window.saveSellerProfile = function() {
             const shopName = document.getElementById('shopName').value.trim();
             const ownerName = document.getElementById('ownerName').value.trim();
             if (!shopName || !ownerName) { alert("Please enter Shop and Owner Name!"); return; }
+            
             const existingProfile = JSON.parse(localStorage.getItem('sellerProfile')) || {};
+            const logoUrl = document.getElementById('shopLogoFile').value.trim();
 
-            compressImage('shopLogoFile', function(base64Logo) {
-                const profile = {
-                    shopName, ownerName,
-                    phone: document.getElementById('shopPhone').value.trim(),
-                    address: document.getElementById('shopAddress').value.trim(),
-                    logo: base64Logo || existingProfile.logo || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
-                };
-                localStorage.setItem('sellerProfile', JSON.stringify(profile));
-                const msg = document.getElementById('profileMsg');
-                msg.style.display = 'block';
-                setTimeout(() => { msg.style.display = 'none'; }, 3000);
-                alert("Profile Saved Locally!");
-            });
+            const profile = {
+                shopName, 
+                ownerName,
+                phone: document.getElementById('shopPhone').value.trim(),
+                address: document.getElementById('shopAddress').value.trim(),
+                logo: logoUrl || existingProfile.logo || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
+            };
+
+            localStorage.setItem('sellerProfile', JSON.stringify(profile));
+            const msg = document.getElementById('profileMsg');
+            msg.style.display = 'block';
+            setTimeout(() => { msg.style.display = 'none'; }, 3000);
+            alert("Profile Saved Successfully!");
         };
 
         window.addProductToFirebase = async function() {
@@ -189,38 +165,39 @@
             
             const name = document.getElementById('pName').value.trim();
             const priceVal = document.getElementById('pPrice').value.trim();
+            const imageUrl = document.getElementById('pImageFile').value.trim();
+
             if (!name || !priceVal) { alert("Please enter Product Name and Price!"); return; }
 
             alert("प्रॉडक्ट डेटाबेस में अपलोड हो रहा है...");
 
-            compressImage('pImageFile', async function(base64Image) {
-                try {
-                    await addDoc(collection(db, "vendors"), {
-                        name: name,
-                        price: Number(priceVal),
-                        unit: document.getElementById('pUnit').value,
-                        material: document.getElementById('pMaterial').value.trim() || "100% Original",
-                        warranty: document.getElementById('pWarranty').value.trim() || "Verified Quality",
-                        image: base64Image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80",
-                        description: document.getElementById('pDesc').value.trim() || `${name} available in best quality.`,
-                        shopName: profile.shopName,
-                        ownerName: profile.ownerName,
-                        address: profile.address,
-                        shopLogo: profile.logo,
-                        createdAt: new Date()
-                    });
+            try {
+                await addDoc(collection(db, "vendors"), {
+                    name: name,
+                    price: Number(priceVal),
+                    unit: document.getElementById('pUnit').value,
+                    material: document.getElementById('pMaterial').value.trim() || "100% Original",
+                    warranty: document.getElementById('pWarranty').value.trim() || "Verified Quality",
+                    image: imageUrl || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80",
+                    description: document.getElementById('pDesc').value.trim() || `${name} available in best quality.`,
+                    shopName: profile.shopName,
+                    ownerName: profile.ownerName,
+                    address: profile.address,
+                    shopLogo: profile.logo,
+                    createdAt: new Date()
+                });
 
-                    alert("Product Added Successfully to Firebase! 🎉");
-                    document.getElementById('pName').value = '';
-                    document.getElementById('pPrice').value = '';
-                    document.getElementById('pMaterial').value = '';
-                    document.getElementById('pWarranty').value = '';
-                    document.getElementById('pDesc').value = '';
-                } catch (error) {
-                    console.error("Error adding document: ", error);
-                    alert("Error: " + error.message);
-                }
-            });
+                alert("Product Added Successfully to Firebase! 🎉");
+                document.getElementById('pName').value = '';
+                document.getElementById('pPrice').value = '';
+                document.getElementById('pMaterial').value = '';
+                document.getElementById('pWarranty').value = '';
+                document.getElementById('pImageFile').value = '';
+                document.getElementById('pDesc').value = '';
+            } catch (error) {
+                console.error("Error adding document: ", error);
+                alert("Error: " + error.message);
+            }
         };
 
         window.onload = function() {
