@@ -3,38 +3,93 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DesiMarket - Home</title>
+    <title>DesiMarket - India's Desi Online Marketplace</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; background-color: #f4f4f4; }
-        header { background-color: #232f3e; color: white; padding: 15px; display: flex; align-items: center; justify-content: space-between; }
-        .logo { font-size: 20px; font-weight: bold; }
-        .search-bar { flex: 1; margin: 0 15px; }
-        .search-bar input { width: 100%; padding: 8px; border-radius: 4px; border: none; }
-        .menu-icon { font-size: 24px; cursor: pointer; }
+        :root {
+            --primary-color: #232f3e;
+            --secondary-color: #ffd814;
+            --accent-color: #ff9900;
+            --bg-color: #eaeded;
+        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background-color: var(--bg-color); color: #0f1111; }
         
+        /* Header / Navbar */
+        header { background-color: var(--primary-color); color: white; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 1000; }
+        .logo-area { font-size: 22px; font-weight: bold; color: white; text-decoration: none; display: flex; align-items: center; gap: 5px; }
+        .logo-area span { color: var(--accent-color); }
+        
+        .search-container { flex: 1; max-width: 600px; margin: 0 20px; display: flex; }
+        .search-container input { width: 100%; padding: 10px 15px; border: none; border-radius: 4px 0 0 4px; font-size: 15px; outline: none; }
+        .search-btn { background-color: var(--secondary-color); border: none; padding: 0 20px; border-radius: 0 4px 4px 0; cursor: pointer; font-size: 16px; color: #111; }
+        
+        .nav-actions { display: flex; align-items: center; gap: 20px; }
+        .nav-link { color: white; text-decoration: none; font-size: 14px; display: flex; flex-direction: column; align-items: center; }
+        .nav-link i { font-size: 18px; margin-bottom: 2px; }
+        .nav-link:hover { color: var(--secondary-color); }
+
         /* Side Menu */
-        .side-menu { height: 100%; width: 0; position: fixed; z-index: 1000; top: 0; right: 0; background-color: #232f3e; overflow-x: hidden; transition: 0.3s; padding-top: 60px; }
-        .side-menu a { padding: 15px 25px; text-decoration: none; font-size: 18px; color: white; display: block; }
+        .side-menu { height: 100%; width: 0; position: fixed; z-index: 2000; top: 0; right: 0; background-color: #232f3e; overflow-x: hidden; transition: 0.3s; padding-top: 60px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); }
+        .side-menu a { padding: 12px 25px; text-decoration: none; font-size: 18px; color: white; display: block; transition: 0.2s; }
+        .side-menu a:hover { background-color: #37475a; }
         .side-menu .close-btn { position: absolute; top: 10px; right: 20px; font-size: 30px; }
+
+        /* Hero Banner Section */
+        .hero-banner { background: linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url('https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&auto=format&fit=crop&q=80') center/cover; height: 250px; display: flex; align-items: center; justify-content: center; color: white; text-align: center; margin-bottom: 20px; }
+        .hero-banner h1 { font-size: 32px; text-shadow: 2px 2px 4px rgba(0,0,0,0.6); margin: 0; }
+
+        /* Main Container & Products Grid */
+        .container { max-width: 1200px; margin: 0 auto; padding: 15px; }
+        .section-title { font-size: 20px; font-weight: bold; margin-bottom: 15px; color: #333; border-bottom: 2px solid #ddd; padding-bottom: 8px; }
         
-        .container { padding: 20px; }
-        .product-card { background: white; padding: 15px; margin-bottom: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .product-card img { width: 100%; height: 200px; object-fit: cover; border-radius: 5px; }
+        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; }
+        .product-card { background: white; border-radius: 8px; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s; }
+        .product-card:hover { transform: translateY(-3px); box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+        
+        .product-card img { width: 100%; height: 180px; object-fit: cover; border-radius: 5px; margin-bottom: 10px; background-color: #eee; }
+        .product-title { font-size: 16px; font-weight: bold; color: #0f1111; margin-bottom: 5px; }
+        .shop-badge { font-size: 12px; color: #565959; margin-bottom: 8px; }
+        .product-price { font-size: 18px; font-weight: bold; color: #B12704; margin-bottom: 10px; }
+        
+        .btn-cart { background-color: var(--secondary-color); border: 1px solid #fcd200; padding: 10px; font-weight: bold; border-radius: 4px; cursor: pointer; width: 100%; font-size: 14px; transition: background 0.2s; }
+        .btn-cart:hover { background-color: #f7ca00; }
+        
+        .loading-text, .no-product { grid-column: 1 / -1; text-align: center; padding: 40px; font-size: 16px; color: #666; background: white; border-radius: 8px; }
+
+        /* Responsive */
+        @media(max-width: 768px) {
+            .search-container { display: none; } /* Mobile optimization */
+            .mobile-search { display: flex; padding: 10px 15px; background: #232f3e; }
+            .mobile-search input { width: 100%; padding: 8px; border-radius: 4px; border: none; }
+        }
+        .mobile-search { display: none; }
     </style>
 </head>
 <body>
 
+    <!-- Header -->
     <header>
-        <div class="logo">DesiMarket</div>
-        <div class="search-bar">
-            <input type="text" id="searchInput" placeholder="Search products...">
+        <a href="index.html" class="logo-area">Desi<span>Market</span></a>
+        
+        <div class="search-container">
+            <input type="text" id="searchInput" placeholder="Search products, local shops, items...">
+            <button class="search-btn"><i class="fas fa-search"></i></button>
         </div>
-        <div class="menu-icon" onclick="toggleMenu()">
-            <i class="fas fa-bars"></i>
+
+        <div class="nav-actions">
+            <a href="orders.html" class="nav-link"><i class="fas fa-box"></i><span>Orders</span></a>
+            <a href="cart.html" class="nav-link"><i class="fas fa-shopping-cart"></i><span>Cart</span></a>
+            <a href="account.html" class="nav-link"><i class="fas fa-user"></i><span>Account</span></a>
+            <div class="nav-link" onclick="toggleMenu()" style="cursor: pointer;"><i class="fas fa-bars"></i><span>Menu</span></div>
         </div>
     </header>
 
+    <!-- Mobile Search Bar -->
+    <div class="mobile-search">
+        <input type="text" id="mobileSearchInput" placeholder="Search products...">
+    </div>
+
+    <!-- Side Menu Drawer -->
     <div id="sideMenu" class="side-menu">
         <a href="javascript:void(0)" class="close-btn" onclick="toggleMenu()">&times;</a>
         <a href="index.html"><i class="fas fa-home"></i> Home</a>
@@ -42,22 +97,109 @@
         <a href="cart.html"><i class="fas fa-shopping-cart"></i> Cart</a>
         <hr style="border: 0.5px solid #444;">
         <a href="account.html"><i class="fas fa-user-circle"></i> Buyer Account</a>
-        <a href="seller-dashboard.html"><i class="fas fa-store"></i> Seller Dashboard</a>
+        <a href="seller-dashboard.html"><i class="fas fa-store"></i> Seller Hub (डैशबोर्ड)</a>
     </div>
 
+    <!-- Hero Banner -->
+    <div class="hero-banner">
+        <h1>Vocal for Local - DesiMarket Direct from Vendors</h1>
+    </div>
+
+    <!-- Main Content -->
     <div class="container">
-        <h2>Available Products</h2>
-        <div id="productGrid">
-            <!-- Products will appear here -->
+        <div class="section-title">Trending Live Products</div>
+        <div id="productGrid" class="product-grid">
+            <div class="loading-text">Loading live products from Firebase database...</div>
         </div>
     </div>
 
-    <script src="script.js"></script>
-    <script>
-        function toggleMenu() {
+    <!-- Firebase SDK & Live Fetch Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD7cgnLiY8yuc3EPiCvmDkpfwhgltR-x-g",
+            authDomain: "desimarket-4b8a5.firebaseapp.com",
+            projectId: "desimarket-4b8a5",
+            storageBucket: "desimarket-4b8a5.firebasestorage.app",
+            messagingSenderId: "761756037231",
+            appId: "1:761756037231:web:f09e5b6abb55947cf85d9a"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        let allProducts = [];
+
+        // Toggle Hamburger Menu
+        window.toggleMenu = function() {
             const menu = document.getElementById('sideMenu');
             menu.style.width = menu.style.width === '250px' ? '0' : '250px';
         }
+
+        // Fetch Products from Firestore 'vendors' collection
+        async function fetchLiveProducts() {
+            const grid = document.getElementById('productGrid');
+            try {
+                const querySnapshot = await getDocs(collection(db, "vendors"));
+                allProducts = [];
+                querySnapshot.forEach((doc) => {
+                    allProducts.push({ id: doc.id, ...doc.data() });
+                });
+
+                displayProducts(allProducts);
+            } catch (error) {
+                console.error("Error fetching products: ", error);
+                grid.innerHTML = `<div class="no-product">Error loading products. Please check connection.</div>`;
+            }
+        }
+
+        // Render Products on Grid
+        function displayProducts(products) {
+            const grid = document.getElementById('productGrid');
+            grid.innerHTML = '';
+
+            if (products.length === 0) {
+                grid.innerHTML = `<div class="no-product">No products found. Add products from the <a href="seller-dashboard.html">Seller Hub</a>!</div>`;
+                return;
+            }
+
+            products.forEach((product) => {
+                grid.innerHTML += `
+                    <div class="product-card">
+                        <div>
+                            <img src="${product.image || 'https://via.placeholder.com/250'}" alt="${product.name}" onerror="this.src='https://via.placeholder.com/250?text=No+Image'">
+                            <div class="product-title">${product.name}</div>
+                            <div class="shop-badge"><i class="fas fa-store"></i> ${product.shopName || 'Local Seller'}</div>
+                            <div class="product-price">₹${product.price} <span style="font-size: 12px; color: #565959; font-weight: normal;">(${product.unit || 'Per Unit'})</span></div>
+                        </div>
+                        <button class="btn-cart" onclick='addToCart(${JSON.stringify(product)})'>Add to Cart</button>
+                    </div>
+                `;
+            });
+        }
+
+        // Add to Cart Logic
+        window.addToCart = function(product) {
+            let cart = JSON.parse(localStorage.getItem('cart')) || [];
+            cart.push(product);
+            localStorage.setItem('cart', JSON.stringify(cart));
+            alert(`${product.name} successfully added to cart! 🛍️`);
+        }
+
+        // Search Filter Logic
+        function filterProducts() {
+            const query = (document.getElementById('searchInput').value || document.getElementById('mobileSearchInput').value).toLowerCase();
+            const filtered = allProducts.filter(p => p.name.toLowerCase().includes(query) || (p.shopName && p.shopName.toLowerCase().includes(query)));
+            displayProducts(filtered);
+        }
+
+        document.getElementById('searchInput').addEventListener('input', filterProducts);
+        document.getElementById('mobileSearchInput').addEventListener('input', filterProducts);
+
+        // Load products when page opens
+        window.onload = fetchLiveProducts;
     </script>
 </body>
 </html>
