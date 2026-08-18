@@ -58,7 +58,7 @@
 
         /* Responsive */
         @media(max-width: 768px) {
-            .search-container { display: none; } /* Mobile optimization */
+            .search-container { display: none; }
             .mobile-search { display: flex; padding: 10px 15px; background: #232f3e; }
             .mobile-search input { width: 100%; padding: 8px; border-radius: 4px; border: none; }
         }
@@ -155,7 +155,7 @@
             }
         }
 
-        // Render Products on Grid
+        // Render Products on Grid (Fixed NaN Issue)
         function displayProducts(products) {
             const grid = document.getElementById('productGrid');
             grid.innerHTML = '';
@@ -166,13 +166,16 @@
             }
 
             products.forEach((product) => {
+                const price = parseFloat(product.price);
+                const displayPrice = isNaN(price) ? '0' : price.toFixed(2);
+
                 grid.innerHTML += `
                     <div class="product-card">
                         <div>
                             <img src="${product.image || 'https://via.placeholder.com/250'}" alt="${product.name}" onerror="this.src='https://via.placeholder.com/250?text=No+Image'">
                             <div class="product-title">${product.name}</div>
                             <div class="shop-badge"><i class="fas fa-store"></i> ${product.shopName || 'Local Seller'}</div>
-                            <div class="product-price">₹${product.price} <span style="font-size: 12px; color: #565959; font-weight: normal;">(${product.unit || 'Per Unit'})</span></div>
+                            <div class="product-price">₹${displayPrice}</div>
                         </div>
                         <button class="btn-cart" onclick='addToCart(${JSON.stringify(product)})'>Add to Cart</button>
                     </div>
