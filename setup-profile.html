@@ -37,13 +37,14 @@
     <div class="container">
         <h2>Complete Your Profile</h2>
         
-        <!-- Profile Picture Upload Section -->
-        <div class="photo-section">
-            <div>
-                <img id="profilePreview" class="preview-img" src="" alt="Photo">
-            </div>
-            <label for="profileImageInput" style="cursor: pointer; color: #0066c0; font-weight: bold; font-size: 14px;">Upload Profile Photo / Logo</label>
-            <input type="file" id="profileImageInput" accept="image/*" style="display: none;" onchange="previewPhoto(event)">
+        <!-- Profile Picture Link Section -->
+        <div class="form-group">
+            <label>Profile Photo Link (Postimages URL)</label>
+            <input type="url" id="profileImageUrl" placeholder="https://i.postimg.cc/..." oninput="previewPhotoLink(this.value)">
+        </div>
+
+        <div class="form-group" style="text-align: center;">
+            <img id="profilePreview" class="preview-img" src="" alt="Photo Preview">
         </div>
 
         <div class="form-group">
@@ -76,30 +77,27 @@
     </div>
 
     <script>
-        let base64Image = "";
-
-        // Load existing name if saved from login page
+        // Load existing data if available
         window.onload = function() {
             const user = JSON.parse(localStorage.getItem('currentUser'));
             if (user) {
                 if (user.name) document.getElementById('setupName').value = user.name;
+                if (user.surname) document.getElementById('setupSurname').value = user.surname;
+                if (user.phone) document.getElementById('setupPhone').value = user.phone;
+                if (user.state) document.getElementById('setupState').value = user.state;
+                if (user.district) document.getElementById('setupDistrict').value = user.district;
+                if (user.city) document.getElementById('setupCity').value = user.city;
                 if (user.photo) {
-                    base64Image = user.photo;
+                    document.getElementById('profileImageUrl').value = user.photo;
                     document.getElementById('profilePreview').src = user.photo;
                 }
             }
         };
 
-        // Convert image to Base64 so it can be saved in localStorage
-        function previewPhoto(event) {
-            const file = event.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    base64Image = e.target.result;
-                    document.getElementById('profilePreview').src = base64Image;
-                };
-                reader.readAsDataURL(file);
+        // Live preview when URL is typed or pasted
+        function previewPhotoLink(url) {
+            if (url) {
+                document.getElementById('profilePreview').src = url;
             }
         }
 
@@ -112,8 +110,10 @@
             user.state = document.getElementById('setupState').value.trim();
             user.district = document.getElementById('setupDistrict').value.trim();
             user.city = document.getElementById('setupCity').value.trim();
-            if (base64Image) {
-                user.photo = base64Image;
+            
+            const photoUrl = document.getElementById('profileImageUrl').value.trim();
+            if (photoUrl) {
+                user.photo = photoUrl;
             }
 
             localStorage.setItem('currentUser', JSON.stringify(user));
