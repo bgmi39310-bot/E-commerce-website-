@@ -13,25 +13,6 @@ if (!localStorage.getItem('cart')) {
     localStorage.setItem('cart', JSON.stringify([]));
 }
 
-// Function to handle selling a new product
-const sellForm = document.getElementById('sellForm');
-if (sellForm) {
-    sellForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        const name = document.getElementById('productName').value;
-        const price = Number(document.getElementById('productPrice').value);
-        const image = document.getElementById('productImage').value;
-        const desc = document.getElementById('productDesc').value;
-
-        const products = JSON.parse(localStorage.getItem('products'));
-        products.push({ name, price, image, desc });
-        localStorage.setItem('products', JSON.stringify(products));
-
-        alert('Product published successfully!');
-        window.location.href = 'index.html';
-    });
-}
-
 // Function to display products on the homepage with search filter
 function displayProducts(filterText = "") {
     const productGrid = document.getElementById('productGrid');
@@ -50,11 +31,10 @@ function displayProducts(filterText = "") {
     }
 
     filteredProducts.forEach((product, index) => {
-        // Find original index for cart mapping
         const originalIndex = products.findIndex(p => p.name === product.name);
         productGrid.innerHTML += `
             <div class="product-card">
-                <img src="${product.image}" alt="${product.name}">
+                <img src="${product.image}" alt="${product.name}" onerror="this.src='https://via.placeholder.com/250?text=Invalid+Image'">
                 <h3>${product.name}</h3>
                 <div class="price">₹${product.price}</div>
                 <p style="font-size: 13px; color: #666;">${product.desc}</p>
@@ -100,7 +80,7 @@ if (cartItemsContainer) {
             total += item.price;
             cartItemsContainer.innerHTML += `
                 <div class="cart-item">
-                    <img src="${item.image}" alt="${item.name}">
+                    <img src="${item.image}" alt="${item.name}" onerror="this.src='https://via.placeholder.com/100?text=Image'">
                     <div class="item-details">
                         <div class="item-title">${item.name}</div>
                         <div class="item-price">₹${item.price}</div>
