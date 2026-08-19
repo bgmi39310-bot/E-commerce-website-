@@ -3,16 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Orders - DesiMarket</title>
+    <title>Orders Hub - DesiMarket</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
         
-        /* Header & Menu Icon Styling */
         header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: relative; }
         .menu-icon { cursor: pointer; display: flex; flex-direction: column; gap: 5px; }
         .menu-icon span { width: 25px; height: 3px; background-color: white; border-radius: 2px; }
 
-        /* Side Menu Drawer */
         .side-menu { height: 100%; width: 0; position: fixed; z-index: 1000; top: 0; right: 0; background-color: #232f3e; overflow-x: hidden; transition: 0.3s; padding-top: 60px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); }
         .side-menu a { padding: 12px 25px; text-decoration: none; font-size: 18px; color: white; display: block; transition: 0.2s; }
         .side-menu a:hover { background-color: #37475a; }
@@ -21,18 +19,22 @@
         .container { max-width: 800px; margin: 20px auto; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         h2 { color: #232f3e; margin-top: 0; }
         
-        .order-card { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 15px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .order-card { background: #fff; border: 1px solid #ddd; border-left: 5px solid #ffd814; border-radius: 6px; padding: 15px; margin-bottom: 15px; }
         .order-info h4 { margin: 0 0 5px 0; color: #333; }
-        .order-info p { margin: 0; color: #666; font-size: 14px; }
-        .order-status { font-weight: bold; color: #007600; background-color: #e7f4e4; padding: 5px 10px; border-radius: 4px; font-size: 14px; }
+        .order-info p { margin: 4px 0; color: #555; font-size: 14px; }
+        .call-btn { display: inline-block; background-color: #28a745; color: white; padding: 8px 15px; text-decoration: none; border-radius: 4px; font-weight: bold; margin-top: 10px; font-size: 14px; }
+        .call-btn:hover { background-color: #218838; }
         .no-orders { text-align: center; color: #777; padding: 30px; font-size: 18px; }
+        
+        .tab-buttons { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab-btn { flex: 1; padding: 10px; background: #eee; border: none; font-weight: bold; cursor: pointer; border-radius: 5px; }
+        .tab-btn.active { background: #232f3e; color: white; }
     </style>
 </head>
 <body>
 
     <header>
-        <h2 style="color: white; margin:0;">DesiMarket</h2>
-        <!-- 3-Lines (Hamburger) Icon -->
+        <h2 style="color: white; margin:0; font-size: 18px;">DesiMarket Orders</h2>
         <div class="menu-icon" onclick="toggleMenu()">
             <span></span>
             <span></span>
@@ -40,7 +42,6 @@
         </div>
     </header>
 
-    <!-- Side Slide Menu -->
     <div id="sideMenu" class="side-menu">
         <a href="javascript:void(0)" class="close-btn" onclick="toggleMenu()">&times;</a>
         <a href="index.html">🏠 Home</a>
@@ -51,26 +52,70 @@
     </div>
 
     <div class="container">
-        <h2>My Order History</h2>
-        <div id="ordersContainer">
-            <!-- Orders will load here -->
+        <h2>Customer & Order Management</h2>
+        
+        <!-- Tabs to switch between My Orders (Buyer) and Incoming Orders (Seller) -->
+        <div class="tab-buttons">
+            <button class="tab-btn active" onclick="switchTab('buyer')" id="btnBuyerTab">My Placed Orders</button>
+            <button class="tab-btn" onclick="switchTab('seller')" id="btnSellerTab">Incoming Orders (Seller Hub)</button>
+        </div>
+
+        <!-- Buyer Orders View -->
+        <div id="buyerOrdersSection">
+            <div id="ordersContainer">
+                <p>Loading your orders...</p>
+            </div>
+        </div>
+
+        <!-- Seller Incoming Orders View -->
+        <div id="sellerOrdersSection" style="display: none;">
+            <div id="incomingOrdersContainer">
+                <p>Loading live database orders...</p>
+            </div>
         </div>
     </div>
 
-    <script>
+    <!-- Firebase SDKs & Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD7cgnLiY8yuc3EPiCvmDkpfwhgltR-x-g",
+            authDomain: "desimarket-4b8a5.firebaseapp.com",
+            projectId: "desimarket-4b8a5",
+            storageBucket: "desimarket-4b8a5.firebasestorage.app",
+            messagingSenderId: "761756037231",
+            appId: "1:761756037231:web:f09e5b6abb55947cf85d9a"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
         function toggleMenu() {
             const menu = document.getElementById('sideMenu');
-            if (menu.style.width === '250px') {
-                menu.style.width = '0';
-            } else {
-                menu.style.width = '250px';
-            }
+            menu.style.width = menu.style.width === '250px' ? '0' : '250px';
         }
+        window.toggleMenu = toggleMenu;
 
-        function loadOrders() {
-            // localStorage से आर्डर लोड करें
+        window.switchTab = function(type) {
+            if(type === 'buyer') {
+                document.getElementById('buyerOrdersSection').style.display = 'block';
+                document.getElementById('sellerOrdersSection').style.display = 'none';
+                document.getElementById('btnBuyerTab').classList.add('active');
+                document.getElementById('btnSellerTab').classList.remove('active');
+            } else {
+                document.getElementById('buyerOrdersSection').style.display = 'none';
+                document.getElementById('sellerOrdersSection').style.display = 'block';
+                document.getElementById('btnSellerTab').classList.add('active');
+                document.getElementById('btnBuyerTab').classList.remove('active');
+                fetchLiveSellerOrders();
+            }
+        };
+
+        // 1. Load Buyer's Local Orders
+        function loadBuyerOrders() {
             let orders = JSON.parse(localStorage.getItem('myOrders')) || [];
-
             const container = document.getElementById('ordersContainer');
             container.innerHTML = '';
 
@@ -83,16 +128,53 @@
                 container.innerHTML += `
                     <div class="order-card">
                         <div class="order-info">
-                            <h4>${o.name} (Qty: ${o.qty || 1})</h4>
-                            <p>Price: ₹${o.price} | Date: ${o.date || 'Recent'}</p>
+                            <h4>📦 ${o.name}</h4>
+                            <p><strong>Total Price:</strong> ₹${o.price} | <strong>Date:</strong> ${o.date || 'Recent'}</p>
+                            <p><strong>Status:</strong> ${o.status || 'Placed'}</p>
                         </div>
-                        <div class="order-status">${o.status || 'Placed'}</div>
                     </div>
                 `;
             });
         }
 
-        window.onload = loadOrders;
+        // 2. Fetch Live Orders from Firebase for Sellers
+        async function fetchLiveSellerOrders() {
+            const container = document.getElementById('incomingOrdersContainer');
+            container.innerHTML = "<p>Fetching live orders...</p>";
+
+            try {
+                const querySnapshot = await getDocs(collection(db, "orders"));
+                if (querySnapshot.empty) {
+                    container.innerHTML = "<div class='no-orders'>No incoming orders found in database.</div>";
+                    return;
+                }
+
+                let html = "";
+                querySnapshot.forEach((doc) => {
+                    const order = doc.data();
+                    html += `
+                        <div class="order-card">
+                            <div class="order-info">
+                                <h4>🛒 Product: ${order.productName || 'General Item'} (Qty: ${order.quantity || 1})</h4>
+                                <p><strong>Buyer Name:</strong> ${order.buyerName || 'Customer'}</p>
+                                <p><strong>Phone Number:</strong> ${order.buyerPhone || 'N/A'}</p>
+                                <p><strong>Delivery Address:</strong> ${order.buyerAddress || 'N/A'}</p>
+                                <p><strong>Amount:</strong> ₹${order.price || 0}</p>
+                                <a href="tel:${order.buyerPhone}" class="call-btn">📞 Call Buyer Now</a>
+                            </div>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            } catch (error) {
+                console.error("Error fetching live orders: ", error);
+                container.innerHTML = "<p style='color:red;'>Error loading orders from database.</p>";
+            }
+        }
+
+        window.onload = function() {
+            loadBuyerOrders();
+        };
     </script>
 </body>
 </html>
