@@ -31,7 +31,7 @@
 <body>
 
     <header>
-        <h2>DesiMarket</h2>
+        <h2 style="color: white; margin:0;">DesiMarket</h2>
         <!-- 3-Lines (Hamburger) Icon -->
         <div class="menu-icon" onclick="toggleMenu()">
             <span></span>
@@ -68,10 +68,8 @@
         }
 
         function loadOrders() {
-            // हम cart से आर्डर स्टोर करने का लॉजिक जोड़ सकते हैं, अभी के लिए डमी आर्डर दिखा रहे हैं
-            let orders = JSON.parse(localStorage.getItem('myOrders')) || [
-                { id: "ORD101", name: "Smart Watch", price: 1999, date: "13 Aug 2026", status: "Delivered" }
-            ];
+            // localStorage से आर्डर लोड करें
+            let orders = JSON.parse(localStorage.getItem('myOrders')) || [];
 
             const container = document.getElementById('ordersContainer');
             container.innerHTML = '';
@@ -85,10 +83,10 @@
                 container.innerHTML += `
                     <div class="order-card">
                         <div class="order-info">
-                            <h4>${o.name} (Order ID: ${o.id})</h4>
-                            <p>Price: ₹${o.price} | Date: ${o.date}</p>
+                            <h4>${o.name} (Qty: ${o.qty || 1})</h4>
+                            <p>Price: ₹${o.price} | Date: ${o.date || 'Recent'}</p>
                         </div>
-                        <div class="order-status">${o.status}</div>
+                        <div class="order-status">${o.status || 'Placed'}</div>
                     </div>
                 `;
             });
