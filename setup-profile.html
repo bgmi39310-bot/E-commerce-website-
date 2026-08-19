@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Setup Profile - DesiMarket</title>
     <style>
+        * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
-        
+
         header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; align-items: center; position: sticky; top: 0; z-index: 998; }
         .back-arrow { font-size: 22px; cursor: pointer; margin-right: 15px; }
         .header-title { flex-grow: 1; font-size: 18px; font-weight: bold; }
@@ -17,9 +18,14 @@
         .form-group { margin-bottom: 15px; }
         label { display: block; font-weight: bold; color: #555; margin-bottom: 5px; font-size: 14px; }
         input, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; background: #fff; font-size: 15px; }
-        
+
         .btn-save { background-color: #ffd814; color: #111; border: 1px solid #fcd200; width: 100%; padding: 12px; font-weight: bold; border-radius: 5px; cursor: pointer; font-size: 16px; margin-top: 20px; }
         .btn-save:hover { background-color: #f7ca00; }
+        .btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .save-msg { text-align: center; font-size: 13px; color: #28a745; margin-top: 10px; display: none; }
+        .login-needed { text-align: center; padding: 40px 10px; color: #666; }
+        .login-needed a { display:inline-block; margin-top:10px; background:#ffd814; padding:10px 22px; border-radius:5px; text-decoration:none; color:#111; font-weight:bold; }
     </style>
 </head>
 <body>
@@ -29,78 +35,69 @@
         <div class="header-title">Setup / Edit Profile</div>
     </header>
 
-    <div class="container">
-        <h2>Complete Your Profile</h2>
-        
-        <div class="form-group">
-            <label>First Name:</label>
-            <input type="text" id="pName" placeholder="Enter first name">
-        </div>
-        <div class="form-group">
-            <label>Surname (Last Name):</label>
-            <input type="text" id="pSurname" placeholder="Enter surname">
-        </div>
-        <div class="form-group">
-            <label>Email Address:</label>
-            <input type="email" id="pEmail" placeholder="Enter email">
-        </div>
-        <div class="form-group">
-            <label>Phone Number:</label>
-            <input type="text" id="pPhone" placeholder="Enter phone number">
-        </div>
-        <div class="form-group">
-            <label>State (Pradesh):</label>
-            <input type="text" id="pState" placeholder="e.g. Uttar Pradesh / Bihar">
-        </div>
-        <div class="form-group">
-            <label>District (Zila):</label>
-            <input type="text" id="pDistrict" placeholder="Enter district">
-        </div>
-        <div class="form-group">
-            <label>City / Village:</label>
-            <input type="text" id="pCity" placeholder="Enter city or village">
-        </div>
-        <div class="form-group">
-            <label>Profile Photo Link (Postimages / Image URL):</label>
-            <input type="url" id="pPhoto" placeholder="https://i.postimg.cc/...">
-        </div>
-
-        <button class="btn-save" onclick="saveProfile()">Save Profile</button>
+    <div class="container" id="pageContent">
+        <p style="text-align:center; color:#888;">Loading...</p>
     </div>
 
-    <!-- Firebase SDKs & Logic -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { auth, db } from './firebase-config.js';
+        import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyD7cgnLiY8yuc3EPiCvmDkpfwhgltR-x-g",
-            authDomain: "desimarket-4b8a5.firebaseapp.com",
-            projectId: "desimarket-4b8a5",
-            storageBucket: "desimarket-4b8a5.firebasestorage.app",
-            messagingSenderId: "761756037231",
-            appId: "1:761756037231:web:f09e5b6abb55947cf85d9a"
-        };
+        let currentUid = null;
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
+        function renderForm(existing) {
+            const content = document.getElementById('pageContent');
+            content.innerHTML = `
+                <h2>Complete Your Profile</h2>
 
-        // पेज लोड होने पर अगर पहले से डेटा है, तो फॉर्म में भर दें
-        window.onload = function() {
-            const user = JSON.parse(localStorage.getItem('currentUser'));
-            if (user) {
-                document.getElementById('pName').value = user.name || '';
-                document.getElementById('pSurname').value = user.surname || '';
-                document.getElementById('pEmail').value = user.email || '';
-                document.getElementById('pPhone').value = user.phone || '';
-                document.getElementById('pState').value = user.state || '';
-                document.getElementById('pDistrict').value = user.district || '';
-                document.getElementById('pCity').value = user.city || '';
-                document.getElementById('pPhoto').value = user.photo || '';
+                <div class="form-group">
+                    <label>First Name:</label>
+                    <input type="text" id="pName" placeholder="Enter first name" value="${existing.name || ''}">
+                </div>
+                <div class="form-group">
+                    <label>Surname (Last Name):</label>
+                    <input type="text" id="pSurname" placeholder="Enter surname" value="${existing.surname || ''}">
+                </div>
+                <div class="form-group">
+                    <label>Phone Number:</label>
+                    <input type="text" id="pPhone" placeholder="Enter phone number" value="${existing.phone || ''}">
+                </div>
+                <div class="form-group">
+                    <label>State (Pradesh):</label>
+                    <input type="text" id="pState" placeholder="e.g. Uttar Pradesh / Bihar" value="${existing.state || ''}">
+                </div>
+                <div class="form-group">
+                    <label>District (Zila):</label>
+                    <input type="text" id="pDistrict" placeholder="Enter district" value="${existing.district || ''}">
+                </div>
+                <div class="form-group">
+                    <label>City / Village:</label>
+                    <input type="text" id="pCity" placeholder="Enter city or village" value="${existing.city || ''}">
+                </div>
+                <div class="form-group">
+                    <label>Profile Photo Link (Postimages / Image URL):</label>
+                    <input type="url" id="pPhoto" placeholder="https://i.postimg.cc/..." value="${existing.photo || ''}">
+                </div>
+
+                <button class="btn-save" id="saveBtn">Save Profile</button>
+                <p class="save-msg" id="saveMsg">Profile updated successfully!</p>
+            `;
+
+            document.getElementById('saveBtn').addEventListener('click', saveProfile);
+        }
+
+        async function loadExistingProfile(uid) {
+            try {
+                const snap = await getDoc(doc(db, "users", uid));
+                renderForm(snap.exists() ? snap.data() : {});
+            } catch (error) {
+                console.error(error);
+                renderForm({});
             }
-        };
+        }
 
-        window.saveProfile = async function() {
+        async function saveProfile() {
             const name = document.getElementById('pName').value.trim();
             const phone = document.getElementById('pPhone').value.trim();
 
@@ -109,37 +106,48 @@
                 return;
             }
 
+            const btn = document.getElementById('saveBtn');
+            btn.disabled = true;
+            btn.innerText = 'Saving...';
+
             const userData = {
                 name: name,
                 surname: document.getElementById('pSurname').value.trim(),
-                email: document.getElementById('pEmail').value.trim(),
                 phone: phone,
                 state: document.getElementById('pState').value.trim(),
                 district: document.getElementById('pDistrict').value.trim(),
                 city: document.getElementById('pCity').value.trim(),
-                photo: document.getElementById('pPhoto').value.trim() || "https://via.placeholder.com/100?text=No+Photo",
+                photo: document.getElementById('pPhoto').value.trim(),
                 updatedAt: new Date()
             };
 
-            alert("प्रोफाइल सेव हो रही है...");
-
             try {
-                // 1. लोकल स्टोरेज में तुरंत सेव करें (ताकि साइट सुपर-फास्ट चले)
-                localStorage.setItem('currentUser', JSON.stringify(userData));
+                // setDoc with merge:true updates the SAME document each time,
+                // instead of creating a new duplicate document on every save.
+                await setDoc(doc(db, "users", currentUid), userData, { merge: true });
 
-                // 2. डेटाबेस (Firebase) में भी सेव करें
-                await addDoc(collection(db, "users"), userData);
-
-                alert("Profile Saved Successfully to Database & Local Storage! 🎉");
-                window.location.href = "account.html";
-
+                document.getElementById('saveMsg').style.display = 'block';
+                setTimeout(() => { window.location.href = "account.html"; }, 900);
             } catch (error) {
-                console.error("Profile save error: ", error);
-                // अगर डेटाबेस में एरर आए, तब भी लोकल स्टोरेज की वजह से ऐप नहीं रुकेगा
-                alert("Profile saved locally, but database sync had an issue: " + error.message);
-                window.location.href = "account.html";
+                console.error(error);
+                alert("Error saving profile: " + error.message);
+                btn.disabled = false;
+                btn.innerText = 'Save Profile';
             }
         }
+
+        onAuthStateChanged(auth, (user) => {
+            if (!user) {
+                document.getElementById('pageContent').innerHTML = `
+                    <div class="login-needed">
+                        <p>Please login first to set up your profile.</p>
+                        <a href="login.html">Login / Create Account</a>
+                    </div>`;
+                return;
+            }
+            currentUid = user.uid;
+            loadExistingProfile(user.uid);
+        });
     </script>
 </body>
 </html>
