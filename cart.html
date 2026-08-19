@@ -5,19 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cart - DesiMarket</title>
     <style>
+        * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
-        
+
         header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; align-items: center; position: sticky; top: 0; z-index: 998; }
         .back-arrow { font-size: 22px; cursor: pointer; margin-right: 15px; }
         .header-title { flex-grow: 1; font-size: 18px; font-weight: bold; }
-        
-        .container { max-width: 800px; margin: 20px auto; padding: 20px; }
+
+        .container { max-width: 800px; margin: 20px auto; padding: 15px; }
         .cart-item { background: white; padding: 15px; border-radius: 8px; display: flex; align-items: center; gap: 15px; margin-bottom: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .cart-item img { width: 70px; height: 70px; object-fit: cover; border-radius: 5px; }
-        .item-details { flex-grow: 1; }
+        .cart-item img { width: 70px; height: 70px; object-fit: cover; border-radius: 5px; flex-shrink: 0; cursor: pointer; }
+        .item-details { flex-grow: 1; min-width: 0; }
+        .item-details h4 { margin: 0 0 5px 0; font-size: 15px; cursor: pointer; }
+        .item-price-row { color: #b12704; font-weight: bold; font-size: 14px; margin-bottom: 6px; }
+
+        .qty-stepper { display: inline-flex; align-items: center; border: 1px solid #ccc; border-radius: 6px; overflow: hidden; margin-right: 10px; vertical-align: middle; }
+        .qty-stepper button { background: #f0f2f2; border: none; width: 26px; height: 26px; font-size: 14px; cursor: pointer; }
+        .qty-stepper span { width: 30px; text-align: center; font-size: 13px; font-weight: bold; display: inline-block; }
+
         .total-box { background: white; padding: 20px; border-radius: 8px; text-align: right; font-size: 18px; font-weight: bold; margin-top: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .btn-checkout { background-color: #ffd814; border: 1px solid #fcd200; padding: 12px 25px; font-weight: bold; cursor: pointer; border-radius: 5px; font-size: 16px; margin-top: 15px; width: 100%; }
-        .remove-btn { color: #ff4d4d; cursor: pointer; font-size: 13px; font-weight: bold; border: none; background: none; margin-top: 5px; }
+        .btn-checkout:hover { background-color: #f7ca00; }
+        .remove-btn { color: #ff4d4d; cursor: pointer; font-size: 13px; font-weight: bold; border: none; background: none; padding: 0; }
+
+        .empty-cart { text-align: center; padding: 50px 20px; background: white; border-radius: 8px; color: #666; }
+        .empty-cart a { display: inline-block; margin-top: 12px; background: #ffd814; padding: 10px 22px; border-radius: 5px; text-decoration: none; color: #111; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -28,34 +40,17 @@
     </header>
 
     <div class="container">
-        <h2>Your Cart Items</h2>
         <div id="cartList"></div>
         <div id="cartSummary" style="display:none;">
             <div class="total-box">
                 Total Amount: <span id="grandTotal" style="color: #b12704;">₹0</span>
                 <br>
-                <button class="btn-checkout" onclick="checkout()">Proceed to Checkout</button>
+                <button class="btn-checkout" onclick="goToCheckout()">Proceed to Checkout</button>
             </div>
         </div>
     </div>
 
-    <!-- Firebase SDKs & Logic -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyD7cgnLiY8yuc3EPiCvmDkpfwhgltR-x-g",
-            authDomain: "desimarket-4b8a5.firebaseapp.com",
-            projectId: "desimarket-4b8a5",
-            storageBucket: "desimarket-4b8a5.firebasestorage.app",
-            messagingSenderId: "761756037231",
-            appId: "1:761756037231:web:f09e5b6abb55947cf85d9a"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-
+    <script>
         function loadCart() {
             let cart = JSON.parse(localStorage.getItem('cart')) || [];
             const cartList = document.getElementById('cartList');
@@ -63,7 +58,11 @@
             cartList.innerHTML = '';
 
             if (cart.length === 0) {
-                cartList.innerHTML = '<p style="text-align:center; color:#666;">Your cart is empty!</p>';
+                cartList.innerHTML = `
+                    <div class="empty-cart">
+                        <p>Your cart is empty!</p>
+                        <a href="index.html">Continue Shopping</a>
+                    </div>`;
                 summary.style.display = 'none';
                 return;
             }
@@ -72,78 +71,58 @@
             let total = 0;
 
             cart.forEach((item, index) => {
-                let itemQty = parseInt(item.qty || item.quantity) || 1;
+                let itemQty = parseInt(item.qty) || 1;
                 let itemPrice = parseFloat(item.price) || 0;
                 let itemTotal = itemPrice * itemQty;
                 total += itemTotal;
 
-                cartList.innerHTML += `
-                    <div class="cart-item">
-                        <img src="${item.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100'}" alt="Item" onerror="this.src='https://via.placeholder.com/100?text=No+Image'">
-                        <div class="item-details">
-                            <h4 style="margin:0 0 5px 0;">${item.name || 'Product'}</h4>
-                            <div style="color:#b12704; font-weight:bold;">₹${itemPrice.toFixed(2)} × ${itemQty} = ₹${itemTotal.toFixed(2)}</div>
-                            <small style="color:#555;">🏪 ${item.shopName || 'Local Shop'}</small><br>
-                            <button class="remove-btn" onclick="removeItem(${index})">Remove</button>
+                const div = document.createElement('div');
+                div.className = 'cart-item';
+                div.innerHTML = `
+                    <img src="${item.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100'}" alt="Item" onerror="this.src='https://via.placeholder.com/100?text=No+Image'" onclick="goToProduct('${item.id}')">
+                    <div class="item-details">
+                        <h4 onclick="goToProduct('${item.id}')">${item.name || 'Product'}</h4>
+                        <div class="item-price-row">₹${itemPrice.toFixed(0)} each</div>
+                        <div class="qty-stepper">
+                            <button onclick="changeQty(${index}, -1)">−</button>
+                            <span>${itemQty}</span>
+                            <button onclick="changeQty(${index}, 1)">+</button>
                         </div>
+                        <strong>= ₹${itemTotal.toFixed(0)}</strong><br>
+                        <small style="color:#555;">🏪 ${item.shopName || 'Local Shop'}</small><br>
+                        <button class="remove-btn" onclick="removeItem(${index})">Remove</button>
                     </div>
                 `;
+                cartList.appendChild(div);
             });
-            document.getElementById('grandTotal').innerText = "₹" + total.toFixed(2);
+            document.getElementById('grandTotal').innerText = "₹" + total.toFixed(0);
         }
 
-        window.removeItem = function(index) {
+        function goToProduct(id) {
+            if (id) window.location.href = `product.html?id=${id}`;
+        }
+
+        function changeQty(index, delta) {
+            let cart = JSON.parse(localStorage.getItem('cart')) || [];
+            let newQty = (parseInt(cart[index].qty) || 1) + delta;
+            if (newQty < 1) {
+                removeItem(index);
+                return;
+            }
+            cart[index].qty = newQty;
+            localStorage.setItem('cart', JSON.stringify(cart));
+            loadCart();
+        }
+
+        function removeItem(index) {
             let cart = JSON.parse(localStorage.getItem('cart')) || [];
             cart.splice(index, 1);
             localStorage.setItem('cart', JSON.stringify(cart));
             loadCart();
         }
 
-        window.checkout = async function() {
-            let cart = JSON.parse(localStorage.getItem('cart')) || [];
-            if (cart.length === 0) {
-                alert("Your cart is empty!");
-                return;
-            }
-
-            let currentUser = JSON.parse(localStorage.getItem('currentUser')) || { name: "Guest User", phone: "N/A" };
-            let pastOrders = JSON.parse(localStorage.getItem('myOrders')) || [];
-
-            alert("ऑर्डर प्रोसेस हो रहा है...");
-
-            try {
-                // 1. डेटाबेस (Firebase) में आर्डर सेव करें
-                for (let item of cart) {
-                    let orderData = {
-                        name: item.name,
-                        price: item.price,
-                        qty: item.qty || item.quantity || 1,
-                        shopName: item.shopName || "Local Shop",
-                        customerName: (currentUser.name || '') + ' ' + (currentUser.surname || ''),
-                        customerPhone: currentUser.phone || 'N/A',
-                        date: new Date().toLocaleDateString(),
-                        status: "Order Placed",
-                        createdAt: new Date()
-                    };
-
-                    // Firebase Firestore में 'orders' कलेक्शन में जोड़ें
-                    await addDoc(collection(db, "orders"), orderData);
-
-                    // लोकल स्टोरेज के लिए भी एरे में डालें
-                    pastOrders.push(orderData);
-                }
-
-                // 2. लोकल स्टोरेज अपडेट करें और कार्ट खाली करें
-                localStorage.setItem('myOrders', JSON.stringify(pastOrders));
-                localStorage.removeItem('cart');
-
-                alert("Order placed successfully and saved to Database! 🎉");
-                window.location.href = "orders.html";
-
-            } catch (error) {
-                console.error("Order error: ", error);
-                alert("Error placing order: " + error.message);
-            }
+        function goToCheckout() {
+            window.location.href = 'checkout.html';
         }
 
         window.onload = loadCart;
