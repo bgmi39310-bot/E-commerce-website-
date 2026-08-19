@@ -40,12 +40,28 @@
         .profile-info p { margin: 3px 0; color: #555; font-size: 14px; }
         .btn-edit { background-color: #232f3e; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 14px; margin-top: 10px; }
         .btn-edit:hover { background-color: #37475a; }
+
+        /* Order Management Styles inside Dashboard */
+        .order-card { background: #fff; border: 1px solid #ddd; border-left: 5px solid #ffd814; border-radius: 6px; padding: 15px; margin-bottom: 15px; }
+        .order-info h4 { margin: 0 0 5px 0; color: #333; }
+        .order-info p { margin: 4px 0; color: #555; font-size: 14px; }
+        .btn-group { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+        .dash-action-btn { padding: 6px 12px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 13px; color: white; }
+        .btn-accept { background-color: #28a745; }
+        .btn-ship { background-color: #007bff; }
+        .btn-cancel { background-color: #dc3545; }
+        .call-btn { background-color: #17a2b8; text-decoration: none; display: inline-block; padding: 6px 12px; border-radius: 4px; color: white; font-weight: bold; font-size: 13px; }
+        .no-orders { text-align: center; color: #777; padding: 20px; font-size: 15px; }
+        
+        .tab-buttons { display: flex; gap: 5px; margin-bottom: 15px; overflow-x: auto; }
+        .tab-btn { padding: 8px 12px; background: #eee; border: none; font-weight: bold; cursor: pointer; border-radius: 5px; font-size: 12px; white-space: nowrap; }
+        .tab-btn.active { background: #232f3e; color: white; }
     </style>
 </head>
 <body>
 
     <header>
-        <div class="header-title">Seller Hub & Profile</div>
+        <div class="header-title">Seller Hub & Dashboard</div>
         <div class="menu-icon" onclick="toggleMenu()">
             <span></span>
             <span></span>
@@ -125,11 +141,27 @@
                 <button onclick="addProductToFirebase()" class="action-btn full-width">List Product on Market</button>
             </div>
         </div>
+
+        <!-- 3. Customer Orders Management Section -->
+        <div class="card">
+            <h2>3. Customer Orders Management</h2>
+            
+            <div class="tab-buttons">
+                <button class="tab-btn active" onclick="filterOrders('Pending')" id="tabPending">⏳ Pending</button>
+                <button class="tab-btn" onclick="filterOrders('Accepted')" id="tabAccepted">✅ Accepted</button>
+                <button class="tab-btn" onclick="filterOrders('Shipped')" id="tabShipped">🚚 Shipped</button>
+                <button class="tab-btn" onclick="filterOrders('Cancelled')" id="tabCancelled">❌ Cancelled</button>
+            </div>
+
+            <div id="dashboardOrdersContainer">
+                <p>Loading database orders...</p>
+            </div>
+        </div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, getDocs, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyD7cgnLiY8yuc3EPiCvmDkpfwhgltR-x-g",
@@ -142,6 +174,9 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+
+        let allOrders = [];
+        let currentStatusFilter = 'Pending';
 
         function toggleMenu() {
             const menu = document.getElementById('sideMenu');
@@ -243,7 +278,83 @@
             }
         }
 
-        window.onload = loadProfileView;
+        // Fetch & Filter Orders for Dashboard
+        window.filterOrders = function(status) {
+            currentStatusFilter = status;
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            if(status === 'Pending') document.getElementById('tabPending').classList.add('active');
+            if(status === 'Accepted') document.getElementById('tabAccepted').classList.add('active');
+            if(status === 'Shipped') document.getElementById('tabShipped').classList.add('active');
+            if(status === 'Cancelled') document.getElementById('tabCancelled').classList.add('active');
+
+            displayDashboardOrders();
+        }
+
+        async function fetchDashboardOrders() {
+            const container = document.getElementById('dashboardOrdersContainer');
+            try {
+                const querySnapshot = await getDocs(collection(db, "orders"));
+                allOrders = [];
+                querySnapshot.forEach((docSnap) => {
+                    allOrders.push({ id: docSnap.id, ...docSnap.data() });
+                });
+                displayDashboardOrders();
+            } catch (error) {
+                console.error("Error fetching orders: ", error);
+                container.innerHTML = "<p style='color:red;'>Error loading orders.</p>";
+            }
+        }
+
+        function displayDashboardOrders() {
+            const container = document.getElementById('dashboardOrdersContainer');
+            const filtered = allOrders.filter(o => (o.status || 'Pending') === currentStatusFilter);
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div class="no-orders">No ${currentStatusFilter} orders found.</div>`;
+                return;
+            }
+
+            let html = "";
+            filtered.forEach(order => {
+                html += `
+                    <div class="order-card">
+                        <div class="order-info">
+                            <h4>📦 ${order.productName || 'Item'} (Qty: ${order.quantity || 1})</h4>
+                            <p><strong>Buyer:</strong> ${order.buyerName || 'Customer'}</p>
+                            <p><strong>Phone:</strong> ${order.buyerPhone || 'N/A'}</p>
+                            <p><strong>Address:</strong> ${order.buyerAddress || 'N/A'}</p>
+                            <p><strong>Amount:</strong> ₹${order.price || 0}</p>
+                            <p><strong>Status:</strong> <span style="font-weight:bold; color:#007600;">${order.status || 'Pending'}</span></p>
+                            
+                            <div class="btn-group">
+                                <a href="tel:${order.buyerPhone}" class="call-btn">📞 Call Buyer</a>
+                                ${currentStatusFilter === 'Pending' ? `<button class="dash-action-btn btn-accept" onclick="updateOrderStatus('${order.id}', 'Accepted')">Accept</button>` : ''}
+                                ${currentStatusFilter === 'Accepted' ? `<button class="dash-action-btn btn-ship" onclick="updateOrderStatus('${order.id}', 'Shipped')">Mark Shipped</button>` : ''}
+                                ${currentStatusFilter !== 'Cancelled' && currentStatusFilter !== 'Shipped' ? `<button class="dash-action-btn btn-cancel" onclick="updateOrderStatus('${order.id}', 'Cancelled')">Cancel</button>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        window.updateOrderStatus = async function(orderId, newStatus) {
+            try {
+                const orderRef = doc(db, "orders", orderId);
+                await updateDoc(orderRef, { status: newStatus });
+                alert(`Order marked as ${newStatus}!`);
+                fetchDashboardOrders();
+            } catch (error) {
+                console.error("Error updating status: ", error);
+                alert("Error updating order status.");
+            }
+        }
+
+        window.onload = function() {
+            loadProfileView();
+            fetchDashboardOrders();
+        };
     </script>
 </body>
 </html>
