@@ -3,38 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Orders Hub - DesiMarket</title>
+    <title>Orders Management - DesiMarket</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
         
-        header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: relative; }
+        header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 998; }
+        .header-title { font-size: 18px; font-weight: bold; }
+        
         .menu-icon { cursor: pointer; display: flex; flex-direction: column; gap: 5px; }
         .menu-icon span { width: 25px; height: 3px; background-color: white; border-radius: 2px; }
 
-        .side-menu { height: 100%; width: 0; position: fixed; z-index: 1000; top: 0; right: 0; background-color: #232f3e; overflow-x: hidden; transition: 0.3s; padding-top: 60px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); }
+        .side-menu { height: 100%; width: 0; position: fixed; z-index: 2000; top: 0; right: 0; background-color: #232f3e; overflow-x: hidden; transition: 0.3s; padding-top: 60px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); }
         .side-menu a { padding: 12px 25px; text-decoration: none; font-size: 18px; color: white; display: block; transition: 0.2s; }
         .side-menu a:hover { background-color: #37475a; }
         .side-menu .close-btn { position: absolute; top: 10px; right: 20px; font-size: 30px; margin-left: 50px; }
 
-        .container { max-width: 800px; margin: 20px auto; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .container { max-width: 900px; margin: 20px auto; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         h2 { color: #232f3e; margin-top: 0; }
         
         .order-card { background: #fff; border: 1px solid #ddd; border-left: 5px solid #ffd814; border-radius: 6px; padding: 15px; margin-bottom: 15px; }
         .order-info h4 { margin: 0 0 5px 0; color: #333; }
         .order-info p { margin: 4px 0; color: #555; font-size: 14px; }
-        .call-btn { display: inline-block; background-color: #28a745; color: white; padding: 8px 15px; text-decoration: none; border-radius: 4px; font-weight: bold; margin-top: 10px; font-size: 14px; }
-        .call-btn:hover { background-color: #218838; }
-        .no-orders { text-align: center; color: #777; padding: 30px; font-size: 18px; }
         
-        .tab-buttons { display: flex; gap: 10px; margin-bottom: 20px; }
-        .tab-btn { flex: 1; padding: 10px; background: #eee; border: none; font-weight: bold; cursor: pointer; border-radius: 5px; }
+        .btn-group { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+        .action-btn { padding: 6px 12px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 13px; color: white; }
+        .btn-accept { background-color: #28a745; }
+        .btn-ship { background-color: #007bff; }
+        .btn-cancel { background-color: #dc3545; }
+        .call-btn { background-color: #17a2b8; text-decoration: none; display: inline-block; padding: 6px 12px; border-radius: 4px; color: white; font-weight: bold; font-size: 13px; }
+
+        .no-orders { text-align: center; color: #777; padding: 30px; font-size: 16px; }
+        
+        .tab-buttons { display: flex; gap: 5px; margin-bottom: 20px; overflow-x: auto; }
+        .tab-btn { padding: 10px 15px; background: #eee; border: none; font-weight: bold; cursor: pointer; border-radius: 5px; font-size: 13px; white-space: nowrap; }
         .tab-btn.active { background: #232f3e; color: white; }
     </style>
 </head>
 <body>
 
     <header>
-        <h2 style="color: white; margin:0; font-size: 18px;">DesiMarket Orders</h2>
+        <div class="header-title">Orders Management</div>
         <div class="menu-icon" onclick="toggleMenu()">
             <span></span>
             <span></span>
@@ -49,36 +57,29 @@
         <a href="cart.html">🛍️ Cart</a>
         <a href="orders.html">📦 Orders</a>
         <a href="account.html">👤 Account</a>
+        <a href="checklist.html">🚀 Launch Checklist</a>
     </div>
 
     <div class="container">
-        <h2>Customer & Order Management</h2>
+        <h2>Live Store Orders</h2>
         
-        <!-- Tabs to switch between My Orders (Buyer) and Incoming Orders (Seller) -->
+        <!-- Status Tabs for Seller -->
         <div class="tab-buttons">
-            <button class="tab-btn active" onclick="switchTab('buyer')" id="btnBuyerTab">My Placed Orders</button>
-            <button class="tab-btn" onclick="switchTab('seller')" id="btnSellerTab">Incoming Orders (Seller Hub)</button>
+            <button class="tab-btn active" onclick="filterOrders('Pending')" id="tabPending">⏳ Pending Orders</button>
+            <button class="tab-btn" onclick="filterOrders('Accepted')" id="tabAccepted">✅ Accepted</button>
+            <button class="tab-btn" onclick="filterOrders('Shipped')" id="tabShipped">🚚 Shipped / Dispatched</button>
+            <button class="tab-btn" onclick="filterOrders('Cancelled')" id="tabCancelled">❌ Cancelled</button>
         </div>
 
-        <!-- Buyer Orders View -->
-        <div id="buyerOrdersSection">
-            <div id="ordersContainer">
-                <p>Loading your orders...</p>
-            </div>
-        </div>
-
-        <!-- Seller Incoming Orders View -->
-        <div id="sellerOrdersSection" style="display: none;">
-            <div id="incomingOrdersContainer">
-                <p>Loading live database orders...</p>
-            </div>
+        <div id="ordersContainer">
+            <p>Loading orders from database...</p>
         </div>
     </div>
 
     <!-- Firebase SDKs & Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyD7cgnLiY8yuc3EPiCvmDkpfwhgltR-x-g",
@@ -92,89 +93,91 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
+        let allOrders = [];
+        let currentStatusFilter = 'Pending';
+
         function toggleMenu() {
             const menu = document.getElementById('sideMenu');
             menu.style.width = menu.style.width === '250px' ? '0' : '250px';
         }
         window.toggleMenu = toggleMenu;
 
-        window.switchTab = function(type) {
-            if(type === 'buyer') {
-                document.getElementById('buyerOrdersSection').style.display = 'block';
-                document.getElementById('sellerOrdersSection').style.display = 'none';
-                document.getElementById('btnBuyerTab').classList.add('active');
-                document.getElementById('btnSellerTab').classList.remove('active');
-            } else {
-                document.getElementById('buyerOrdersSection').style.display = 'none';
-                document.getElementById('sellerOrdersSection').style.display = 'block';
-                document.getElementById('btnSellerTab').classList.add('active');
-                document.getElementById('btnBuyerTab').classList.remove('active');
-                fetchLiveSellerOrders();
-            }
-        };
+        window.filterOrders = function(status) {
+            currentStatusFilter = status;
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            if(status === 'Pending') document.getElementById('tabPending').classList.add('active');
+            if(status === 'Accepted') document.getElementById('tabAccepted').classList.add('active');
+            if(status === 'Shipped') document.getElementById('tabShipped').classList.add('active');
+            if(status === 'Cancelled') document.getElementById('tabCancelled').classList.add('active');
 
-        // 1. Load Buyer's Local Orders
-        function loadBuyerOrders() {
-            let orders = JSON.parse(localStorage.getItem('myOrders')) || [];
+            displayOrders();
+        }
+
+        async function fetchAllOrders() {
             const container = document.getElementById('ordersContainer');
-            container.innerHTML = '';
+            container.innerHTML = "<p>Fetching orders...</p>";
 
-            if (orders.length === 0) {
-                container.innerHTML = '<div class="no-orders">You have no past orders yet.</div>';
+            try {
+                const querySnapshot = await getDocs(collection(db, "orders"));
+                allOrders = [];
+                querySnapshot.forEach((docSnap) => {
+                    allOrders.push({ id: docSnap.id, ...docSnap.data() });
+                });
+                displayOrders();
+            } catch (error) {
+                console.error("Error fetching orders: ", error);
+                container.innerHTML = "<p style='color:red;'>Error loading database orders.</p>";
+            }
+        }
+
+        function displayOrders() {
+            const container = document.getElementById('ordersContainer');
+            // अगर आर्डर में स्टेटस नहीं है तो डिफ़ॉल्ट 'Pending' मान लें
+            const filtered = allOrders.filter(o => (o.status || 'Pending') === currentStatusFilter);
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div class="no-orders">No ${currentStatusFilter} orders found.</div>`;
                 return;
             }
 
-            orders.forEach(o => {
-                container.innerHTML += `
+            let html = "";
+            filtered.forEach(order => {
+                html += `
                     <div class="order-card">
                         <div class="order-info">
-                            <h4>📦 ${o.name}</h4>
-                            <p><strong>Total Price:</strong> ₹${o.price} | <strong>Date:</strong> ${o.date || 'Recent'}</p>
-                            <p><strong>Status:</strong> ${o.status || 'Placed'}</p>
+                            <h4>📦 ${order.productName || 'Item'} (Qty: ${order.quantity || 1})</h4>
+                            <p><strong>Buyer:</strong> ${order.buyerName || 'Customer'}</p>
+                            <p><strong>Phone:</strong> ${order.buyerPhone || 'N/A'}</p>
+                            <p><strong>Address:</strong> ${order.buyerAddress || 'N/A'}</p>
+                            <p><strong>Amount:</strong> ₹${order.price || 0}</p>
+                            <p><strong>Status:</strong> <span style="font-weight:bold; color:#007600;">${order.status || 'Pending'}</span></p>
+                            
+                            <div class="btn-group">
+                                <a href="tel:${order.buyerPhone}" class="call-btn">📞 Call Buyer</a>
+                                ${currentStatusFilter === 'Pending' ? `<button class="action-btn btn-accept" onclick="updateOrderStatus('${order.id}', 'Accepted')">Accept</button>` : ''}
+                                ${currentStatusFilter === 'Accepted' ? `<button class="action-btn btn-ship" onclick="updateOrderStatus('${order.id}', 'Shipped')">Mark Shipped</button>` : ''}
+                                ${currentStatusFilter !== 'Cancelled' && currentStatusFilter !== 'Shipped' ? `<button class="action-btn btn-cancel" onclick="updateOrderStatus('${order.id}', 'Cancelled')">Cancel</button>` : ''}
+                            </div>
                         </div>
                     </div>
                 `;
             });
+            container.innerHTML = html;
         }
 
-        // 2. Fetch Live Orders from Firebase for Sellers
-        async function fetchLiveSellerOrders() {
-            const container = document.getElementById('incomingOrdersContainer');
-            container.innerHTML = "<p>Fetching live orders...</p>";
-
+        window.updateOrderStatus = async function(orderId, newStatus) {
             try {
-                const querySnapshot = await getDocs(collection(db, "orders"));
-                if (querySnapshot.empty) {
-                    container.innerHTML = "<div class='no-orders'>No incoming orders found in database.</div>";
-                    return;
-                }
-
-                let html = "";
-                querySnapshot.forEach((doc) => {
-                    const order = doc.data();
-                    html += `
-                        <div class="order-card">
-                            <div class="order-info">
-                                <h4>🛒 Product: ${order.productName || 'General Item'} (Qty: ${order.quantity || 1})</h4>
-                                <p><strong>Buyer Name:</strong> ${order.buyerName || 'Customer'}</p>
-                                <p><strong>Phone Number:</strong> ${order.buyerPhone || 'N/A'}</p>
-                                <p><strong>Delivery Address:</strong> ${order.buyerAddress || 'N/A'}</p>
-                                <p><strong>Amount:</strong> ₹${order.price || 0}</p>
-                                <a href="tel:${order.buyerPhone}" class="call-btn">📞 Call Buyer Now</a>
-                            </div>
-                        </div>
-                    `;
-                });
-                container.innerHTML = html;
+                const orderRef = doc(db, "orders", orderId);
+                await updateDoc(orderRef, { status: newStatus });
+                alert(`Order marked as ${newStatus}!`);
+                fetchAllOrders(); // डेटा रिफ्रेश करें
             } catch (error) {
-                console.error("Error fetching live orders: ", error);
-                container.innerHTML = "<p style='color:red;'>Error loading orders from database.</p>";
+                console.error("Error updating status: ", error);
+                alert("Error updating order status.");
             }
         }
 
-        window.onload = function() {
-            loadBuyerOrders();
-        };
+        window.onload = fetchAllOrders;
     </script>
 </body>
 </html>
