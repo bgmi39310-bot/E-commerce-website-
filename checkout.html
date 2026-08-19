@@ -5,155 +5,219 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Checkout - DesiMarket</title>
     <style>
+        * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
-        
-        header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: relative; }
-        .menu-icon { cursor: pointer; display: flex; flex-direction: column; gap: 5px; }
-        .menu-icon span { width: 25px; height: 3px; background-color: white; border-radius: 2px; }
 
-        .side-menu { height: 100%; width: 0; position: fixed; z-index: 1000; top: 0; right: 0; background-color: #232f3e; overflow-x: hidden; transition: 0.3s; padding-top: 60px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); }
-        .side-menu a { padding: 12px 25px; text-decoration: none; font-size: 18px; color: white; display: block; transition: 0.2s; }
-        .side-menu a:hover { background-color: #37475a; }
-        .side-menu .close-btn { position: absolute; top: 10px; right: 20px; font-size: 30px; margin-left: 50px; }
+        header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 998; }
+        .back-arrow { font-size: 20px; cursor: pointer; }
+        .header-title { font-size: 18px; font-weight: bold; }
 
-        .container { max-width: 600px; margin: 30px auto; padding: 25px; background: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h2 { color: #232f3e; margin-top: 0; }
-        
-        .form-group { margin-bottom: 15px; }
-        label { display: block; font-weight: bold; margin-bottom: 5px; color: #444; }
-        input, textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
-        
-        .btn-place { background-color: #ffd814; border: 1px solid #fcd200; width: 100%; padding: 12px; font-weight: bold; cursor: pointer; border-radius: 5px; font-size: 16px; margin-top: 10px; }
-        .btn-place:hover { background-color: #f7ca00; }
+        .container { max-width: 650px; margin: 20px auto; padding: 15px; }
+        .card { background: white; border-radius: 10px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.06); }
+        h2 { color: #232f3e; margin-top: 0; font-size: 16px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+
+        .form-group { margin-bottom: 14px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; color: #444; font-size: 13px; }
+        input, textarea, select { width: 100%; padding: 11px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; font-size: 14.5px; }
+        .form-row { display: flex; gap: 12px; }
+        .form-row .form-group { flex: 1; }
+
+        .payment-options { display: flex; gap: 10px; }
+        .payment-card { flex: 1; border: 2px solid #ddd; border-radius: 6px; padding: 12px; text-align: center; cursor: pointer; font-size: 13.5px; font-weight: 600; }
+        .payment-card.active { border-color: #fa8900; background: #fff3e0; color: #c7511f; }
+
+        .order-item-row { display: flex; justify-content: space-between; font-size: 13.5px; padding: 6px 0; border-bottom: 1px solid #f2f2f2; }
+        .order-item-row:last-of-type { border-bottom: none; }
+        .grand-total-row { display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; padding-top: 10px; margin-top: 6px; border-top: 1px solid #eee; }
+
+        .btn-place { background-color: #fa8900; color: white; border: none; width: 100%; padding: 13px; font-weight: bold; cursor: pointer; border-radius: 6px; font-size: 16px; margin-top: 10px; }
+        .btn-place:hover { background-color: #e07b00; }
+        .btn-place:disabled { opacity: 0.6; cursor: not-allowed; }
     </style>
 </head>
 <body>
 
     <header>
-        <h2>DesiMarket</h2>
-        <div class="menu-icon" onclick="toggleMenu()">
-            <span></span>
-            <span></span>
-            <span></span>
-        </div>
+        <div class="back-arrow" onclick="history.back()">⬅️</div>
+        <div class="header-title">Checkout</div>
     </header>
 
-    <div id="sideMenu" class="side-menu">
-        <a href="javascript:void(0)" class="close-btn" onclick="toggleMenu()">&times;</a>
-        <a href="index.html">🏠 Home</a>
-        <a href="seller-dashboard.html">🛒 Seller Hub</a>
-        <a href="cart.html">🛍️ Cart</a>
-        <a href="orders.html">📦 Orders</a>
-        <a href="account.html">👤 Account</a>
-    </div>
-
     <div class="container">
-        <h2>Shipping & Checkout</h2>
-        <div class="form-group">
-            <label>Full Name</label>
-            <input type="text" id="cName" placeholder="Enter your name">
+
+        <div class="card">
+            <h2>📦 Order Summary</h2>
+            <div id="orderItemsList"></div>
+            <div class="grand-total-row">
+                <span>Total Payable</span>
+                <span id="grandTotal">₹0</span>
+            </div>
         </div>
-        <div class="form-group">
-            <label>Phone Number (for contact)</label>
-            <input type="text" id="cPhone" placeholder="10-digit mobile number">
+
+        <div class="card">
+            <h2>🚚 Delivery Details</h2>
+            <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" id="cName" placeholder="Enter your name">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Phone Number</label>
+                    <input type="tel" id="cPhone" placeholder="10-digit mobile number" maxlength="10">
+                </div>
+                <div class="form-group">
+                    <label>Pincode</label>
+                    <input type="text" id="cPincode" placeholder="e.g. 226001" maxlength="6">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Complete Address (House No, Street, Landmark)</label>
+                <textarea id="cAddress" rows="2" placeholder="Enter complete address"></textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>City / Village</label>
+                    <input type="text" id="cCity" placeholder="City">
+                </div>
+                <div class="form-group">
+                    <label>State</label>
+                    <input type="text" id="cState" placeholder="State">
+                </div>
+            </div>
         </div>
-        <div class="form-group">
-            <label>Delivery Address (House No, Street, Village/City)</label>
-            <textarea id="cAddress" rows="3" placeholder="Enter complete address"></textarea>
+
+        <div class="card">
+            <h2>💳 Payment Method</h2>
+            <div class="payment-options">
+                <div class="payment-card active" data-method="COD" onclick="selectPayment('COD')">💵 Cash on Delivery</div>
+                <div class="payment-card" data-method="UPI" onclick="selectPayment('UPI')">📱 UPI on Delivery</div>
+            </div>
         </div>
-        <button class="btn-place" onclick="placeOrder()">Place Order Now</button>
+
+        <button class="btn-place" id="placeOrderBtn">Place Order</button>
     </div>
 
-    <!-- Firebase SDKs & Logic -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { db } from './firebase-config.js';
+        import { collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyD7cgnLiY8yuc3EPiCvmDkpfwhgltR-x-g",
-            authDomain: "desimarket-4b8a5.firebaseapp.com",
-            projectId: "desimarket-4b8a5",
-            storageBucket: "desimarket-4b8a5.firebasestorage.app",
-            messagingSenderId: "761756037231",
-            appId: "1:761756037231:web:f09e5b6abb55947cf85d9a"
+        let selectedPayment = 'COD';
+        window.selectPayment = function(method) {
+            selectedPayment = method;
+            document.querySelectorAll('.payment-card').forEach(c => c.classList.toggle('active', c.dataset.method === method));
         };
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
+        function renderSummary() {
+            const cart = JSON.parse(localStorage.getItem('cart')) || [];
+            const listEl = document.getElementById('orderItemsList');
+            let total = 0;
+            listEl.innerHTML = '';
 
-        function toggleMenu() {
-            const menu = document.getElementById('sideMenu');
-            menu.style.width = menu.style.width === '250px' ? '0' : '250px';
+            cart.forEach(item => {
+                const qty = parseInt(item.qty) || 1;
+                const price = parseFloat(item.price) || 0;
+                const lineTotal = qty * price;
+                total += lineTotal;
+                listEl.innerHTML += `<div class="order-item-row"><span>${item.name} × ${qty}</span><span>₹${lineTotal.toFixed(0)}</span></div>`;
+            });
+
+            document.getElementById('grandTotal').innerText = '₹' + total.toFixed(0);
+            return { cart, total };
         }
-        window.toggleMenu = toggleMenu;
 
-        window.onload = function() {
+        function prefillFromProfile() {
             const user = JSON.parse(localStorage.getItem('currentUser'));
             if (user) {
-                if (user.name) document.getElementById('cName').value = user.name + (user.surname ? ' ' + user.surname : '');
-                if (user.phone) document.getElementById('cPhone').value = user.phone;
-                if (user.city || user.district) {
-                    document.getElementById('cAddress').value = `${user.city || ''}, ${user.district || ''}, ${user.state || ''}`;
-                }
+                document.getElementById('cName').value = (user.name || '') + (user.surname ? ' ' + user.surname : '');
+                document.getElementById('cPhone').value = user.phone || '';
+                document.getElementById('cCity').value = user.city || '';
+                document.getElementById('cState').value = user.state || '';
             }
-        };
+        }
 
         window.placeOrder = async function() {
-            const name = document.getElementById('cName').value.trim();
-            const phone = document.getElementById('cPhone').value.trim();
-            const address = document.getElementById('cAddress').value.trim();
-
-            if (!name || !phone || !address) {
-                alert("Please fill in all delivery details!");
-                return;
-            }
-
-            let cart = JSON.parse(localStorage.getItem('cart')) || [];
+            const cart = JSON.parse(localStorage.getItem('cart')) || [];
             if (cart.length === 0) {
-                alert("Your cart is empty!");
+                alert('Your cart is empty!');
                 window.location.href = 'index.html';
                 return;
             }
 
-            alert("ऑर्डर सबमिट हो रहा है...");
+            const name = document.getElementById('cName').value.trim();
+            const phone = document.getElementById('cPhone').value.trim();
+            const pincode = document.getElementById('cPincode').value.trim();
+            const address = document.getElementById('cAddress').value.trim();
+            const city = document.getElementById('cCity').value.trim();
+            const state = document.getElementById('cState').value.trim();
+
+            if (!name || !phone || !address || !city) {
+                alert('Please fill in all delivery details!');
+                return;
+            }
+            if (!/^\d{10}$/.test(phone)) {
+                alert('Please enter a valid 10-digit mobile number.');
+                return;
+            }
+
+            const btn = document.getElementById('placeOrderBtn');
+            btn.disabled = true;
+            btn.innerText = 'Placing order...';
+
+            const fullAddress = `${address}, ${city}, ${state}${pincode ? ' - ' + pincode : ''}`;
 
             try {
-                // कार्ट के हर सामान को डेटाबेस में ऑर्डर के रूप में भेजें
+                // Each cart item becomes its own order, carrying its own sellerUid,
+                // so it reaches the correct seller's dashboard.
                 for (let item of cart) {
+                    const qty = parseInt(item.qty) || 1;
+                    const price = parseFloat(item.price) || 0;
+
                     await addDoc(collection(db, "orders"), {
+                        productId: item.id || null,
+                        productName: item.name,
+                        price: price * qty,
+                        quantity: qty,
+                        shopName: item.shopName || 'Local Shop',
+                        sellerUid: item.sellerUid || null,
                         buyerName: name,
                         buyerPhone: phone,
-                        buyerAddress: address,
-                        productName: item.name,
-                        price: item.price * (item.quantity || 1),
-                        quantity: item.quantity || 1,
-                        orderDate: new Date(),
-                        status: "Order Placed"
+                        buyerAddress: fullAddress,
+                        paymentMethod: selectedPayment,
+                        status: 'Pending',
+                        createdAt: new Date()
                     });
                 }
 
-                // लोकल ऑर्डर्स में भी सेव करें
-                let orders = JSON.parse(localStorage.getItem('myOrders')) || [];
+                // Keep a local copy for the buyer's "My Orders" quick view
+                let myOrders = JSON.parse(localStorage.getItem('myOrders')) || [];
                 cart.forEach(item => {
-                    orders.unshift({
-                        id: "ORD" + Math.floor(100000 + Math.random() * 900000),
+                    const qty = parseInt(item.qty) || 1;
+                    const price = parseFloat(item.price) || 0;
+                    myOrders.unshift({
+                        id: 'ORD' + Math.floor(100000 + Math.random() * 900000),
                         name: item.name,
-                        price: item.price * (item.quantity || 1),
+                        price: price * qty,
                         date: new Date().toLocaleDateString(),
-                        status: "Order Placed"
+                        status: 'Pending'
                     });
                 });
-
-                localStorage.setItem('myOrders', JSON.stringify(orders));
+                localStorage.setItem('myOrders', JSON.stringify(myOrders));
                 localStorage.removeItem('cart');
 
-                alert("Order placed successfully! दुकानदार तक आपका ऑर्डर पहुँच गया है। 🎉");
+                alert('Order placed successfully! The seller has been notified. 🎉');
                 window.location.href = 'orders.html';
-
             } catch (error) {
-                console.error("Order error: ", error);
-                alert("Error placing order: " + error.message);
+                console.error('Order error:', error);
+                alert('Error placing order: ' + error.message);
+                btn.disabled = false;
+                btn.innerText = 'Place Order';
             }
+        };
+
+        document.getElementById('placeOrderBtn').addEventListener('click', window.placeOrder);
+
+        window.onload = function() {
+            renderSummary();
+            prefillFromProfile();
         };
     </script>
 </body>
