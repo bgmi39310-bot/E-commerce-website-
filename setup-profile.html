@@ -5,125 +5,142 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Setup Profile - DesiMarket</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
-        header { background-color: #232f3e; color: white; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; }
-        .nav-links { display: flex; gap: 12px; }
-        .nav-links a { color: white; text-decoration: none; font-weight: bold; font-size: 14px; }
-        .container { max-width: 500px; margin: 30px auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        h2 { text-align: center; color: #333; margin-top: 0; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
+        
+        header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; align-items: center; position: sticky; top: 0; z-index: 998; }
+        .back-arrow { font-size: 22px; cursor: pointer; margin-right: 15px; }
+        .header-title { flex-grow: 1; font-size: 18px; font-weight: bold; }
+
+        .container { max-width: 600px; margin: 30px auto; padding: 25px; background: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h2 { color: #232f3e; margin-top: 0; text-align: center; }
+
         .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
-        .form-group input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        .photo-section { text-align: center; margin-bottom: 20px; }
-        .preview-img { width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 2px solid #ccc; margin-bottom: 10px; background-color: #eee; display: inline-block; }
-        .btn-save { background-color: #ffd814; border: 1px solid #fcd200; padding: 10px; font-weight: bold; cursor: pointer; border-radius: 4px; width: 100%; font-size: 16px; margin-top: 10px; }
+        label { display: block; font-weight: bold; color: #555; margin-bottom: 5px; font-size: 14px; }
+        input, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; background: #fff; font-size: 15px; }
+        
+        .btn-save { background-color: #ffd814; color: #111; border: 1px solid #fcd200; width: 100%; padding: 12px; font-weight: bold; border-radius: 5px; cursor: pointer; font-size: 16px; margin-top: 20px; }
         .btn-save:hover { background-color: #f7ca00; }
-        .btn-skip { background-color: #e7e7e7; border: 1px solid #ccc; padding: 10px; font-weight: bold; cursor: pointer; border-radius: 4px; width: 100%; font-size: 16px; margin-top: 10px; color: #333; }
-        .btn-skip:hover { background-color: #d8d8d8; }
     </style>
 </head>
 <body>
 
     <header>
-        <h2>DesiMarket</h2>
-        <div class="nav-links">
-            <a href="index.html">Home</a>
-            <a href="cart.html">Cart</a>
-            <a href="orders.html">Orders</a>
-            <a href="account.html">Account</a>
-        </div>
+        <div class="back-arrow" onclick="history.back()">⬅️</div>
+        <div class="header-title">Setup / Edit Profile</div>
     </header>
 
     <div class="container">
         <h2>Complete Your Profile</h2>
         
-        <!-- Profile Picture Link Section -->
         <div class="form-group">
-            <label>Profile Photo Link (Postimages URL)</label>
-            <input type="url" id="profileImageUrl" placeholder="https://i.postimg.cc/..." oninput="previewPhotoLink(this.value)">
+            <label>First Name:</label>
+            <input type="text" id="pName" placeholder="Enter first name">
+        </div>
+        <div class="form-group">
+            <label>Surname (Last Name):</label>
+            <input type="text" id="pSurname" placeholder="Enter surname">
+        </div>
+        <div class="form-group">
+            <label>Email Address:</label>
+            <input type="email" id="pEmail" placeholder="Enter email">
+        </div>
+        <div class="form-group">
+            <label>Phone Number:</label>
+            <input type="text" id="pPhone" placeholder="Enter phone number">
+        </div>
+        <div class="form-group">
+            <label>State (Pradesh):</label>
+            <input type="text" id="pState" placeholder="e.g. Uttar Pradesh / Bihar">
+        </div>
+        <div class="form-group">
+            <label>District (Zila):</label>
+            <input type="text" id="pDistrict" placeholder="Enter district">
+        </div>
+        <div class="form-group">
+            <label>City / Village:</label>
+            <input type="text" id="pCity" placeholder="Enter city or village">
+        </div>
+        <div class="form-group">
+            <label>Profile Photo Link (Postimages / Image URL):</label>
+            <input type="url" id="pPhoto" placeholder="https://i.postimg.cc/...">
         </div>
 
-        <div class="form-group" style="text-align: center;">
-            <img id="profilePreview" class="preview-img" src="" alt="Photo Preview">
-        </div>
-
-        <div class="form-group">
-            <label>First Name</label>
-            <input type="text" id="setupName" placeholder="Enter first name">
-        </div>
-        <div class="form-group">
-            <label>Surname / Last Name</label>
-            <input type="text" id="setupSurname" placeholder="Enter surname">
-        </div>
-        <div class="form-group">
-            <label>Phone Number (Optional)</label>
-            <input type="tel" id="setupPhone" placeholder="Enter phone number">
-        </div>
-        <div class="form-group">
-            <label>Pradesh / State</label>
-            <input type="text" id="setupState" placeholder="e.g. Madhya Pradesh">
-        </div>
-        <div class="form-group">
-            <label>Zila / District</label>
-            <input type="text" id="setupDistrict" placeholder="Enter district">
-        </div>
-        <div class="form-group">
-            <label>City / Village Name</label>
-            <input type="text" id="setupCity" placeholder="Enter city or village name">
-        </div>
-
-        <button class="btn-save" onclick="saveFullProfile()">Save and Continue</button>
-        <button class="btn-skip" onclick="skipProfileSetup()">Skip for now</button>
+        <button class="btn-save" onclick="saveProfile()">Save Profile</button>
     </div>
 
-    <script>
-        // Load existing data if available
+    <!-- Firebase SDKs & Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD7cgnLiY8yuc3EPiCvmDkpfwhgltR-x-g",
+            authDomain: "desimarket-4b8a5.firebaseapp.com",
+            projectId: "desimarket-4b8a5",
+            storageBucket: "desimarket-4b8a5.firebasestorage.app",
+            messagingSenderId: "761756037231",
+            appId: "1:761756037231:web:f09e5b6abb55947cf85d9a"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // पेज लोड होने पर अगर पहले से डेटा है, तो फॉर्म में भर दें
         window.onload = function() {
             const user = JSON.parse(localStorage.getItem('currentUser'));
             if (user) {
-                if (user.name) document.getElementById('setupName').value = user.name;
-                if (user.surname) document.getElementById('setupSurname').value = user.surname;
-                if (user.phone) document.getElementById('setupPhone').value = user.phone;
-                if (user.state) document.getElementById('setupState').value = user.state;
-                if (user.district) document.getElementById('setupDistrict').value = user.district;
-                if (user.city) document.getElementById('setupCity').value = user.city;
-                if (user.photo) {
-                    document.getElementById('profileImageUrl').value = user.photo;
-                    document.getElementById('profilePreview').src = user.photo;
-                }
+                document.getElementById('pName').value = user.name || '';
+                document.getElementById('pSurname').value = user.surname || '';
+                document.getElementById('pEmail').value = user.email || '';
+                document.getElementById('pPhone').value = user.phone || '';
+                document.getElementById('pState').value = user.state || '';
+                document.getElementById('pDistrict').value = user.district || '';
+                document.getElementById('pCity').value = user.city || '';
+                document.getElementById('pPhoto').value = user.photo || '';
             }
         };
 
-        // Live preview when URL is typed or pasted
-        function previewPhotoLink(url) {
-            if (url) {
-                document.getElementById('profilePreview').src = url;
-            }
-        }
+        window.saveProfile = async function() {
+            const name = document.getElementById('pName').value.trim();
+            const phone = document.getElementById('pPhone').value.trim();
 
-        function saveFullProfile() {
-            let user = JSON.parse(localStorage.getItem('currentUser')) || {};
-
-            user.name = document.getElementById('setupName').value.trim();
-            user.surname = document.getElementById('setupSurname').value.trim();
-            user.phone = document.getElementById('setupPhone').value.trim();
-            user.state = document.getElementById('setupState').value.trim();
-            user.district = document.getElementById('setupDistrict').value.trim();
-            user.city = document.getElementById('setupCity').value.trim();
-            
-            const photoUrl = document.getElementById('profileImageUrl').value.trim();
-            if (photoUrl) {
-                user.photo = photoUrl;
+            if (!name || !phone) {
+                alert("Please enter at least your Name and Phone Number!");
+                return;
             }
 
-            localStorage.setItem('currentUser', JSON.stringify(user));
-            alert("Profile saved successfully!");
-            window.location.href = 'index.html';
-        }
+            const userData = {
+                name: name,
+                surname: document.getElementById('pSurname').value.trim(),
+                email: document.getElementById('pEmail').value.trim(),
+                phone: phone,
+                state: document.getElementById('pState').value.trim(),
+                district: document.getElementById('pDistrict').value.trim(),
+                city: document.getElementById('pCity').value.trim(),
+                photo: document.getElementById('pPhoto').value.trim() || "https://via.placeholder.com/100?text=No+Photo",
+                updatedAt: new Date()
+            };
 
-        function skipProfileSetup() {
-            window.location.href = 'index.html';
+            alert("प्रोफाइल सेव हो रही है...");
+
+            try {
+                // 1. लोकल स्टोरेज में तुरंत सेव करें (ताकि साइट सुपर-फास्ट चले)
+                localStorage.setItem('currentUser', JSON.stringify(userData));
+
+                // 2. डेटाबेस (Firebase) में भी सेव करें
+                await addDoc(collection(db, "users"), userData);
+
+                alert("Profile Saved Successfully to Database & Local Storage! 🎉");
+                window.location.href = "account.html";
+
+            } catch (error) {
+                console.error("Profile save error: ", error);
+                // अगर डेटाबेस में एरर आए, तब भी लोकल स्टोरेज की वजह से ऐप नहीं रुकेगा
+                alert("Profile saved locally, but database sync had an issue: " + error.message);
+                window.location.href = "account.html";
+            }
         }
     </script>
 </body>
 </html>
+
