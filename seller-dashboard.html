@@ -7,9 +7,8 @@
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
         
-        header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; align-items: center; position: sticky; top: 0; z-index: 998; }
-        .back-arrow { font-size: 22px; cursor: pointer; margin-right: 15px; }
-        .header-title { flex-grow: 1; font-size: 18px; font-weight: bold; }
+        header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 998; }
+        .header-title { font-size: 18px; font-weight: bold; }
         
         .menu-icon { cursor: pointer; display: flex; flex-direction: column; gap: 5px; }
         .menu-icon span { width: 25px; height: 3px; background-color: white; border-radius: 2px; }
@@ -35,7 +34,6 @@
 
         .success-msg { color: green; font-weight: bold; margin-bottom: 10px; display: none; }
 
-        /* Profile Display Card Styles */
         .profile-display-card { display: flex; align-items: center; gap: 20px; }
         .profile-logo { width: 80px; height: 80px; object-fit: cover; border-radius: 50%; border: 2px solid #ddd; }
         .profile-info h3 { margin: 0 0 5px 0; color: #232f3e; }
@@ -47,7 +45,6 @@
 <body>
 
     <header>
-        <div class="back-arrow" onclick="history.back()">⬅️</div>
         <div class="header-title">Seller Hub & Profile</div>
         <div class="menu-icon" onclick="toggleMenu()">
             <span></span>
@@ -72,7 +69,6 @@
             <h2>1. Seller / Shop Profile</h2>
             <div id="profileMsg" class="success-msg">Profile Saved Successfully!</div>
             
-            <!-- Profile Preview View (Initially Hidden/Shown based on data) -->
             <div id="profileDisplay" style="display: none;">
                 <div class="profile-display-card">
                     <img id="dispLogo" src="" alt="Shop Logo" class="profile-logo">
@@ -86,7 +82,6 @@
                 </div>
             </div>
 
-            <!-- Profile Edit Form (Hidden if profile exists, shown on edit click) -->
             <div id="profileForm" class="form-grid" style="margin-top: 15px;">
                 <input type="text" id="shopName" placeholder="Shop Name">
                 <input type="text" id="ownerName" placeholder="Owner Name">
@@ -130,14 +125,8 @@
                 <button onclick="addProductToFirebase()" class="action-btn full-width">List Product on Market</button>
             </div>
         </div>
-
-        <div class="card">
-            <h2>3. Live Database Status</h2>
-            <p style="color: #666; font-size: 14px;">प्रोडक्ट इमेज अब डायरेक्ट लिंक के जरिए सीधे Firebase Firestore डेटाबेस में सेव होगी।</p>
-        </div>
     </div>
 
-    <!-- Firebase SDKs & Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -160,7 +149,6 @@
         }
         window.toggleMenu = toggleMenu;
 
-        // जब यूजर 'Edit Profile' पर क्लिक करे
         window.enableEditMode = function() {
             document.getElementById('profileDisplay').style.display = 'none';
             document.getElementById('profileForm').style.display = 'grid';
@@ -183,8 +171,6 @@
             };
 
             localStorage.setItem('sellerProfile', JSON.stringify(profile));
-            
-            // सेव होने के बाद वापस कार्ड व्यू दिखाएं
             loadProfileView();
 
             const msg = document.getElementById('profileMsg');
@@ -237,25 +223,21 @@
         function loadProfileView() {
             const profile = JSON.parse(localStorage.getItem('sellerProfile'));
             if (profile && profile.shopName) {
-                // अगर प्रोफाइल है, तो फॉर्म छुपाकर कार्ड दिखाएं
                 document.getElementById('profileDisplay').style.display = 'block';
                 document.getElementById('profileForm').style.display = 'none';
 
-                // डेटा भरें
                 document.getElementById('dispShopName').innerText = profile.shopName;
                 document.getElementById('dispOwnerName').innerText = profile.ownerName || 'N/A';
                 document.getElementById('dispPhone').innerText = profile.phone || 'N/A';
                 document.getElementById('dispAddress').innerText = profile.address || 'N/A';
                 document.getElementById('dispLogo').src = profile.logo || 'https://via.placeholder.com/80';
 
-                // फॉर्म के अंदर भी वैल्यू भर कर रखें (ताकि एडिट करते वक्त दिखे)
                 document.getElementById('shopName').value = profile.shopName || '';
                 document.getElementById('ownerName').value = profile.ownerName || '';
                 document.getElementById('shopPhone').value = profile.phone || '';
                 document.getElementById('shopLogoFile').value = profile.logo || '';
                 document.getElementById('shopAddress').value = profile.address || '';
             } else {
-                // अगर प्रोफाइल नहीं है, तो सिर्फ फॉर्म दिखाएं
                 document.getElementById('profileDisplay').style.display = 'none';
                 document.getElementById('profileForm').style.display = 'grid';
             }
