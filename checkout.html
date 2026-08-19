@@ -54,7 +54,7 @@
             <input type="text" id="cName" placeholder="Enter your name">
         </div>
         <div class="form-group">
-            <label>Phone Number</label>
+            <label>Phone Number (for contact)</label>
             <input type="text" id="cPhone" placeholder="10-digit mobile number">
         </div>
         <div class="form-group">
@@ -64,11 +64,28 @@
         <button class="btn-place" onclick="placeOrder()">Place Order Now</button>
     </div>
 
-    <script>
+    <!-- Firebase SDKs & Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD7cgnLiY8yuc3EPiCvmDkpfwhgltR-x-g",
+            authDomain: "desimarket-4b8a5.firebaseapp.com",
+            projectId: "desimarket-4b8a5",
+            storageBucket: "desimarket-4b8a5.firebasestorage.app",
+            messagingSenderId: "761756037231",
+            appId: "1:761756037231:web:f09e5b6abb55947cf85d9a"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
         function toggleMenu() {
             const menu = document.getElementById('sideMenu');
             menu.style.width = menu.style.width === '250px' ? '0' : '250px';
         }
+        window.toggleMenu = toggleMenu;
 
         window.onload = function() {
             const user = JSON.parse(localStorage.getItem('currentUser'));
@@ -81,7 +98,7 @@
             }
         };
 
-        function placeOrder() {
+        window.placeOrder = async function() {
             const name = document.getElementById('cName').value.trim();
             const phone = document.getElementById('cPhone').value.trim();
             const address = document.getElementById('cAddress').value.trim();
@@ -98,24 +115,46 @@
                 return;
             }
 
-            let orders = JSON.parse(localStorage.getItem('myOrders')) || [];
-            
-            cart.forEach(item => {
-                orders.unshift({
-                    id: "ORD" + Math.floor(100000 + Math.random() * 900000),
-                    name: item.name,
-                    price: item.price * (item.quantity || 1),
-                    date: new Date().toLocaleDateString(),
-                    status: "Order Placed"
+            alert("ऑर्डर सबमिट हो रहा है...");
+
+            try {
+                // कार्ट के हर सामान को डेटाबेस में ऑर्डर के रूप में भेजें
+                for (let item of cart) {
+                    await addDoc(collection(db, "orders"), {
+                        buyerName: name,
+                        buyerPhone: phone,
+                        buyerAddress: address,
+                        productName: item.name,
+                        price: item.price * (item.quantity || 1),
+                        quantity: item.quantity || 1,
+                        orderDate: new Date(),
+                        status: "Order Placed"
+                    });
+                }
+
+                // लोकल ऑर्डर्स में भी सेव करें
+                let orders = JSON.parse(localStorage.getItem('myOrders')) || [];
+                cart.forEach(item => {
+                    orders.unshift({
+                        id: "ORD" + Math.floor(100000 + Math.random() * 900000),
+                        name: item.name,
+                        price: item.price * (item.quantity || 1),
+                        date: new Date().toLocaleDateString(),
+                        status: "Order Placed"
+                    });
                 });
-            });
 
-            localStorage.setItem('myOrders', JSON.stringify(orders));
-            localStorage.removeItem('cart');
+                localStorage.setItem('myOrders', JSON.stringify(orders));
+                localStorage.removeItem('cart');
 
-            alert("Order placed successfully!");
-            window.location.href = 'orders.html';
-        }
+                alert("Order placed successfully! दुकानदार तक आपका ऑर्डर पहुँच गया है। 🎉");
+                window.location.href = 'orders.html';
+
+            } catch (error) {
+                console.error("Order error: ", error);
+                alert("Error placing order: " + error.message);
+            }
+        };
     </script>
 </body>
 </html>
