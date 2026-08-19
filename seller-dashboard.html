@@ -4,53 +4,40 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Seller Hub - DesiMarket</title>
+    <!-- यहाँ अपना पुराना वाला <style> CSS कोड रख लें -->
     <style>
+        /* (Wahi purana CSS yahan daal dein jo upar likha tha) */
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
-        
         header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 998; }
         .header-title { font-size: 18px; font-weight: bold; }
-        
         .menu-icon { cursor: pointer; display: flex; flex-direction: column; gap: 5px; }
         .menu-icon span { width: 25px; height: 3px; background-color: white; border-radius: 2px; }
-
         .side-menu { height: 100%; width: 0; position: fixed; z-index: 2000; top: 0; right: 0; background-color: #232f3e; overflow-x: hidden; transition: 0.3s; padding-top: 60px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); }
         .side-menu a { padding: 12px 25px; text-decoration: none; font-size: 18px; color: white; display: block; transition: 0.2s; }
         .side-menu a:hover { background-color: #37475a; }
         .side-menu .close-btn { position: absolute; top: 10px; right: 20px; font-size: 30px; margin-left: 50px; }
-
         .container { max-width: 900px; margin: 20px auto; padding: 20px; }
         .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
         h2 { color: #232f3e; margin-top: 0; }
-        
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         input, textarea, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; background: #fff; }
         .full-width { grid-column: span 2; }
-        
         .file-upload-box { border: 1px solid #ddd; padding: 12px; border-radius: 5px; background: #fafafa; }
         .file-upload-box label { font-size: 13px; color: #666; display: block; margin-bottom: 5px; font-weight: bold; }
-
         button.action-btn { background-color: #ffd814; color: #111; border: 1px solid #fcd200; padding: 12px 20px; font-weight: bold; border-radius: 5px; cursor: pointer; width: 100%; font-size: 15px; }
         button.action-btn:hover { background-color: #f7ca00; }
-
         .success-msg { color: green; font-weight: bold; margin-bottom: 10px; display: none; }
-
         .profile-display-card { display: flex; align-items: center; gap: 20px; }
         .profile-logo { width: 80px; height: 80px; object-fit: cover; border-radius: 50%; border: 2px solid #ddd; }
         .profile-info h3 { margin: 0 0 5px 0; color: #232f3e; }
         .profile-info p { margin: 3px 0; color: #555; font-size: 14px; }
-        
         .btn-group-profile { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
         .btn-edit { background-color: #232f3e; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 14px; }
-        .btn-edit:hover { background-color: #37475a; }
         .btn-view { background-color: #007bff; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 14px; }
-        .btn-view:hover { background-color: #0056b3; }
-
-        /* Order & Product Management Styles */
         .order-card, .product-item-card { background: #fff; border: 1px solid #ddd; border-left: 5px solid #ffd814; border-radius: 6px; padding: 15px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; gap: 15px; }
         .order-info h4, .product-info h4 { margin: 0 0 5px 0; color: #333; }
         .order-info p, .product-info p { margin: 4px 0; color: #555; font-size: 14px; }
         .product-thumb { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #ccc; }
-        
         .btn-group { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
         .dash-action-btn { padding: 6px 12px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 13px; color: white; }
         .btn-accept { background-color: #28a745; }
@@ -59,7 +46,6 @@
         .btn-delete { background-color: #dc3545; border: none; padding: 6px 12px; border-radius: 4px; color: white; font-weight: bold; font-size: 13px; cursor: pointer; }
         .call-btn { background-color: #17a2b8; text-decoration: none; display: inline-block; padding: 6px 12px; border-radius: 4px; color: white; font-weight: bold; font-size: 13px; }
         .no-data { text-align: center; color: #777; padding: 20px; font-size: 15px; }
-        
         .tab-buttons { display: flex; gap: 5px; margin-bottom: 15px; overflow-x: auto; }
         .tab-btn { padding: 8px 12px; background: #eee; border: none; font-weight: bold; cursor: pointer; border-radius: 5px; font-size: 12px; white-space: nowrap; }
         .tab-btn.active { background: #232f3e; color: white; }
@@ -72,9 +58,7 @@
         <div style="display: flex; align-items: center; gap: 15px;">
             <button onclick="logoutSeller()" style="background:#dc3545; color:white; border:none; padding:6px 10px; border-radius:4px; cursor:pointer; font-weight:bold;">Logout</button>
             <div class="menu-icon" onclick="toggleMenu()">
-                <span></span>
-                <span></span>
-                <span></span>
+                <span></span><span></span><span></span>
             </div>
         </div>
     </header>
@@ -92,12 +76,7 @@
         <!-- 1. Shop Profile Section -->
         <div class="card">
             <h2>1. Seller / Shop Profile</h2>
-            
-            <!-- Unique Seller ID Display Box -->
-            <div id="sellerIdDisplay" style="background: #e9ecef; padding: 10px; border-radius: 5px; margin-bottom: 15px; font-weight: bold; color: #333; border: 1px dashed #232f3e; font-size: 14px;">
-                Unique Seller ID: Loading...
-            </div>
-
+            <div id="sellerIdDisplay" style="background: #e9ecef; padding: 10px; border-radius: 5px; margin-bottom: 15px; font-weight: bold; color: #333; border: 1px dashed #232f3e; font-size: 14px;">Unique Seller ID: Loading...</div>
             <div id="profileMsg" class="success-msg">Profile Saved Successfully!</div>
             
             <div id="profileDisplay" style="display: none;">
@@ -108,7 +87,6 @@
                         <p><strong>Owner:</strong> <span id="dispOwnerName"></span></p>
                         <p><strong>Phone:</strong> <span id="dispPhone"></span></p>
                         <p><strong>Address:</strong> <span id="dispAddress"></span></p>
-                        
                         <div class="btn-group-profile">
                             <button class="btn-edit" onclick="enableEditMode()">✏️ Edit Profile</button>
                             <button class="btn-view" onclick="viewMyProfile()">👁️ View Profile ID</button>
@@ -121,14 +99,12 @@
                 <input type="text" id="shopName" placeholder="Shop Name">
                 <input type="text" id="ownerName" placeholder="Owner Name">
                 <input type="text" id="shopPhone" placeholder="Contact Number">
-                
                 <div class="file-upload-box">
                     <label>Shop Logo Link (Postimages URL):</label>
                     <input type="url" id="shopLogoFile" placeholder="https://i.postimg.cc/...">
                 </div>
-
                 <textarea id="shopAddress" placeholder="Complete Shop Address" class="full-width" rows="2"></textarea>
-                <button onclick="saveSellerProfile()" class="action-btn full-width">Save Shop Profile</button>
+                <button onclick="saveSellerProfileMain()" class="action-btn full-width">Save Shop Profile</button>
             </div>
         </div>
 
@@ -138,7 +114,6 @@
             <div class="form-grid">
                 <input type="text" id="pName" placeholder="Product Name">
                 <input type="number" id="pPrice" placeholder="Price per unit (₹)">
-                
                 <select id="pUnit">
                     <option value="Per Piece">Per Piece</option>
                     <option value="Per Kg">Per Kg</option>
@@ -147,66 +122,45 @@
                     <option value="Per Packet">Per Packet</option>
                     <option value="Per Dozen">Per Dozen</option>
                 </select>
-
                 <input type="text" id="pMaterial" placeholder="Material (e.g. Cotton)">
                 <input type="text" id="pWarranty" placeholder="Warranty / Validity">
-                
                 <div class="file-upload-box full-width">
                     <label>Product Image Link (Postimages URL):</label>
                     <input type="url" id="pImageFile" placeholder="https://i.postimg.cc/...">
                 </div>
-
                 <textarea id="pDesc" placeholder="Full Details Description" class="full-width" rows="3"></textarea>
-                <button onclick="addProductToFirebase()" class="action-btn full-width">List Product on Market</button>
+                <button onclick="addProductMain()" class="action-btn full-width">List Product on Market</button>
             </div>
         </div>
 
         <!-- 3. Customer Orders Management Section -->
         <div class="card">
             <h2>3. Customer Orders Management</h2>
-            
             <div class="tab-buttons">
-                <button class="tab-btn active" onclick="filterOrders('Pending')" id="tabPending">⏳ Pending</button>
-                <button class="tab-btn" onclick="filterOrders('Accepted')" id="tabAccepted">✅ Accepted</button>
-                <button class="tab-btn" onclick="filterOrders('Shipped')" id="tabShipped">🚚 Shipped</button>
-                <button class="tab-btn" onclick="filterOrders('Cancelled')" id="tabCancelled">❌ Cancelled</button>
+                <button class="tab-btn active" onclick="filterOrdersMain('Pending')" id="tabPending">⏳ Pending</button>
+                <button class="tab-btn" onclick="filterOrdersMain('Accepted')" id="tabAccepted">✅ Accepted</button>
+                <button class="tab-btn" onclick="filterOrdersMain('Shipped')" id="tabShipped">🚚 Shipped</button>
+                <button class="tab-btn" onclick="filterOrdersMain('Cancelled')" id="tabCancelled">❌ Cancelled</button>
             </div>
-
-            <div id="dashboardOrdersContainer">
-                <p>Loading database orders...</p>
-            </div>
+            <div id="dashboardOrdersContainer"><p>Loading database orders...</p></div>
         </div>
 
         <!-- 4. My Listed Products Hub -->
         <div class="card">
             <h2>4. My Listed Products Hub (Manage Your Inventory)</h2>
-            <div id="myProductsContainer">
-                <p>Loading your listed products...</p>
-            </div>
+            <div id="myProductsContainer"><p>Loading your listed products...</p></div>
         </div>
     </div>
 
+    <!-- यहाँ सभी फाइलों को इम्पोर्ट किया जा रहा है -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyD7cgnLiY8yuc3EPiCvmDkpfwhgltR-x-g",
-            authDomain: "desimarket-4b8a5.firebaseapp.com",
-            projectId: "desimarket-4b8a5",
-            storageBucket: "desimarket-4b8a5.firebasestorage.app",
-            messagingSenderId: "761756037231",
-            appId: "1:761756037231:web:f09e5b6abb55947cf85d9a"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+        import { auth, db } from './firebase-config.js';
+        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { loadSellerProfileFromFirestore, saveSellerProfile } from './profile-logic.js';
+        import { addProductToFirebase, fetchMyListedProducts, editProduct, deleteProduct } from './product-logic.js';
+        import { fetchDashboardOrders, filterOrders, updateOrderStatus } from './order-logic.js';
 
         let currentLoggedInUser = null;
-        let allOrders = [];
-        let currentStatusFilter = 'Pending';
 
         function toggleMenu() {
             const menu = document.getElementById('sideMenu');
@@ -224,43 +178,13 @@
                 currentLoggedInUser = user;
                 document.getElementById('sellerIdDisplay').innerText = "Unique Seller ID: " + user.uid;
                 
-                await loadSellerProfileFromFirestore(user.uid);
-                fetchDashboardOrders(user.uid);
-                fetchMyListedProducts(user.uid);
+                await loadSellerProfileFromFirestore(db, user.uid);
+                fetchDashboardOrders(db, user.uid);
+                fetchMyListedProducts(db, user.uid);
             } else {
                 window.location.href = "login.html";
             }
         });
-
-        async function loadSellerProfileFromFirestore(uid) {
-            try {
-                const docRef = doc(db, "sellers_profiles", uid);
-                const docSnap = await getDoc(docRef);
-
-                if (docSnap.exists()) {
-                    const profile = docSnap.data();
-                    document.getElementById('profileDisplay').style.display = 'block';
-                    document.getElementById('profileForm').style.display = 'none';
-
-                    document.getElementById('dispShopName').innerText = profile.shopName;
-                    document.getElementById('dispOwnerName').innerText = profile.ownerName || 'N/A';
-                    document.getElementById('dispPhone').innerText = profile.phone || 'N/A';
-                    document.getElementById('dispAddress').innerText = profile.address || 'N/A';
-                    document.getElementById('dispLogo').src = profile.logo || 'https://via.placeholder.com/80';
-
-                    document.getElementById('shopName').value = profile.shopName || '';
-                    document.getElementById('ownerName').value = profile.ownerName || '';
-                    document.getElementById('shopPhone').value = profile.phone || '';
-                    document.getElementById('shopLogoFile').value = profile.logo || '';
-                    document.getElementById('shopAddress').value = profile.address || '';
-                } else {
-                    document.getElementById('profileDisplay').style.display = 'none';
-                    document.getElementById('profileForm').style.display = 'grid';
-                }
-            } catch (error) {
-                console.error("Error loading profile:", error);
-            }
-        }
 
         window.enableEditMode = function() {
             document.getElementById('profileDisplay').style.display = 'none';
@@ -273,218 +197,33 @@
             }
         }
 
-        window.saveSellerProfile = async function() {
-            if (!currentLoggedInUser) return;
-            const shopName = document.getElementById('shopName').value.trim();
-            const ownerName = document.getElementById('ownerName').value.trim();
-            if (!shopName || !ownerName) { alert("Please enter Shop and Owner Name!"); return; }
-            
-            const logoUrl = document.getElementById('shopLogoFile').value.trim();
-
-            const profile = {
-                uid: currentLoggedInUser.uid,
-                shopName, 
-                ownerName,
-                phone: document.getElementById('shopPhone').value.trim(),
-                address: document.getElementById('shopAddress').value.trim(),
-                logo: logoUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
-            };
-
-            try {
-                await setDoc(doc(db, "sellers_profiles", currentLoggedInUser.uid), profile);
-                loadSellerProfileFromFirestore(currentLoggedInUser.uid);
-
-                const msg = document.getElementById('profileMsg');
-                msg.style.display = 'block';
-                setTimeout(() => { msg.style.display = 'none'; }, 3000);
-                alert("Shop Profile Saved Successfully! 🎉");
-            } catch (error) {
-                alert("Error saving profile: " + error.message);
-            }
-        };
-
-        window.addProductToFirebase = async function() {
-            if (!currentLoggedInUser) return;
-            
-            const name = document.getElementById('pName').value.trim();
-            const priceVal = document.getElementById('pPrice').value.trim();
-            const imageUrl = document.getElementById('pImageFile').value.trim();
-
-            if (!name || !priceVal) { alert("Please enter Product Name and Price!"); return; }
-
-            const shopNameVal = document.getElementById('shopName').value.trim();
-            if (!shopNameVal) { alert("Please save Shop Profile first!"); return; }
-
-            try {
-                await addDoc(collection(db, "vendors"), {
-                    name: name,
-                    price: Number(priceVal),
-                    unit: document.getElementById('pUnit').value,
-                    material: document.getElementById('pMaterial').value.trim() || "100% Original",
-                    warranty: document.getElementById('pWarranty').value.trim() || "Verified Quality",
-                    image: imageUrl || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80",
-                    description: document.getElementById('pDesc').value.trim() || `${name} available in best quality.`,
-                    shopName: shopNameVal,
-                    sellerUid: currentLoggedInUser.uid,
-                    createdAt: new Date()
-                });
-
-                alert("Product Added Successfully to Database! 🎉");
-                document.getElementById('pName').value = '';
-                document.getElementById('pPrice').value = '';
-                document.getElementById('pMaterial').value = '';
-                document.getElementById('pWarranty').value = '';
-                document.getElementById('pImageFile').value = '';
-                document.getElementById('pDesc').value = '';
-                
-                fetchMyListedProducts(currentLoggedInUser.uid);
-            } catch (error) {
-                console.error("Error adding product: ", error);
-                alert("Error: " + error.message);
-            }
-        };
-
-        window.filterOrders = function(status) {
-            currentStatusFilter = status;
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            if(status === 'Pending') document.getElementById('tabPending').classList.add('active');
-            if(status === 'Accepted') document.getElementById('tabAccepted').classList.add('active');
-            if(status === 'Shipped') document.getElementById('tabShipped').classList.add('active');
-            if(status === 'Cancelled') document.getElementById('tabCancelled').classList.add('active');
-
-            displayDashboardOrders();
+        window.saveSellerProfileMain = function() {
+            saveSellerProfile(db, currentLoggedInUser, (uid) => loadSellerProfileFromFirestore(db, uid));
         }
 
-        async function fetchDashboardOrders(uid) {
-            const container = document.getElementById('dashboardOrdersContainer');
-            try {
-                const q = query(collection(db, "orders"), where("sellerUid", "==", uid));
-                const querySnapshot = await getDocs(q);
-                allOrders = [];
-                querySnapshot.forEach((docSnap) => {
-                    allOrders.push({ id: docSnap.id, ...docSnap.data() });
-                });
-                displayDashboardOrders();
-            } catch (error) {
-                console.error("Error fetching orders: ", error);
-                container.innerHTML = "<p style='color:red;'>Error loading orders.</p>";
-            }
+        window.addProductMain = function() {
+            addProductToFirebase(db, currentLoggedInUser, (uid) => fetchMyListedProducts(db, uid));
         }
 
-        function displayDashboardOrders() {
-            const container = document.getElementById('dashboardOrdersContainer');
-            const filtered = allOrders.filter(o => (o.status || 'Pending') === currentStatusFilter);
-
-            if (filtered.length === 0) {
-                container.innerHTML = `<div class="no-data">No ${currentStatusFilter} orders found for your account.</div>`;
-                return;
-            }
-
-            let html = "";
-            filtered.forEach(order => {
-                html += `
-                    <div class="order-card">
-                        <div class="order-info">
-                            <h4>📦 ${order.productName || 'Item'} (Qty: ${order.quantity || 1})</h4>
-                            <p><strong>Buyer:</strong> ${order.buyerName || 'Customer'}</p>
-                            <p><strong>Phone:</strong> ${order.buyerPhone || 'N/A'}</p>
-                            <p><strong>Address:</strong> ${order.buyerAddress || 'N/A'}</p>
-                            <p><strong>Amount:</strong> ₹${order.price || 0}</p>
-                            <p><strong>Status:</strong> <span style="font-weight:bold; color:#007600;">${order.status || 'Pending'}</span></p>
-                            
-                            <div class="btn-group">
-                                <a href="tel:${order.buyerPhone}" class="call-btn">📞 Call Buyer</a>
-                                ${currentStatusFilter === 'Pending' ? `<button class="dash-action-btn btn-accept" onclick="updateOrderStatus('${order.id}', 'Accepted')">Accept</button>` : ''}
-                                ${currentStatusFilter === 'Accepted' ? `<button class="dash-action-btn btn-ship" onclick="updateOrderStatus('${order.id}', 'Shipped')">Mark Shipped</button>` : ''}
-                                ${currentStatusFilter !== 'Cancelled' && currentStatusFilter !== 'Shipped' ? `<button class="dash-action-btn btn-cancel" onclick="updateOrderStatus('${order.id}', 'Cancelled')">Cancel</button>` : ''}
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-            container.innerHTML = html;
-        }
-
-        window.updateOrderStatus = async function(orderId, newStatus) {
-            try {
-                const orderRef = doc(db, "orders", orderId);
-                await updateDoc(orderRef, { status: newStatus });
-                alert(`Order marked as ${newStatus}!`);
-                if(currentLoggedInUser) fetchDashboardOrders(currentLoggedInUser.uid);
-            } catch (error) {
-                console.error("Error updating status: ", error);
-                alert("Error updating order status.");
-            }
-        }
-
-        async function fetchMyListedProducts(uid) {
-            const container = document.getElementById('myProductsContainer');
-            container.innerHTML = "<p>Loading your products...</p>";
-
-            try {
-                const q = query(collection(db, "vendors"), where("sellerUid", "==", uid));
-                const querySnapshot = await getDocs(q);
-                
-                if (querySnapshot.empty) {
-                    container.innerHTML = "<div class='no-data'>No products listed by you yet.</div>";
-                    return;
-                }
-
-                let html = "";
-                querySnapshot.forEach((docSnap) => {
-                    const prod = docSnap.data();
-                    html += `
-                        <div class="product-item-card">
-                            <div style="display: flex; gap: 15px; align-items: center;">
-                                <img src="${prod.image || 'https://via.placeholder.com/60'}" class="product-thumb" alt="Product">
-                                <div class="product-info">
-                                    <h4>${prod.name}</h4>
-                                    <p><strong>Price:</strong> ₹${prod.price} (${prod.unit || 'Per Piece'})</p>
-                                </div>
-                            </div>
-                            <div class="btn-group">
-                                <button class="btn-edit" onclick="editProduct('${docSnap.id}', ${prod.price})">✏️ Edit</button>
-                                <button class="btn-delete" onclick="deleteProduct('${docSnap.id}')">🗑️ Delete</button>
-                            </div>
-                        </div>
-                    `;
-                });
-                container.innerHTML = html;
-            } catch (error) {
-                console.error("Error loading products: ", error);
-                container.innerHTML = "<p style='color:red;'>Error loading your products.</p>";
-            }
+        window.filterOrdersMain = function(status) {
+            filterOrders(status);
         }
 
         window.editProduct = function(productId, currentPrice) {
-            const newPrice = prompt("Enter new price:", currentPrice);
-            if (newPrice !== null && newPrice.trim() !== "") {
-                const updatedPrice = Number(newPrice);
-                if (isNaN(updatedPrice)) {
-                    alert("Please enter a valid number for the price!");
-                    return;
-                }
-                updateDoc(doc(db, "vendors", productId), {
-                    price: updatedPrice
-                }).then(() => {
-                    alert("Product price updated successfully! 🎉");
-                    if(currentLoggedInUser) fetchMyListedProducts(currentLoggedInUser.uid);
-                }).catch((error) => {
-                    alert("Error updating price: " + error.message);
-                });
+            if(currentLoggedInUser) {
+                editProduct(db, productId, currentPrice, currentLoggedInUser.uid, (uid) => fetchMyListedProducts(db, uid));
             }
-        };
+        }
 
-        window.deleteProduct = async function(productId) {
-            if (confirm("Are you sure you want to delete this product?")) {
-                try {
-                    await deleteDoc(doc(db, "vendors", productId));
-                    alert("Product deleted successfully!");
-                    if(currentLoggedInUser) fetchMyListedProducts(currentLoggedInUser.uid);
-                } catch (error) {
-                    console.error("Error deleting product: ", error);
-                    alert("Error deleting product.");
-                }
+        window.deleteProduct = function(productId) {
+            if(currentLoggedInUser) {
+                deleteProduct(db, productId, currentLoggedInUser.uid, (uid) => fetchMyListedProducts(db, uid));
+            }
+        }
+
+        window.updateOrderStatus = function(orderId, newStatus) {
+            if(currentLoggedInUser) {
+                updateOrderStatus(db, orderId, newStatus, currentLoggedInUser.uid, fetchDashboardOrders);
             }
         }
     </script>
