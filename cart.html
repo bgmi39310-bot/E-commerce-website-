@@ -56,21 +56,25 @@
             let total = 0;
 
             cart.forEach((item, index) => {
-                let itemTotal = item.price * item.quantity;
+                // यहाँ हमने 'qty' और 'quantity' दोनों को हैंडल कर लिया है ताकि कभी गलती न हो
+                let itemQty = parseInt(item.qty || item.quantity) || 1;
+                let itemPrice = parseFloat(item.price) || 0;
+                let itemTotal = itemPrice * itemQty;
                 total += itemTotal;
+
                 cartList.innerHTML += `
                     <div class="cart-item">
-                        <img src="${item.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100'}" alt="Item">
+                        <img src="${item.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100'}" alt="Item" onerror="this.src='https://via.placeholder.com/100?text=No+Image'">
                         <div class="item-details">
-                            <h4 style="margin:0 0 5px 0;">${item.name}</h4>
-                            <div style="color:#b12704; font-weight:bold;">₹${item.price} × ${item.quantity} ${item.unit || 'Piece'} = ₹${itemTotal}</div>
+                            <h4 style="margin:0 0 5px 0;">${item.name || 'Product'}</h4>
+                            <div style="color:#b12704; font-weight:bold;">₹${itemPrice.toFixed(2)} × ${itemQty} = ₹${itemTotal.toFixed(2)}</div>
                             <small style="color:#555;">🏪 ${item.shopName || 'Local Shop'}</small><br>
                             <button class="remove-btn" onclick="removeItem(${index})">Remove</button>
                         </div>
                     </div>
                 `;
             });
-            document.getElementById('grandTotal').innerText = "₹" + total;
+            document.getElementById('grandTotal').innerText = "₹" + total.toFixed(2);
         }
 
         function removeItem(index) {
