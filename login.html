@@ -1,88 +1,190 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - DesiMarket</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
-        header { background-color: #232f3e; color: white; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; }
-        .nav-links { display: flex; gap: 12px; }
-        .nav-links a { color: white; text-decoration: none; font-weight: bold; font-size: 14px; }
-        .container { max-width: 400px; margin: 50px auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        h2 { text-align: center; color: #333; margin-top: 0; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
-        .form-group input[type="text"], .form-group input[type="email"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        .terms-container { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
-        .terms-container input { width: auto; }
-        .terms-container label { font-size: 13px; font-weight: normal; color: #444; margin-bottom: 0; cursor: pointer; }
-        .terms-container a { color: #0066c0; text-decoration: none; }
-        .terms-container a:hover { text-decoration: underline; }
-        .btn-login { background-color: #ffd814; border: 1px solid #fcd200; padding: 10px; font-weight: bold; cursor: pointer; border-radius: 4px; width: 100%; font-size: 16px; }
-        .btn-login:hover { background-color: #f7ca00; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login - DesiMarket</title>
+<style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f2f2f2; margin: 0; padding: 0; color: #0f1111; }
+
+    header { background-color: #232f3e; padding: 14px 20px; display: flex; align-items: center; justify-content: center; }
+    .logo-area { color: white; font-size: 22px; font-weight: bold; text-decoration: none; }
+    .logo-area span { color: #ff9900; }
+
+    .wrapper { display: flex; justify-content: center; padding: 30px 15px 60px; }
+    .auth-box { background: white; width: 100%; max-width: 380px; border: 1px solid #ddd; border-radius: 8px; padding: 25px 25px 20px; }
+    .auth-box h1 { font-size: 22px; margin: 0 0 18px; font-weight: 500; }
+
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 4px; }
+    .form-group input { width: 100%; padding: 9px 10px; border: 1px solid #a6a6a6; border-radius: 4px; font-size: 15px; outline: none; }
+    .form-group input:focus { border-color: #e77600; box-shadow: 0 0 3px 2px #e77600aa; }
+
+    .password-wrap { position: relative; }
+    .toggle-pass { position: absolute; right: 10px; top: 9px; font-size: 12px; color: #007185; cursor: pointer; user-select: none; }
+
+    .error-box { background: #fdf2f2; border: 1px solid #f5c2c7; color: #b02a37; font-size: 13px; padding: 8px 10px; border-radius: 4px; margin-bottom: 14px; display: none; }
+
+    .btn-primary { width: 100%; background: linear-gradient(to bottom,#f7dfa5,#f0c14b); border: 1px solid #a88734; padding: 9px; border-radius: 6px; font-size: 14px; cursor: pointer; margin-top: 6px; }
+    .btn-primary:hover { background: linear-gradient(to bottom,#f5d78e,#eeb933); }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .forgot-link { display: block; text-align: right; font-size: 12.5px; color: #007185; margin-top: 6px; cursor: pointer; text-decoration: none; }
+    .forgot-link:hover { text-decoration: underline; color: #c7511f; }
+
+    .terms-note { font-size: 12px; color: #565959; margin-top: 16px; line-height: 1.5; }
+    .terms-note a { color: #007185; text-decoration: none; }
+    .terms-note a:hover { text-decoration: underline; color: #c7511f; }
+
+    .divider { display: flex; align-items: center; margin: 20px 0 14px; }
+    .divider hr { flex: 1; border: none; border-top: 1px solid #e7e7e7; }
+    .divider span { padding: 0 10px; font-size: 12px; color: #767676; }
+
+    .create-account-box { text-align: center; }
+    .btn-secondary { display: inline-block; width: 100%; background: #f0f2f2; border: 1px solid #adb1b8; padding: 9px; border-radius: 6px; font-size: 14px; cursor: pointer; text-decoration: none; color: #0f1111; }
+    .btn-secondary:hover { background: #e3e6e6; }
+
+    .role-note { text-align: center; font-size: 12.5px; color: #565959; margin-top: 14px; }
+    .role-note a { color: #007185; text-decoration: none; }
+
+    footer { text-align: center; font-size: 11.5px; color: #767676; padding: 20px; border-top: 1px solid #e7e7e7; margin-top: 20px; }
+</style>
 </head>
 <body>
 
-    <header>
-        <h2>DesiMarket</h2>
-        <div class="nav-links">
-            <a href="index.html">Home</a>
-            <a href="cart.html">Cart</a>
-            <a href="orders.html">Orders</a>
-            <a href="account.html">Account</a>
-        </div>
-    </header>
+<header>
+    <a href="index.html" class="logo-area">Desi<span>Market</span></a>
+</header>
 
-    <div class="container">
-        <h2>Login / Register</h2>
+<div class="wrapper">
+    <div class="auth-box">
+        <h1>Login</h1>
+
+        <div id="errorBox" class="error-box"></div>
+
         <div class="form-group">
-            <label for="loginName">Your Name</label>
-            <input type="text" id="loginName" placeholder="Enter your name">
+            <label for="loginEmail">Email address</label>
+            <input type="email" id="loginEmail" placeholder="your@email.com" autocomplete="email">
         </div>
+
         <div class="form-group">
-            <label for="loginEmail">Email Address</label>
-            <input type="email" id="loginEmail" placeholder="Enter your email">
+            <label for="loginPassword">Password</label>
+            <div class="password-wrap">
+                <input type="password" id="loginPassword" placeholder="Enter password" autocomplete="current-password">
+                <span class="toggle-pass" id="togglePass">SHOW</span>
+            </div>
+            <a class="forgot-link" id="forgotBtn">Forgot password?</a>
         </div>
 
-        <!-- Terms and Conditions Checkbox -->
-        <div class="terms-container">
-            <input type="checkbox" id="termsCheck">
-            <label for="termsCheck">I agree to the <a href="#" onclick="showTerms(event)">Terms and Conditions</a></label>
+        <button class="btn-primary" id="loginBtn">Login</button>
+
+        <p class="terms-note">
+            By continuing, you agree to DesiMarket's <a href="terms.html">Terms & Conditions</a> and <a href="terms.html#privacy">Privacy Policy</a>.
+        </p>
+
+        <div class="divider"><hr><span>New to DesiMarket?</span><hr></div>
+
+        <div class="create-account-box">
+            <a href="signup.html" class="btn-secondary">Create your DesiMarket account</a>
         </div>
 
-        <button class="btn-login" onclick="handleLogin()">Login / Proceed</button>
+        <p class="role-note">Want to sell on DesiMarket? <a href="signup.html?role=seller">Register as a Seller</a></p>
     </div>
+</div>
 
-    <script>
-        function showTerms(event) {
-            event.preventDefault();
-            alert("Terms & Conditions:\n1. Users must provide correct information.\n2. Do not share or edit other users' private details.\n3. Maintain safe behavior on the platform.");
+<footer>&copy; 2026 DesiMarket. Vocal for Local.</footer>
+
+<script type="module">
+    import { auth } from './firebase-config.js';
+    import { signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { db } from './firebase-config.js';
+
+    const emailInput = document.getElementById('loginEmail');
+    const passInput = document.getElementById('loginPassword');
+    const errorBox = document.getElementById('errorBox');
+    const loginBtn = document.getElementById('loginBtn');
+
+    document.getElementById('togglePass').addEventListener('click', () => {
+        const isPassword = passInput.type === 'password';
+        passInput.type = isPassword ? 'text' : 'password';
+        document.getElementById('togglePass').innerText = isPassword ? 'HIDE' : 'SHOW';
+    });
+
+    function showError(msg) {
+        errorBox.innerText = msg;
+        errorBox.style.display = 'block';
+    }
+    function hideError() {
+        errorBox.style.display = 'none';
+    }
+
+    function friendlyError(code) {
+        switch (code) {
+            case 'auth/invalid-email': return 'Please enter a valid email address.';
+            case 'auth/user-not-found':
+            case 'auth/invalid-credential':
+            case 'auth/wrong-password': return 'Incorrect email or password. Please try again.';
+            case 'auth/too-many-requests': return 'Too many attempts. Please wait a bit and try again.';
+            case 'auth/missing-password': return 'Please enter your password.';
+            default: return 'Something went wrong. Please try again.';
+        }
+    }
+
+    // Redirect to correct page based on saved role
+    async function redirectAfterLogin(uid) {
+        try {
+            const snap = await getDoc(doc(db, "users", uid));
+            const role = snap.exists() ? snap.data().role : 'customer';
+            window.location.href = role === 'seller' ? 'seller-dashboard.html' : 'index.html';
+        } catch (e) {
+            window.location.href = 'index.html';
+        }
+    }
+
+    async function handleLogin() {
+        hideError();
+        const email = emailInput.value.trim();
+        const password = passInput.value;
+
+        if (!email || !password) {
+            showError('Please enter both email and password.');
+            return;
         }
 
-        function handleLogin() {
-            const name = document.getElementById('loginName').value.trim();
-            const email = document.getElementById('loginEmail').value.trim();
-            const termsChecked = document.getElementById('termsCheck').checked;
+        loginBtn.disabled = true;
+        loginBtn.innerText = 'Signing in...';
 
-            if (name === '' || email === '') {
-                alert("Please fill in all fields!");
-                return;
-            }
-
-            if (!termsChecked) {
-                alert("You must agree to the Terms and Conditions before proceeding!");
-                return;
-            }
-
-            // Save user data to localStorage
-            const userData = { name: name, email: email };
-            localStorage.setItem('currentUser', JSON.stringify(userData));
-
-            alert("Login successful!");
-            window.location.href = 'setup-profile.html';
+        try {
+            const cred = await signInWithEmailAndPassword(auth, email, password);
+            await redirectAfterLogin(cred.user.uid);
+        } catch (error) {
+            console.error(error);
+            showError(friendlyError(error.code));
+            loginBtn.disabled = false;
+            loginBtn.innerText = 'Login';
         }
-    </script>
+    }
+
+    loginBtn.addEventListener('click', handleLogin);
+    passInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleLogin(); });
+    emailInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') passInput.focus(); });
+
+    document.getElementById('forgotBtn').addEventListener('click', async () => {
+        const email = emailInput.value.trim();
+        if (!email) {
+            showError('Enter your email above first, then click "Forgot password?"');
+            return;
+        }
+        try {
+            await sendPasswordResetEmail(auth, email);
+            hideError();
+            alert('Password reset link sent to ' + email + '. Please check your inbox.');
+        } catch (error) {
+            showError(friendlyError(error.code));
+        }
+    });
+</script>
 </body>
 </html>
