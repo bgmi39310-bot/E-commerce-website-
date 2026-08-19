@@ -39,7 +39,23 @@
         </div>
     </div>
 
-    <script>
+    <!-- Firebase SDKs & Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD7cgnLiY8yuc3EPiCvmDkpfwhgltR-x-g",
+            authDomain: "desimarket-4b8a5.firebaseapp.com",
+            projectId: "desimarket-4b8a5",
+            storageBucket: "desimarket-4b8a5.firebasestorage.app",
+            messagingSenderId: "761756037231",
+            appId: "1:761756037231:web:f09e5b6abb55947cf85d9a"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
         function loadCart() {
             let cart = JSON.parse(localStorage.getItem('cart')) || [];
             const cartList = document.getElementById('cartList');
@@ -56,7 +72,6 @@
             let total = 0;
 
             cart.forEach((item, index) => {
-                // यहाँ हमने 'qty' और 'quantity' दोनों को हैंडल कर लिया है ताकि कभी गलती न हो
                 let itemQty = parseInt(item.qty || item.quantity) || 1;
                 let itemPrice = parseFloat(item.price) || 0;
                 let itemTotal = itemPrice * itemQty;
@@ -77,17 +92,58 @@
             document.getElementById('grandTotal').innerText = "₹" + total.toFixed(2);
         }
 
-        function removeItem(index) {
+        window.removeItem = function(index) {
             let cart = JSON.parse(localStorage.getItem('cart')) || [];
             cart.splice(index, 1);
             localStorage.setItem('cart', JSON.stringify(cart));
             loadCart();
         }
 
-        function checkout() {
-            alert("Order placed successfully! Thank you for shopping with DesiMarket.");
-            localStorage.removeItem('cart');
-            window.location.href = "index.html";
+        window.checkout = async function() {
+            let cart = JSON.parse(localStorage.getItem('cart')) || [];
+            if (cart.length === 0) {
+                alert("Your cart is empty!");
+                return;
+            }
+
+            let currentUser = JSON.parse(localStorage.getItem('currentUser')) || { name: "Guest User", phone: "N/A" };
+            let pastOrders = JSON.parse(localStorage.getItem('myOrders')) || [];
+
+            alert("ऑर्डर प्रोसेस हो रहा है...");
+
+            try {
+                // 1. डेटाबेस (Firebase) में आर्डर सेव करें
+                for (let item of cart) {
+                    let orderData = {
+                        name: item.name,
+                        price: item.price,
+                        qty: item.qty || item.quantity || 1,
+                        shopName: item.shopName || "Local Shop",
+                        customerName: (currentUser.name || '') + ' ' + (currentUser.surname || ''),
+                        customerPhone: currentUser.phone || 'N/A',
+                        date: new Date().toLocaleDateString(),
+                        status: "Order Placed",
+                        createdAt: new Date()
+                    };
+
+                    // Firebase Firestore में 'orders' कलेक्शन में जोड़ें
+                    await addDoc(collection(db, "orders"), orderData);
+
+                    // लोकल स्टोरेज के लिए भी एरे में डालें
+                    pastOrders.push(orderData);
+                }
+
+                // 2. लोकल स्टोरेज अपडेट करें और कार्ट खाली करें
+                localStorage.setItem('myOrders', JSON.stringify(pastOrders));
+                localStorage.removeItem('cart');
+
+                alert("Order placed successfully and saved to Database! 🎉");
+                window.location.href = "orders.html";
+
+            } catch (error) {
+                console.error("Order error: ", error);
+                alert("Error placing order: " + error.message);
+            }
         }
 
         window.onload = loadCart;
