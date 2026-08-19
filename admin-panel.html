@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Panel - DesiMarket</title>
+<style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #14181f; margin: 0; color: #e8e8e8; }
+
+    header { background: #0d1117; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #232a35; position: sticky; top: 0; z-index: 100; }
+    .logo-area { color: white; font-size: 19px; font-weight: bold; }
+    .logo-area span { color: #ff9900; }
+    .logo-area small { display: block; font-size: 11px; color: #888; font-weight: normal; }
+    .logout-btn { background: #dc3545; color: white; border: none; padding: 7px 14px; border-radius: 5px; font-size: 13px; font-weight: bold; cursor: pointer; }
+
+    .container { max-width: 950px; margin: 20px auto; padding: 0 15px 40px; }
+
+    /* Login Gate */
+    .gate-wrap { display: flex; justify-content: center; padding: 60px 15px; }
+    .gate-box { background: #1c2128; border: 1px solid #30363d; border-radius: 10px; padding: 28px; width: 100%; max-width: 360px; }
+    .gate-box h2 { margin-top: 0; font-size: 19px; }
+    .gate-box .form-group { margin-bottom: 12px; }
+    .gate-box label { display: block; font-size: 12.5px; margin-bottom: 4px; color: #aaa; }
+    .gate-box input { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #30363d; background: #0d1117; color: white; font-size: 14px; }
+    .gate-btn { width: 100%; background: #ff9900; border: none; color: #111; font-weight: bold; padding: 10px; border-radius: 6px; cursor: pointer; margin-top: 8px; }
+    .gate-error { color: #ff6b6b; font-size: 13px; margin-bottom: 10px; display: none; }
+    .access-denied { text-align: center; padding: 60px 15px; color: #aaa; }
+
+    /* Tabs */
+    .admin-tabs { display: flex; gap: 6px; overflow-x: auto; margin: 18px 0 16px; }
+    .admin-tab-btn { padding: 9px 16px; background: #1c2128; border: 1px solid #30363d; border-radius: 6px; color: #ccc; font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .admin-tab-btn.active { background: #ff9900; color: #111; border-color: #ff9900; }
+
+    .admin-section { display: none; }
+    .admin-section.active { display: block; }
+
+    /* Overview stats */
+    .admin-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
+    .admin-stat-card { background: #1c2128; border: 1px solid #30363d; border-radius: 10px; padding: 16px 10px; text-align: center; }
+    .asv { font-size: 22px; font-weight: bold; color: #ff9900; }
+    .asl { font-size: 12px; color: #aaa; margin-top: 4px; }
+
+    /* Row cards (sellers/buyers/products/orders) */
+    .admin-row-card { background: #1c2128; border: 1px solid #30363d; border-left: 4px solid #ff9900; border-radius: 8px; padding: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .admin-row-card.is-blocked { border-left-color: #dc3545; opacity: 0.75; }
+    .arc-thumb { width: 50px; height: 50px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
+    .arc-info { flex-grow: 1; min-width: 200px; }
+    .arc-info h4 { margin: 0 0 4px; font-size: 14.5px; color: #f0f0f0; }
+    .arc-info p { margin: 2px 0; font-size: 12.5px; color: #aaa; }
+    .uid-tag { font-family: monospace; font-size: 10.5px !important; color: #666 !important; }
+    .blocked-tag { background: #dc3545; color: white; font-size: 10px; padding: 2px 7px; border-radius: 10px; margin-left: 6px; vertical-align: middle; }
+
+    .admin-btn { border: none; padding: 8px 14px; border-radius: 5px; font-size: 12.5px; font-weight: bold; cursor: pointer; white-space: nowrap; }
+    .admin-btn-block { background: #dc3545; color: white; }
+    .admin-btn-unblock { background: #28a745; color: white; }
+    .admin-btn-delete { background: #6f42c1; color: white; }
+
+    .admin-no-data { text-align: center; padding: 40px 20px; color: #888; background: #1c2128; border-radius: 8px; border: 1px solid #30363d; }
+
+    .filter-select { padding: 8px 12px; border-radius: 6px; border: 1px solid #30363d; background: #1c2128; color: white; font-size: 13px; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+
+<header>
+    <div class="logo-area">Desi<span>Market</span><small>Admin Control Panel</small></div>
+    <button class="logout-btn" id="logoutBtn" style="display:none;">Logout</button>
+</header>
+
+<div class="container">
+
+    <!-- Login Gate -->
+    <div class="gate-wrap" id="gateWrap">
+        <div class="gate-box">
+            <h2>🔐 Admin Login</h2>
+            <div class="gate-error" id="gateError"></div>
+            <div class="form-group">
+                <label>Admin Email</label>
+                <input type="email" id="adminEmail" placeholder="admin@email.com">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="adminPassword" placeholder="Password">
+            </div>
+            <button class="gate-btn" id="gateLoginBtn">Login to Admin Panel</button>
+        </div>
+    </div>
+
+    <!-- Access Denied -->
+    <div class="access-denied" id="accessDenied" style="display:none;">
+        <h2>🚫 Access Denied</h2>
+        <p>This account does not have admin privileges.</p>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboardWrap" style="display:none;">
+        <div class="admin-tabs">
+            <button class="admin-tab-btn active" onclick="switchTab('overview')" id="tab-overview">📊 Overview</button>
+            <button class="admin-tab-btn" onclick="switchTab('sellers')" id="tab-sellers">🏪 Sellers</button>
+            <button class="admin-tab-btn" onclick="switchTab('buyers')" id="tab-buyers">🧑‍🤝‍🧑 Buyers</button>
+            <button class="admin-tab-btn" onclick="switchTab('products')" id="tab-products">📦 Products</button>
+            <button class="admin-tab-btn" onclick="switchTab('orders')" id="tab-orders">🧾 Orders</button>
+        </div>
+
+        <div class="admin-section active" id="section-overview">
+            <div id="overviewContainer"><p>Loading...</p></div>
+        </div>
+
+        <div class="admin-section" id="section-sellers">
+            <div id="sellersContainer"><p>Loading...</p></div>
+        </div>
+
+        <div class="admin-section" id="section-buyers">
+            <div id="buyersContainer"><p>Loading...</p></div>
+        </div>
+
+        <div class="admin-section" id="section-products">
+            <div id="productsContainer"><p>Loading...</p></div>
+        </div>
+
+        <div class="admin-section" id="section-orders">
+            <select class="filter-select" id="orderStatusFilter" onchange="filterOrdersMain()">
+                <option value="All">All Statuses</option>
+                <option value="Pending">Pending</option>
+                <option value="Accepted">Accepted</option>
+                <option value="Shipped">Shipped</option>
+                <option value="Delivered">Delivered</option>
+                <option value="Cancelled">Cancelled</option>
+            </select>
+            <div id="ordersContainer"><p>Loading...</p></div>
+        </div>
+    </div>
+
+</div>
+
+<script type="module">
+    import { auth, db } from './firebase-config.js';
+    import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import {
+        loadOverviewStats, loadSellers, loadBuyers, toggleBlockUser,
+        loadAllProducts, deleteProductAdmin, loadAllOrders
+    } from './admin-logic.js';
+
+    let isCurrentlyAdmin = false;
+
+    function showGate() {
+        document.getElementById('gateWrap').style.display = 'flex';
+        document.getElementById('accessDenied').style.display = 'none';
+        document.getElementById('dashboardWrap').style.display = 'none';
+        document.getElementById('logoutBtn').style.display = 'none';
+    }
+
+    function showDenied() {
+        document.getElementById('gateWrap').style.display = 'none';
+        document.getElementById('accessDenied').style.display = 'block';
+        document.getElementById('dashboardWrap').style.display = 'none';
+        document.getElementById('logoutBtn').style.display = 'inline-block';
+    }
+
+    function showDashboard() {
+        document.getElementById('gateWrap').style.display = 'none';
+        document.getElementById('accessDenied').style.display = 'none';
+        document.getElementById('dashboardWrap').style.display = 'block';
+        document.getElementById('logoutBtn').style.display = 'inline-block';
+        loadOverviewStats(db);
+    }
+
+    onAuthStateChanged(auth, async (user) => {
+        if (!user) { showGate(); return; }
+        try {
+            const snap = await getDoc(doc(db, "users", user.uid));
+            const isAdmin = snap.exists() && snap.data().isAdmin === true;
+            isCurrentlyAdmin = isAdmin;
+            isAdmin ? showDashboard() : showDenied();
+        } catch (e) {
+            console.error(e);
+            showDenied();
+        }
+    });
+
+    document.getElementById('gateLoginBtn').addEventListener('click', async () => {
+        const email = document.getElementById('adminEmail').value.trim();
+        const password = document.getElementById('adminPassword').value;
+        const errBox = document.getElementById('gateError');
+        errBox.style.display = 'none';
+
+        if (!email || !password) {
+            errBox.innerText = 'Please enter email and password.';
+            errBox.style.display = 'block';
+            return;
+        }
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
+        } catch (error) {
+            errBox.innerText = 'Incorrect email or password.';
+            errBox.style.display = 'block';
+        }
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+        await signOut(auth);
+    });
+
+    // ---------- Tabs ----------
+    window.switchTab = function(tabName) {
+        document.querySelectorAll('.admin-tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
+        document.getElementById('tab-' + tabName).classList.add('active');
+        document.getElementById('section-' + tabName).classList.add('active');
+
+        if (tabName === 'sellers') loadSellers(db);
+        if (tabName === 'buyers') loadBuyers(db);
+        if (tabName === 'products') loadAllProducts(db);
+        if (tabName === 'orders') loadAllOrders(db, document.getElementById('orderStatusFilter').value);
+    };
+
+    window.toggleBlockMain = function(uid, shouldBlock) {
+        toggleBlockUser(db, uid, shouldBlock, () => {
+            loadSellers(db);
+            loadBuyers(db);
+        });
+    };
+
+    window.deleteProductMain = function(productId) {
+        if (!confirm('Remove this product from the marketplace? This cannot be undone.')) return;
+        deleteProductAdmin(db, productId, () => loadAllProducts(db));
+    };
+
+    window.filterOrdersMain = function() {
+        loadAllOrders(db, document.getElementById('orderStatusFilter').value);
+    };
+</script>
+</body>
+</html>
+
