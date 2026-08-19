@@ -40,6 +40,7 @@
         .dash-action-btn { padding: 6px 12px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 13px; color: white; }
         .btn-accept { background-color: #28a745; }
         .btn-ship { background-color: #007bff; }
+        .btn-delivered { background-color: #6f42c1; }
         .btn-cancel { background-color: #dc3545; }
         .btn-delete { background-color: #dc3545; border: none; padding: 6px 12px; border-radius: 4px; color: white; font-weight: bold; font-size: 13px; cursor: pointer; }
         .call-btn { background-color: #17a2b8; text-decoration: none; display: inline-block; padding: 6px 12px; border-radius: 4px; color: white; font-weight: bold; font-size: 13px; }
@@ -66,6 +67,7 @@
         .bar-Pending { background: #ffc107; }
         .bar-Accepted { background: #17a2b8; }
         .bar-Shipped { background: #007bff; }
+        .bar-Delivered { background: #6f42c1; }
         .bar-Cancelled { background: #dc3545; }
         .bar-count { width: 22px; text-align: right; font-weight: bold; color: #333; }
     </style>
@@ -163,6 +165,7 @@
                 <button class="tab-btn active" onclick="filterOrdersMain('Pending')" id="tabPending">⏳ Pending</button>
                 <button class="tab-btn" onclick="filterOrdersMain('Accepted')" id="tabAccepted">✅ Accepted</button>
                 <button class="tab-btn" onclick="filterOrdersMain('Shipped')" id="tabShipped">🚚 Shipped</button>
+                <button class="tab-btn" onclick="filterOrdersMain('Delivered')" id="tabDelivered">✅ Delivered</button>
                 <button class="tab-btn" onclick="filterOrdersMain('Cancelled')" id="tabCancelled">❌ Cancelled</button>
             </div>
             <div id="dashboardOrdersContainer"><p>Loading database orders...</p></div>
@@ -186,7 +189,7 @@
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { loadSellerProfileFromFirestore, saveSellerProfile } from './profile-logic.js';
         import { addProductToFirebase, fetchMyListedProducts, editProduct, deleteProduct } from './product-logic.js';
-        import { fetchDashboardOrders, filterOrders, updateOrderStatus } from './order-logic.js';
+        import { fetchDashboardOrders, filterOrders, updateOrderStatus, markAsShipped, confirmDelivery } from './order-logic.js';
         import { loadAnalytics } from './analytics-logic.js';
         import { listenForNewOrders, clearUnreadNotifications } from './notification-logic.js';
 
@@ -266,6 +269,24 @@
         window.updateOrderStatus = function(orderId, newStatus) {
             if(currentLoggedInUser) {
                 updateOrderStatus(db, orderId, newStatus, currentLoggedInUser.uid, (uid) => {
+                    fetchDashboardOrders(db, uid);
+                    loadAnalytics(db, uid);
+                });
+            }
+        }
+
+        window.markShippedMain = function(orderId) {
+            if(currentLoggedInUser) {
+                markAsShipped(db, orderId, currentLoggedInUser.uid, (uid) => {
+                    fetchDashboardOrders(db, uid);
+                    loadAnalytics(db, uid);
+                });
+            }
+        }
+
+        window.confirmDeliveryMain = function(orderId) {
+            if(currentLoggedInUser) {
+                confirmDelivery(db, orderId, currentLoggedInUser.uid, (uid) => {
                     fetchDashboardOrders(db, uid);
                     loadAnalytics(db, uid);
                 });
