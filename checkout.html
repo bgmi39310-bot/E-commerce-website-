@@ -97,8 +97,12 @@
     </div>
 
     <script type="module">
-        import { db } from './firebase-config.js';
+        import { db, auth } from './firebase-config.js';
         import { collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+        let currentBuyerUid = null;
+        onAuthStateChanged(auth, (user) => { currentBuyerUid = user ? user.uid : null; });
 
         let selectedPayment = 'COD';
         window.selectPayment = function(method) {
@@ -178,6 +182,7 @@
                         quantity: qty,
                         shopName: item.shopName || 'Local Shop',
                         sellerUid: item.sellerUid || null,
+                        buyerUid: currentBuyerUid,
                         buyerName: name,
                         buyerPhone: phone,
                         buyerAddress: fullAddress,
