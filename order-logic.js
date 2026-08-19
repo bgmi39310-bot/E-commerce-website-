@@ -25,6 +25,7 @@ export function filterOrders(status) {
     if(status === 'Pending') document.getElementById('tabPending').classList.add('active');
     if(status === 'Accepted') document.getElementById('tabAccepted').classList.add('active');
     if(status === 'Shipped') document.getElementById('tabShipped').classList.add('active');
+    if(status === 'Delivered') document.getElementById('tabDelivered').classList.add('active');
     if(status === 'Cancelled') document.getElementById('tabCancelled').classList.add('active');
 
     displayDashboardOrders();
@@ -50,12 +51,14 @@ function displayDashboardOrders() {
                     <p><strong>Address:</strong> ${order.buyerAddress || 'N/A'}</p>
                     <p><strong>Amount:</strong> ₹${order.price || 0}</p>
                     <p><strong>Status:</strong> <span style="font-weight:bold; color:#007600;">${order.status || 'Pending'}</span></p>
-                    
+                    ${currentStatusFilter === 'Shipped' ? `<p style="color:#6f42c1; font-size:13px;"><strong>🔐 Ask the buyer for their Delivery OTP to confirm handover.</strong></p>` : ''}
+
                     <div class="btn-group">
                         <a href="tel:${order.buyerPhone}" class="call-btn">📞 Call Buyer</a>
                         ${currentStatusFilter === 'Pending' ? `<button class="dash-action-btn btn-accept" onclick="updateOrderStatus('${order.id}', 'Accepted')">Accept</button>` : ''}
-                        ${currentStatusFilter === 'Accepted' ? `<button class="dash-action-btn btn-ship" onclick="updateOrderStatus('${order.id}', 'Shipped')">Mark Shipped</button>` : ''}
-                        ${currentStatusFilter !== 'Cancelled' && currentStatusFilter !== 'Shipped' ? `<button class="dash-action-btn btn-cancel" onclick="updateOrderStatus('${order.id}', 'Cancelled')">Cancel</button>` : ''}
+                        ${currentStatusFilter === 'Accepted' ? `<button class="dash-action-btn btn-ship" onclick="markShippedMain('${order.id}')">Mark Shipped</button>` : ''}
+                        ${currentStatusFilter === 'Shipped' ? `<button class="dash-action-btn btn-delivered" onclick="confirmDeliveryMain('${order.id}')">✅ Confirm Delivery (Enter OTP)</button>` : ''}
+                        ${(currentStatusFilter === 'Pending' || currentStatusFilter === 'Accepted') ? `<button class="dash-action-btn btn-cancel" onclick="updateOrderStatus('${order.id}', 'Cancelled')">Cancel</button>` : ''}
                     </div>
                 </div>
             </div>
@@ -67,7 +70,7 @@ function displayDashboardOrders() {
 export async function updateOrderStatus(db, orderId, newStatus, uid, fetchOrdersCallback) {
     try {
         const orderRef = doc(db, "orders", orderId);
-        await updateDoc(orderRef, { status: newStatus });
+        await updateDoc(orderRef, { status: newStatus, [newStatus.toLowerCase() + 'At']: new Date() });
         alert(`Order marked as ${newStatus}!`);
         fetchOrdersCallback(db, uid);
     } catch (error) {
@@ -76,3 +79,44 @@ export async function updateOrderStatus(db, orderId, newStatus, uid, fetchOrders
     }
 }
 
+// Generates a 4-digit delivery OTP when the seller ships the order.
+// The OTP is stored on the order and shown ONLY to the buyer (never to the seller ahead of time).
+export async function markAsShipped(db, orderId, uid, fetchOrdersCallback) {
+    try {
+        const otp = Math.floor(1000 + Math.random() * 9000).toString();
+        const orderRef = doc(db, "orders", orderId);
+        await updateDoc(orderRef, { status: 'Shipped', shippedAt: new Date(), deliveryOTP: otp });
+        alert("Order marked as Shipped! 🚚\n\nThe buyer will now see a Delivery OTP on their Orders page. Ask them for it when you hand over the package, to confirm delivery.");
+        fetchOrdersCallback(db, uid);
+    } catch (error) {
+        console.error("Error marking shipped:", error);
+        alert("Error updating order status.");
+    }
+}
+
+// Seller must enter the OTP the buyer received to confirm the order was actually delivered.
+export async function confirmDelivery(db, orderId, uid, fetchOrdersCallback) {
+    const order = allOrders.find(o => o.id === orderId);
+    if (!order) {
+        alert("Order not found. Please refresh and try again.");
+        return;
+    }
+
+    const enteredOtp = prompt("Enter the 4-digit Delivery OTP given by the buyer:");
+    if (enteredOtp === null) return; // seller cancelled the prompt
+
+    if (enteredOtp.trim() !== (order.deliveryOTP || '')) {
+        alert("❌ Incorrect OTP. Please ask the buyer again — the order will not be marked delivered until the correct OTP is entered.");
+        return;
+    }
+
+    try {
+        const orderRef = doc(db, "orders", orderId);
+        await updateDoc(orderRef, { status: 'Delivered', deliveredAt: new Date() });
+        alert("✅ Delivery confirmed! Order marked as Delivered.");
+        fetchOrdersCallback(db, uid);
+    } catch (error) {
+        console.error("Error confirming delivery:", error);
+        alert("Error updating order status.");
+    }
+}
