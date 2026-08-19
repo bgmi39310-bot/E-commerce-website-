@@ -38,8 +38,12 @@
         .profile-logo { width: 80px; height: 80px; object-fit: cover; border-radius: 50%; border: 2px solid #ddd; }
         .profile-info h3 { margin: 0 0 5px 0; color: #232f3e; }
         .profile-info p { margin: 3px 0; color: #555; font-size: 14px; }
-        .btn-edit { background-color: #232f3e; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 14px; margin-top: 10px; }
+        
+        .btn-group-profile { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+        .btn-edit { background-color: #232f3e; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 14px; }
         .btn-edit:hover { background-color: #37475a; }
+        .btn-view { background-color: #007bff; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        .btn-view:hover { background-color: #0056b3; }
 
         /* Order & Product Management Styles */
         .order-card, .product-item-card { background: #fff; border: 1px solid #ddd; border-left: 5px solid #ffd814; border-radius: 6px; padding: 15px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; gap: 15px; }
@@ -88,6 +92,12 @@
         <!-- 1. Shop Profile Section -->
         <div class="card">
             <h2>1. Seller / Shop Profile</h2>
+            
+            <!-- Unique Seller ID Display Box -->
+            <div id="sellerIdDisplay" style="background: #e9ecef; padding: 10px; border-radius: 5px; margin-bottom: 15px; font-weight: bold; color: #333; border: 1px dashed #232f3e; font-size: 14px;">
+                Unique Seller ID: Loading...
+            </div>
+
             <div id="profileMsg" class="success-msg">Profile Saved Successfully!</div>
             
             <div id="profileDisplay" style="display: none;">
@@ -98,7 +108,11 @@
                         <p><strong>Owner:</strong> <span id="dispOwnerName"></span></p>
                         <p><strong>Phone:</strong> <span id="dispPhone"></span></p>
                         <p><strong>Address:</strong> <span id="dispAddress"></span></p>
-                        <button class="btn-edit" onclick="enableEditMode()">✏️ Edit Profile</button>
+                        
+                        <div class="btn-group-profile">
+                            <button class="btn-edit" onclick="enableEditMode()">✏️ Edit Profile</button>
+                            <button class="btn-view" onclick="viewMyProfile()">👁️ View Profile ID</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -208,6 +222,9 @@
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 currentLoggedInUser = user;
+                // यहाँ Unique ID सीधे स्क्रीन पर दिखाई देगी
+                document.getElementById('sellerIdDisplay').innerText = "Unique Seller ID: " + user.uid;
+                
                 await loadSellerProfileFromFirestore(user.uid);
                 fetchDashboardOrders(user.uid);
                 fetchMyListedProducts(user.uid);
@@ -249,6 +266,12 @@
         window.enableEditMode = function() {
             document.getElementById('profileDisplay').style.display = 'none';
             document.getElementById('profileForm').style.display = 'grid';
+        }
+
+        window.viewMyProfile = function() {
+            if (currentLoggedInUser) {
+                alert("Shop Profile Details:\n\nUnique ID: " + currentLoggedInUser.uid + "\nShop Name: " + document.getElementById('dispShopName').innerText);
+            }
         }
 
         window.saveSellerProfile = async function() {
