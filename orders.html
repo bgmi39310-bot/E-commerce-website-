@@ -24,6 +24,7 @@
         .status-Pending { background: #fff3cd; color: #8a6800; }
         .status-Accepted { background: #d1ecf1; color: #0c5460; }
         .status-Shipped { background: #cce5ff; color: #004085; }
+        .status-Delivered { background: #e2d9f3; color: #4b2e83; }
         .status-Cancelled { background: #f8d7da; color: #842029; }
 
         .progress-track { display: flex; align-items: center; margin: 12px 0 4px; }
@@ -33,8 +34,16 @@
 
         .order-date { font-size: 12px; color: #888; margin-top: 6px; }
 
+        .delivery-code-box { background: #f3e8ff; border: 1.5px dashed #6f42c1; border-radius: 8px; padding: 12px 14px; margin: 10px 0; text-align: center; }
+        .delivery-code-box .code-label { font-size: 12px; color: #4b2e83; font-weight: 600; margin-bottom: 4px; }
+        .delivery-code-box .code-value { font-size: 24px; font-weight: bold; letter-spacing: 6px; color: #4b2e83; }
+        .delivery-code-box .code-hint { font-size: 11.5px; color: #6f42c1; margin-top: 4px; }
+
         .no-orders { text-align: center; padding: 50px 20px; background: white; border-radius: 8px; color: #666; }
         .no-orders a { display: inline-block; margin-top: 12px; background: #ffd814; padding: 10px 22px; border-radius: 5px; text-decoration: none; color: #111; font-weight: bold; }
+
+        .cancel-order-btn { display: block; margin-top: 10px; background: none; border: 1px solid #dc3545; color: #dc3545; padding: 7px 14px; border-radius: 5px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+        .cancel-order-btn:hover { background: #dc3545; color: white; }
 
         .login-prompt { text-align: center; padding: 50px 20px; background: white; border-radius: 8px; }
         .login-prompt a { display: inline-block; margin-top: 12px; background: #ffd814; padding: 10px 22px; border-radius: 5px; text-decoration: none; color: #111; font-weight: bold; }
@@ -53,10 +62,12 @@
 
     <script type="module">
         import { db, auth } from './firebase-config.js';
-        import { collection, getDocs, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { collection, getDocs, query, where, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        const STEPS = ['Pending', 'Accepted', 'Shipped'];
+        let currentBuyerUid = null;
+
+        const STEPS = ['Pending', 'Accepted', 'Shipped', 'Delivered'];
 
         function renderProgress(status) {
             if (status === 'Cancelled') {
@@ -96,7 +107,15 @@
                             <span class="status-pill status-${status}">${status}</span>
                         </div>
                         ${renderProgress(status)}
+                        ${status === 'Shipped' && order.deliveryOTP ? `
+                            <div class="delivery-code-box">
+                                <div class="code-label">🔐 Your Delivery OTP</div>
+                                <div class="code-value">${order.deliveryOTP}</div>
+                                <div class="code-hint">Share this code with the seller ONLY after you physically receive your order</div>
+                            </div>
+                        ` : ''}
                         <div class="order-price">₹${order.price || 0}</div>
+                        ${status === 'Pending' ? `<button class="cancel-order-btn" onclick="cancelMyOrder('${order.id}')">Cancel Order</button>` : ''}
                         <div class="order-date">${dateStr ? 'Ordered on ' + dateStr : ''}</div>
                     </div>
                 `;
@@ -126,8 +145,21 @@
             }
         }
 
+        window.cancelMyOrder = async function(orderId) {
+            if (!confirm("Are you sure you want to cancel this order?")) return;
+            try {
+                await updateDoc(doc(db, "orders", orderId), { status: 'Cancelled', cancelledAt: new Date(), cancelledBy: 'buyer' });
+                alert("Order cancelled successfully.");
+                if (currentBuyerUid) fetchMyOrders(currentBuyerUid);
+            } catch (error) {
+                console.error(error);
+                alert("Unable to cancel order right now. Please try again.");
+            }
+        };
+
         onAuthStateChanged(auth, (user) => {
             if (user) {
+                currentBuyerUid = user.uid;
                 fetchMyOrders(user.uid);
             } else {
                 document.getElementById('pageContent').innerHTML = `
