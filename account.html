@@ -5,14 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Account - DesiMarket</title>
     <style>
+        * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
-        
-        /* Header & Menu Icon Styling */
+
         header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: relative; }
         .menu-icon { cursor: pointer; display: flex; flex-direction: column; gap: 5px; }
         .menu-icon span { width: 25px; height: 3px; background-color: white; border-radius: 2px; }
 
-        /* Side Menu Drawer */
         .side-menu { height: 100%; width: 0; position: fixed; z-index: 1000; top: 0; right: 0; background-color: #232f3e; overflow-x: hidden; transition: 0.3s; padding-top: 60px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); }
         .side-menu a { padding: 12px 25px; text-decoration: none; font-size: 18px; color: white; display: block; transition: 0.2s; }
         .side-menu a:hover { background-color: #37475a; }
@@ -24,12 +23,12 @@
         .profile-header { text-align: center; margin-bottom: 25px; }
         .profile-img { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid #232f3e; margin-bottom: 10px; background-color: #eee; }
         .profile-name { font-size: 20px; font-weight: bold; color: #333; }
-        
+
         .info-card { background: #fdfdfd; border: 1px solid #eee; border-radius: 6px; padding: 15px; margin-bottom: 15px; text-align: left; }
         .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f2f2f2; font-size: 15px; }
         .info-row:last-child { border-bottom: none; }
         .label { font-weight: bold; color: #555; }
-        .value { color: #333; }
+        .value { color: #333; text-align: right; }
 
         .btn-container { display: flex; gap: 10px; margin-top: 20px; }
         .btn-action { flex: 1; padding: 12px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 15px; text-align: center; text-decoration: none; display: inline-block; }
@@ -38,7 +37,10 @@
         .btn-logout { background-color: #ff4d4d; color: white; }
         .btn-logout:hover { background-color: #e04343; }
 
-        /* Login Prompt Styles for Guest Users */
+        .quick-links { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
+        .quick-link { background: #f0f2f2; border-radius: 6px; padding: 14px; text-decoration: none; color: #333; font-size: 14px; font-weight: 600; }
+        .quick-link:hover { background: #e3e6e6; }
+
         .login-prompt { padding: 30px 10px; }
         .login-prompt p { color: #666; font-size: 16px; margin-bottom: 20px; }
         .btn-login-main { background-color: #ffd814; color: #111; border: 1px solid #fcd200; padding: 12px 25px; font-weight: bold; border-radius: 5px; cursor: pointer; font-size: 16px; text-decoration: none; display: inline-block; width: 100%; box-sizing: border-box; }
@@ -49,7 +51,6 @@
 
     <header>
         <h2 style="color: white; margin:0; font-size: 18px;">DesiMarket</h2>
-        <!-- 3-Lines (Hamburger) Icon -->
         <div class="menu-icon" onclick="toggleMenu()">
             <span></span>
             <span></span>
@@ -57,7 +58,6 @@
         </div>
     </header>
 
-    <!-- Side Slide Menu -->
     <div id="sideMenu" class="side-menu">
         <a href="javascript:void(0)" class="close-btn" onclick="toggleMenu()">&times;</a>
         <a href="index.html">🏠 Home</a>
@@ -65,15 +65,14 @@
         <a href="cart.html">🛍️ Cart</a>
         <a href="orders.html">📦 Orders</a>
         <a href="account.html">👤 Account</a>
-        <a href="checklist.html">🚀 Launch Checklist</a>
+        <a href="terms.html">📄 Terms & Privacy</a>
     </div>
 
     <div class="container">
-        
-        <!-- अगर यूजर लॉग-इन है, तो यह हिस्सा दिखेगा -->
+
         <div id="userProfileSection" style="display: none;">
-            <h2>My Account Details</h2>
-            
+            <h2>My Account</h2>
+
             <div class="profile-header">
                 <img id="accPhoto" class="profile-img" src="" alt="Profile Photo">
                 <div class="profile-name" id="accFullName">User Name</div>
@@ -106,62 +105,69 @@
                 <a href="setup-profile.html" class="btn-action btn-edit">Edit Profile</a>
                 <button class="btn-action btn-logout" onclick="logoutUser()">Log Out</button>
             </div>
+
+            <div class="quick-links">
+                <a href="orders.html" class="quick-link">📦 My Orders</a>
+                <a href="cart.html" class="quick-link">🛍️ My Cart</a>
+                <a href="seller-dashboard.html" class="quick-link">🏪 Seller Hub</a>
+                <a href="terms.html" class="quick-link">📄 Terms & Privacy</a>
+            </div>
         </div>
 
-        <!-- अगर नया यूजर (Guest) लिंक खोलेगा, तो यह लॉगिन/साइनअप वाला हिस्सा दिखेगा -->
         <div id="guestSection" class="login-prompt" style="display: none;">
             <h2>Welcome to DesiMarket</h2>
             <p>Please login or create an account to manage your orders, cart, and profile.</p>
             <a href="login.html" class="btn-login-main">🔑 Login / Create Account</a>
         </div>
 
+        <div id="loadingSection" style="padding: 40px 10px; color: #888;">Loading your account...</div>
+
     </div>
 
-    <script>
+    <script type="module">
+        import { auth, db } from './firebase-config.js';
+        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
         function toggleMenu() {
             const menu = document.getElementById('sideMenu');
-            if (menu.style.width === '250px') {
-                menu.style.width = '0';
-            } else {
-                menu.style.width = '250px';
-            }
+            menu.style.width = menu.style.width === '250px' ? '0' : '250px';
         }
+        window.toggleMenu = toggleMenu;
 
-        window.onload = function() {
-            const user = JSON.parse(localStorage.getItem('currentUser'));
-            
-            // चेक करें कि क्या यूजर सही मायने में लॉग-इन है या नहीं
-            if (user && (user.phone || user.email)) {
-                // हाँ, यूजर लॉग-इन है -> प्रोफाइल दिखाओ
-                document.getElementById('userProfileSection').style.display = 'block';
-                document.getElementById('guestSection').style.display = 'none';
-
-                if (user.name || user.surname) {
-                    document.getElementById('accFullName').innerText = (user.name || '') + ' ' + (user.surname || '');
-                }
-                if (user.email) document.getElementById('accEmail').innerText = user.email;
-                if (user.phone) document.getElementById('accPhone').innerText = user.phone;
-                if (user.state) document.getElementById('accState').innerText = user.state;
-                if (user.district) document.getElementById('accDistrict').innerText = user.district;
-                if (user.city) document.getElementById('accCity').innerText = user.city;
-                
-                if (user.photo) {
-                    document.getElementById('accPhoto').src = user.photo;
-                } else {
-                    document.getElementById('accPhoto').src = 'https://via.placeholder.com/100?text=No+Photo';
-                }
-            } else {
-                // नहीं, कोई यूजर लॉग-इन नहीं है (नया गेस्ट यूजर है) -> Login/Signup का पेज दिखाओ
-                document.getElementById('userProfileSection').style.display = 'none';
-                document.getElementById('guestSection').style.display = 'block';
-            }
-        };
-
-        function logoutUser() {
-            localStorage.removeItem('currentUser');
-            alert("Logged out successfully!");
+        window.logoutUser = async function() {
+            await signOut(auth);
             window.location.href = 'login.html';
         }
+
+        onAuthStateChanged(auth, async (user) => {
+            document.getElementById('loadingSection').style.display = 'none';
+
+            if (!user) {
+                document.getElementById('userProfileSection').style.display = 'none';
+                document.getElementById('guestSection').style.display = 'block';
+                return;
+            }
+
+            document.getElementById('userProfileSection').style.display = 'block';
+            document.getElementById('guestSection').style.display = 'none';
+
+            try {
+                const snap = await getDoc(doc(db, "users", user.uid));
+                const data = snap.exists() ? snap.data() : {};
+
+                const fullName = (data.name || user.displayName || 'User') + (data.surname ? ' ' + data.surname : '');
+                document.getElementById('accFullName').innerText = fullName;
+                document.getElementById('accEmail').innerText = data.email || user.email || 'N/A';
+                document.getElementById('accPhone').innerText = data.phone || 'N/A';
+                document.getElementById('accState').innerText = data.state || 'N/A';
+                document.getElementById('accDistrict').innerText = data.district || 'N/A';
+                document.getElementById('accCity').innerText = data.city || 'N/A';
+                document.getElementById('accPhoto').src = data.photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(fullName) + '&background=232f3e&color=fff';
+            } catch (error) {
+                console.error('Error loading profile:', error);
+            }
+        });
     </script>
 </body>
 </html>
