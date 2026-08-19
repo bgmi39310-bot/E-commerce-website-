@@ -42,7 +42,7 @@
 <body>
 
     <header>
-        <h2>DesiMarket</h2>
+        <h2 style="color: white; margin:0;">DesiMarket</h2>
         <!-- 3-Lines (Hamburger) Icon -->
         <div class="menu-icon" onclick="toggleMenu()">
             <span></span>
@@ -127,6 +127,7 @@
                 }
             } else {
                 document.getElementById('accFullName').innerText = "Guest User";
+                document.getElementById('accPhoto').src = 'https://via.placeholder.com/100?text=Guest';
             }
         };
 
