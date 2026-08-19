@@ -34,6 +34,14 @@
         button.action-btn:hover { background-color: #f7ca00; }
 
         .success-msg { color: green; font-weight: bold; margin-bottom: 10px; display: none; }
+
+        /* Profile Display Card Styles */
+        .profile-display-card { display: flex; align-items: center; gap: 20px; }
+        .profile-logo { width: 80px; height: 80px; object-fit: cover; border-radius: 50%; border: 2px solid #ddd; }
+        .profile-info h3 { margin: 0 0 5px 0; color: #232f3e; }
+        .profile-info p { margin: 3px 0; color: #555; font-size: 14px; }
+        .btn-edit { background-color: #232f3e; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 14px; margin-top: 10px; }
+        .btn-edit:hover { background-color: #37475a; }
     </style>
 </head>
 <body>
@@ -63,7 +71,23 @@
         <div class="card">
             <h2>1. Seller / Shop Profile</h2>
             <div id="profileMsg" class="success-msg">Profile Saved Successfully!</div>
-            <div class="form-grid">
+            
+            <!-- Profile Preview View (Initially Hidden/Shown based on data) -->
+            <div id="profileDisplay" style="display: none;">
+                <div class="profile-display-card">
+                    <img id="dispLogo" src="" alt="Shop Logo" class="profile-logo">
+                    <div class="profile-info">
+                        <h3 id="dispShopName"></h3>
+                        <p><strong>Owner:</strong> <span id="dispOwnerName"></span></p>
+                        <p><strong>Phone:</strong> <span id="dispPhone"></span></p>
+                        <p><strong>Address:</strong> <span id="dispAddress"></span></p>
+                        <button class="btn-edit" onclick="enableEditMode()">✏️ Edit Profile</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Edit Form (Hidden if profile exists, shown on edit click) -->
+            <div id="profileForm" class="form-grid" style="margin-top: 15px;">
                 <input type="text" id="shopName" placeholder="Shop Name">
                 <input type="text" id="ownerName" placeholder="Owner Name">
                 <input type="text" id="shopPhone" placeholder="Contact Number">
@@ -136,6 +160,12 @@
         }
         window.toggleMenu = toggleMenu;
 
+        // जब यूजर 'Edit Profile' पर क्लिक करे
+        window.enableEditMode = function() {
+            document.getElementById('profileDisplay').style.display = 'none';
+            document.getElementById('profileForm').style.display = 'grid';
+        }
+
         window.saveSellerProfile = function() {
             const shopName = document.getElementById('shopName').value.trim();
             const ownerName = document.getElementById('ownerName').value.trim();
@@ -153,6 +183,10 @@
             };
 
             localStorage.setItem('sellerProfile', JSON.stringify(profile));
+            
+            // सेव होने के बाद वापस कार्ड व्यू दिखाएं
+            loadProfileView();
+
             const msg = document.getElementById('profileMsg');
             msg.style.display = 'block';
             setTimeout(() => { msg.style.display = 'none'; }, 3000);
@@ -200,15 +234,34 @@
             }
         };
 
-        window.onload = function() {
+        function loadProfileView() {
             const profile = JSON.parse(localStorage.getItem('sellerProfile'));
-            if (profile) {
+            if (profile && profile.shopName) {
+                // अगर प्रोफाइल है, तो फॉर्म छुपाकर कार्ड दिखाएं
+                document.getElementById('profileDisplay').style.display = 'block';
+                document.getElementById('profileForm').style.display = 'none';
+
+                // डेटा भरें
+                document.getElementById('dispShopName').innerText = profile.shopName;
+                document.getElementById('dispOwnerName').innerText = profile.ownerName || 'N/A';
+                document.getElementById('dispPhone').innerText = profile.phone || 'N/A';
+                document.getElementById('dispAddress').innerText = profile.address || 'N/A';
+                document.getElementById('dispLogo').src = profile.logo || 'https://via.placeholder.com/80';
+
+                // फॉर्म के अंदर भी वैल्यू भर कर रखें (ताकि एडिट करते वक्त दिखे)
                 document.getElementById('shopName').value = profile.shopName || '';
                 document.getElementById('ownerName').value = profile.ownerName || '';
                 document.getElementById('shopPhone').value = profile.phone || '';
+                document.getElementById('shopLogoFile').value = profile.logo || '';
                 document.getElementById('shopAddress').value = profile.address || '';
+            } else {
+                // अगर प्रोफाइल नहीं है, तो सिर्फ फॉर्म दिखाएं
+                document.getElementById('profileDisplay').style.display = 'none';
+                document.getElementById('profileForm').style.display = 'grid';
             }
-        };
+        }
+
+        window.onload = loadProfileView;
     </script>
 </body>
 </html>
