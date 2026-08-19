@@ -64,7 +64,7 @@
 <body>
 
     <header>
-        <div class="header-title" id="sellerHeaderTitle">Seller Hub & Dashboard</div>
+        <div class="header-title">Seller Hub & Dashboard</div>
         <div style="display: flex; align-items: center; gap: 15px;">
             <button onclick="logoutSeller()" style="background:#dc3545; color:white; border:none; padding:6px 10px; border-radius:4px; cursor:pointer; font-weight:bold;">Logout</button>
             <div class="menu-icon" onclick="toggleMenu()">
@@ -202,10 +202,9 @@
 
         window.logoutSeller = async function() {
             await signOut(auth);
-            window.location.href = "signup.html";
+            window.location.href = "login.html";
         }
 
-        // चेक करें कि कौन सा सेलर लॉग इन है
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 currentLoggedInUser = user;
@@ -213,8 +212,7 @@
                 fetchDashboardOrders(user.uid);
                 fetchMyListedProducts(user.uid);
             } else {
-                // अगर लॉग इन नहीं है तो साइनअप/लॉगिन पेज पर भेजें
-                window.location.href = "signup.html";
+                window.location.href = "login.html";
             }
         });
 
@@ -305,7 +303,7 @@
                     image: imageUrl || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80",
                     description: document.getElementById('pDesc').value.trim() || `${name} available in best quality.`,
                     shopName: shopNameVal,
-                    sellerUid: currentLoggedInUser.uid, // सीधे लॉगिन आईडी से जोड़ा गया
+                    sellerUid: currentLoggedInUser.uid,
                     createdAt: new Date()
                 });
 
@@ -324,7 +322,6 @@
             }
         };
 
-        // 1. Fetch & Filter Orders strictly for this Seller UID
         window.filterOrders = function(status) {
             currentStatusFilter = status;
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -339,7 +336,6 @@
         async function fetchDashboardOrders(uid) {
             const container = document.getElementById('dashboardOrdersContainer');
             try {
-                // केवल उसी सेलर के ऑर्डर फैच करें जिसकी UID मैच हो रही हो
                 const q = query(collection(db, "orders"), where("sellerUid", "==", uid));
                 const querySnapshot = await getDocs(q);
                 allOrders = [];
@@ -399,7 +395,6 @@
             }
         }
 
-        // 2. Fetch and Display Seller's Listed Products strictly for this Seller UID
         async function fetchMyListedProducts(uid) {
             const container = document.getElementById('myProductsContainer');
             container.innerHTML = "<p>Loading your products...</p>";
