@@ -158,7 +158,7 @@
             }
         }
 
-        // Render Products on Grid (Fixed NaN & Added Quantity Selector)
+        // Render Products on Grid
         function displayProducts(products) {
             const grid = document.getElementById('productGrid');
             grid.innerHTML = '';
@@ -172,13 +172,15 @@
                 const rawPrice = product.price || product.ProductPrice || product.amount || 0;
                 const price = parseFloat(rawPrice);
                 const displayPrice = isNaN(price) ? '0.00' : price.toFixed(2);
+                const pImage = product.image || 'https://via.placeholder.com/250';
+                const pShop = product.shopName || 'Local Seller';
 
                 grid.innerHTML += `
                     <div class="product-card">
                         <div>
-                            <img src="${product.image || 'https://via.placeholder.com/250'}" alt="${product.name}" onerror="this.src='https://via.placeholder.com/250?text=No+Image'">
+                            <img src="${pImage}" alt="${product.name}" onerror="this.src='https://via.placeholder.com/250?text=No+Image'">
                             <div class="product-title">${product.name}</div>
-                            <div class="shop-badge"><i class="fas fa-store"></i> ${product.shopName || 'Local Seller'}</div>
+                            <div class="shop-badge"><i class="fas fa-store"></i> ${pShop}</div>
                             <div class="product-price">₹${displayPrice}</div>
                             
                             <!-- Quantity Selector -->
@@ -193,19 +195,19 @@
                                 </select>
                             </div>
                         </div>
-                        <button class="btn-cart" onclick="addToCart('${product.id}', '${product.name.replace(/'/g, "\\'")}', ${price})">Add to Cart</button>
+                        <button class="btn-cart" onclick="addToCart('${product.id}', '${product.name.replace(/'/g, "\\'")}', ${price}, '${pImage}', '${pShop.replace(/'/g, "\\'")}')">Add to Cart</button>
                     </div>
                 `;
             });
         }
 
-        // Add to Cart Logic with Quantity
-        window.addToCart = function(id, name, price) {
+        // Add to Cart Logic with Quantity, Image & Shop Name
+        window.addToCart = function(id, name, price, image, shopName) {
             const qtySelect = document.getElementById(`qty-${id}`);
             const qty = qtySelect ? parseInt(qtySelect.value) : 1;
 
             let cart = JSON.parse(localStorage.getItem('cart')) || [];
-            cart.push({ id, name, price, qty });
+            cart.push({ id, name, price, qty, image, shopName });
             localStorage.setItem('cart', JSON.stringify(cart));
             
             alert(`${qty} x ${name} successfully added to cart! 🛍️`);
