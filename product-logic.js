@@ -6,12 +6,19 @@ export async function addProductToFirebase(db, currentLoggedInUser, fetchProduct
     const name = document.getElementById('pName').value.trim();
     const priceVal = document.getElementById('pPrice').value.trim();
     const imageUrl = document.getElementById('pImageFile').value.trim();
+    const imageUrl2 = document.getElementById('pImageFile2').value.trim();
+    const imageUrl3 = document.getElementById('pImageFile3').value.trim();
+    const imageUrl4 = document.getElementById('pImageFile4').value.trim();
     const stockVal = document.getElementById('pStock').value.trim();
 
     if (!name || !priceVal) { alert("Please enter Product Name and Price!"); return; }
 
     const shopNameVal = document.getElementById('shopName').value.trim();
     if (!shopNameVal) { alert("Please save Shop Profile first!"); return; }
+
+    const defaultImg = "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80";
+    const imagesArray = [imageUrl, imageUrl2, imageUrl3, imageUrl4].filter(url => url !== '');
+    if (imagesArray.length === 0) imagesArray.push(defaultImg);
 
     try {
         await addDoc(collection(db, "vendors"), {
@@ -20,7 +27,8 @@ export async function addProductToFirebase(db, currentLoggedInUser, fetchProduct
             unit: document.getElementById('pUnit').value,
             material: document.getElementById('pMaterial').value.trim() || "100% Original",
             warranty: document.getElementById('pWarranty').value.trim() || "Verified Quality",
-            image: imageUrl || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80",
+            image: imagesArray[0],
+            images: imagesArray,
             description: document.getElementById('pDesc').value.trim() || `${name} available in best quality.`,
             shopName: shopNameVal,
             sellerUid: currentLoggedInUser.uid,
@@ -34,6 +42,9 @@ export async function addProductToFirebase(db, currentLoggedInUser, fetchProduct
         document.getElementById('pMaterial').value = '';
         document.getElementById('pWarranty').value = '';
         document.getElementById('pImageFile').value = '';
+        document.getElementById('pImageFile2').value = '';
+        document.getElementById('pImageFile3').value = '';
+        document.getElementById('pImageFile4').value = '';
         document.getElementById('pDesc').value = '';
         document.getElementById('pStock').value = '';
 
