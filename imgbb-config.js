@@ -6,5 +6,5 @@
 // 3. Copy your API key
 // 4. Paste it below, replacing the placeholder text
 
-export const IMGBB_API_KEY = "PASTE_YOUR_IMGBB_API_KEY_HERE";
+export const IMGBB_API_KEY = "372ea599df1d45610161438b9647f0a5";
 
