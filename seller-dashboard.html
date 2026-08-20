@@ -45,6 +45,9 @@
         .btn-delete { background-color: #dc3545; border: none; padding: 6px 12px; border-radius: 4px; color: white; font-weight: bold; font-size: 13px; cursor: pointer; }
         .call-btn { background-color: #17a2b8; text-decoration: none; display: inline-block; padding: 6px 12px; border-radius: 4px; color: white; font-weight: bold; font-size: 13px; }
         .no-data { text-align: center; color: #777; padding: 20px; font-size: 15px; }
+        .stock-tag { font-size: 11px; font-weight: bold; padding: 2px 8px; border-radius: 10px; margin-left: 6px; vertical-align: middle; }
+        .stock-tag.in { background: #d4edda; color: #1a7f4b; }
+        .stock-tag.out { background: #f8d7da; color: #842029; }
         .tab-buttons { display: flex; gap: 5px; margin-bottom: 15px; overflow-x: auto; }
         .tab-btn { padding: 8px 12px; background: #eee; border: none; font-weight: bold; cursor: pointer; border-radius: 5px; font-size: 12px; white-space: nowrap; }
         .tab-btn.active { background: #232f3e; color: white; }
@@ -149,6 +152,7 @@
                 </select>
                 <input type="text" id="pMaterial" placeholder="Material (e.g. Cotton)">
                 <input type="text" id="pWarranty" placeholder="Warranty / Validity">
+                <input type="number" id="pStock" placeholder="Stock Quantity (e.g. 50)" min="0">
                 <div class="file-upload-box full-width">
                     <label>Product Image Link (Postimages URL):</label>
                     <input type="url" id="pImageFile" placeholder="https://i.postimg.cc/...">
@@ -264,9 +268,9 @@
             filterOrders(status);
         }
 
-        window.editProduct = function(productId, currentPrice) {
+        window.editProduct = function(productId, currentPrice, currentStock) {
             if(currentLoggedInUser) {
-                editProduct(db, productId, currentPrice, currentLoggedInUser.uid, (uid) => fetchMyListedProducts(db, uid));
+                editProduct(db, productId, currentPrice, currentStock, currentLoggedInUser.uid, (uid) => fetchMyListedProducts(db, uid));
             }
         }
 
