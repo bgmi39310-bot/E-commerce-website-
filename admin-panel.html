@@ -4,134 +4,257 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin Panel - DesiMarket</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
-    * { box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #14181f; margin: 0; color: #e8e8e8; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f1419; color: #e8e8e8; }
 
-    header { background: #0d1117; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #232a35; position: sticky; top: 0; z-index: 100; }
-    .logo-area { color: white; font-size: 19px; font-weight: bold; }
-    .logo-area span { color: #ff9900; }
-    .logo-area small { display: block; font-size: 11px; color: #888; font-weight: normal; }
-    .logout-btn { background: #dc3545; color: white; border: none; padding: 7px 14px; border-radius: 5px; font-size: 13px; font-weight: bold; cursor: pointer; }
+    /* ---------- LOGIN GATE ---------- */
+    .gate-wrap { min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
+    .gate-box { background: #1a2028; border: 1px solid #2a3341; border-radius: 14px; padding: 32px 28px; width: 100%; max-width: 380px; }
+    .gate-box .gate-logo { text-align: center; font-size: 22px; font-weight: bold; color: white; margin-bottom: 4px; }
+    .gate-box .gate-logo span { color: #ff9900; }
+    .gate-box .gate-sub { text-align: center; color: #8a94a6; font-size: 12.5px; margin-bottom: 22px; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 12.5px; margin-bottom: 5px; color: #8a94a6; }
+    .form-group input { width: 100%; padding: 11px; border-radius: 7px; border: 1px solid #2a3341; background: #12171f; color: white; font-size: 14px; outline: none; }
+    .form-group input:focus { border-color: #ff9900; }
+    .gate-btn { width: 100%; background: linear-gradient(135deg, #ff9900, #ff7a00); border: none; color: #111; font-weight: bold; padding: 12px; border-radius: 8px; cursor: pointer; margin-top: 8px; font-size: 14.5px; }
+    .gate-error { color: #ff6b6b; font-size: 13px; margin-bottom: 12px; display: none; background: #3a1a1a; padding: 8px 10px; border-radius: 6px; }
+    .access-denied { text-align: center; padding: 80px 20px; color: #8a94a6; }
+    .access-denied h2 { color: #ff6b6b; margin-bottom: 10px; }
 
-    .container { max-width: 950px; margin: 20px auto; padding: 0 15px 40px; }
+    /* ---------- LAYOUT ---------- */
+    .app-layout { display: flex; min-height: 100vh; }
 
-    /* Login Gate */
-    .gate-wrap { display: flex; justify-content: center; padding: 60px 15px; }
-    .gate-box { background: #1c2128; border: 1px solid #30363d; border-radius: 10px; padding: 28px; width: 100%; max-width: 360px; }
-    .gate-box h2 { margin-top: 0; font-size: 19px; }
-    .gate-box .form-group { margin-bottom: 12px; }
-    .gate-box label { display: block; font-size: 12.5px; margin-bottom: 4px; color: #aaa; }
-    .gate-box input { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #30363d; background: #0d1117; color: white; font-size: 14px; }
-    .gate-btn { width: 100%; background: #ff9900; border: none; color: #111; font-weight: bold; padding: 10px; border-radius: 6px; cursor: pointer; margin-top: 8px; }
-    .gate-error { color: #ff6b6b; font-size: 13px; margin-bottom: 10px; display: none; }
-    .access-denied { text-align: center; padding: 60px 15px; color: #aaa; }
+    .sidebar { width: 240px; background: #141a23; border-right: 1px solid #232b38; flex-shrink: 0; position: fixed; top: 0; left: 0; height: 100vh; overflow-y: auto; transition: transform 0.25s; z-index: 200; }
+    .sidebar-logo { padding: 22px 20px; font-size: 19px; font-weight: bold; color: white; border-bottom: 1px solid #232b38; }
+    .sidebar-logo span { color: #ff9900; }
+    .sidebar-logo small { display: block; font-size: 10.5px; color: #6b7383; font-weight: normal; margin-top: 2px; letter-spacing: 0.5px; }
 
-    /* Tabs */
-    .admin-tabs { display: flex; gap: 6px; overflow-x: auto; margin: 18px 0 16px; }
-    .admin-tab-btn { padding: 9px 16px; background: #1c2128; border: 1px solid #30363d; border-radius: 6px; color: #ccc; font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
-    .admin-tab-btn.active { background: #ff9900; color: #111; border-color: #ff9900; }
+    .sidebar-profile { padding: 20px; text-align: center; border-bottom: 1px solid #232b38; }
+    .sidebar-profile .avatar { width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg,#ff9900,#ff5e62); display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; color: white; margin: 0 auto 10px; }
+    .sidebar-profile .role-tag { font-size: 11px; color: #ff9900; background: #2a2115; padding: 3px 10px; border-radius: 10px; display: inline-block; margin-top: 4px; }
+
+    .sidebar-nav { padding: 14px 10px; }
+    .sidebar-nav-item { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 8px; color: #9aa3b2; text-decoration: none; font-size: 14px; cursor: pointer; margin-bottom: 3px; border: none; background: none; width: 100%; text-align: left; }
+    .sidebar-nav-item:hover { background: #1c2430; color: white; }
+    .sidebar-nav-item.active { background: linear-gradient(135deg, #ff9900, #ff7a00); color: #111; font-weight: 600; }
+    .sidebar-nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+
+    .sidebar-logout { padding: 14px; border-top: 1px solid #232b38; margin-top: 10px; }
+    .sidebar-logout button { width: 100%; background: #2a1418; color: #ff6b6b; border: 1px solid #3a1a1e; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13.5px; }
+
+    .main-area { flex-grow: 1; margin-left: 240px; min-height: 100vh; }
+
+    .topbar { background: #141a23; border-bottom: 1px solid #232b38; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+    .topbar .page-title { font-size: 18px; font-weight: 600; color: white; }
+    .hamburger-btn { display: none; background: none; border: none; color: white; font-size: 20px; cursor: pointer; }
+    .topbar-right { display: flex; align-items: center; gap: 14px; color: #8a94a6; font-size: 13px; }
+
+    .content-pad { padding: 22px; }
+
+    /* ---------- STAT CARDS ---------- */
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin-bottom: 20px; }
+    .stat-card { background: #1a2028; border: 1px solid #232b38; border-radius: 12px; padding: 18px; display: flex; align-items: center; gap: 14px; }
+    .stat-icon { width: 46px; height: 46px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+    .stat-icon.sellers { background: #1e3a2e; color: #4ade80; }
+    .stat-icon.buyers { background: #1e2f4a; color: #60a5fa; }
+    .stat-icon.products { background: #3a2e1e; color: #fbbf24; }
+    .stat-icon.orders { background: #3a1e35; color: #f472b6; }
+    .stat-icon.revenue { background: #1e3a3a; color: #2dd4bf; }
+    .stat-icon.active { background: #2e1e3a; color: #a78bfa; }
+    .stat-text .stat-num { font-size: 21px; font-weight: bold; color: white; }
+    .stat-text .stat-lbl { font-size: 12px; color: #8a94a6; margin-top: 2px; }
+
+    /* ---------- CHART PANELS ---------- */
+    .charts-row { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; margin-bottom: 20px; }
+    @media(max-width: 900px) { .charts-row { grid-template-columns: 1fr; } }
+    .panel { background: #1a2028; border: 1px solid #232b38; border-radius: 12px; padding: 20px; }
+    .panel h3 { font-size: 15px; color: white; margin-bottom: 4px; }
+    .panel .panel-sub { font-size: 12px; color: #8a94a6; margin-bottom: 16px; }
+    .chart-box { position: relative; height: 240px; }
+    .chart-box.small { height: 200px; }
+
+    .legend-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; justify-content: center; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: #8a94a6; }
+    .legend-dot { width: 9px; height: 9px; border-radius: 50%; }
+
+    .bottom-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media(max-width: 900px) { .bottom-row { grid-template-columns: 1fr; } }
+
+    .mini-list-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #232b38; font-size: 13px; }
+    .mini-list-row:last-child { border-bottom: none; }
+    .mini-list-row .name { color: #d8dde5; }
+    .mini-list-row .amount { color: #4ade80; font-weight: 600; }
+    .bar-mini-track { flex-grow: 1; height: 6px; background: #232b38; border-radius: 3px; margin: 0 10px; overflow: hidden; }
+    .bar-mini-fill { height: 100%; background: linear-gradient(90deg,#ff9900,#ff5e62); border-radius: 3px; }
+
+    .status-pill-mini { font-size: 10.5px; font-weight: bold; padding: 3px 9px; border-radius: 10px; }
+    .sp-Pending { background: #3a2e15; color: #fbbf24; }
+    .sp-Accepted { background: #15343a; color: #38bdf8; }
+    .sp-Shipped { background: #1a2c4a; color: #60a5fa; }
+    .sp-Delivered { background: #2e1e3a; color: #a78bfa; }
+    .sp-Cancelled { background: #3a1a1e; color: #f87171; }
+
+    /* ---------- MANAGEMENT SECTIONS ---------- */
+    .filter-select { padding: 9px 12px; border-radius: 7px; border: 1px solid #232b38; background: #1a2028; color: white; font-size: 13px; margin-bottom: 16px; }
+
+    .admin-row-card { background: #1a2028; border: 1px solid #232b38; border-left: 4px solid #ff9900; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .admin-row-card.is-blocked { border-left-color: #f87171; opacity: 0.7; }
+    .arc-thumb { width: 50px; height: 50px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
+    .arc-info { flex-grow: 1; min-width: 200px; }
+    .arc-info h4 { font-size: 14.5px; color: #f0f0f0; margin-bottom: 4px; }
+    .arc-info p { font-size: 12.5px; color: #8a94a6; margin: 2px 0; }
+    .uid-tag { font-family: monospace; font-size: 10.5px !important; color: #55606f !important; }
+    .blocked-tag { background: #f87171; color: #1a0505; font-size: 10px; padding: 2px 8px; border-radius: 10px; margin-left: 6px; font-weight: bold; }
+
+    .admin-btn { border: none; padding: 8px 14px; border-radius: 7px; font-size: 12.5px; font-weight: bold; cursor: pointer; white-space: nowrap; }
+    .admin-btn-block { background: #f87171; color: #1a0505; }
+    .admin-btn-unblock { background: #4ade80; color: #052e13; }
+    .admin-btn-delete { background: #a78bfa; color: #1e1033; }
+
+    .admin-no-data { text-align: center; padding: 40px 20px; color: #8a94a6; background: #1a2028; border-radius: 10px; border: 1px solid #232b38; }
 
     .admin-section { display: none; }
     .admin-section.active { display: block; }
 
-    /* Overview stats */
-    .admin-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
-    .admin-stat-card { background: #1c2128; border: 1px solid #30363d; border-radius: 10px; padding: 16px 10px; text-align: center; }
-    .asv { font-size: 22px; font-weight: bold; color: #ff9900; }
-    .asl { font-size: 12px; color: #aaa; margin-top: 4px; }
+    .menu-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 150; }
 
-    /* Row cards (sellers/buyers/products/orders) */
-    .admin-row-card { background: #1c2128; border: 1px solid #30363d; border-left: 4px solid #ff9900; border-radius: 8px; padding: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-    .admin-row-card.is-blocked { border-left-color: #dc3545; opacity: 0.75; }
-    .arc-thumb { width: 50px; height: 50px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
-    .arc-info { flex-grow: 1; min-width: 200px; }
-    .arc-info h4 { margin: 0 0 4px; font-size: 14.5px; color: #f0f0f0; }
-    .arc-info p { margin: 2px 0; font-size: 12.5px; color: #aaa; }
-    .uid-tag { font-family: monospace; font-size: 10.5px !important; color: #666 !important; }
-    .blocked-tag { background: #dc3545; color: white; font-size: 10px; padding: 2px 7px; border-radius: 10px; margin-left: 6px; vertical-align: middle; }
-
-    .admin-btn { border: none; padding: 8px 14px; border-radius: 5px; font-size: 12.5px; font-weight: bold; cursor: pointer; white-space: nowrap; }
-    .admin-btn-block { background: #dc3545; color: white; }
-    .admin-btn-unblock { background: #28a745; color: white; }
-    .admin-btn-delete { background: #6f42c1; color: white; }
-
-    .admin-no-data { text-align: center; padding: 40px 20px; color: #888; background: #1c2128; border-radius: 8px; border: 1px solid #30363d; }
-
-    .filter-select { padding: 8px 12px; border-radius: 6px; border: 1px solid #30363d; background: #1c2128; color: white; font-size: 13px; margin-bottom: 14px; }
+    @media(max-width: 850px) {
+        .sidebar { transform: translateX(-100%); }
+        .sidebar.open { transform: translateX(0); }
+        .main-area { margin-left: 0; }
+        .hamburger-btn { display: block; }
+    }
 </style>
 </head>
 <body>
 
-<header>
-    <div class="logo-area">Desi<span>Market</span><small>Admin Control Panel</small></div>
-    <button class="logout-btn" id="logoutBtn" style="display:none;">Logout</button>
-</header>
+<!-- ---------- LOGIN GATE ---------- -->
+<div class="gate-wrap" id="gateWrap">
+    <div class="gate-box">
+        <div class="gate-logo">Desi<span>Market</span></div>
+        <div class="gate-sub">ADMIN CONTROL PANEL</div>
+        <div class="gate-error" id="gateError"></div>
+        <div class="form-group">
+            <label>Admin Email</label>
+            <input type="email" id="adminEmail" placeholder="admin@email.com">
+        </div>
+        <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="adminPassword" placeholder="Password">
+        </div>
+        <button class="gate-btn" id="gateLoginBtn">Login to Dashboard</button>
+    </div>
+</div>
 
-<div class="container">
+<!-- ---------- ACCESS DENIED ---------- -->
+<div class="access-denied" id="accessDenied" style="display:none;">
+    <h2>🚫 Access Denied</h2>
+    <p>This account does not have admin privileges.</p>
+</div>
 
-    <!-- Login Gate -->
-    <div class="gate-wrap" id="gateWrap">
-        <div class="gate-box">
-            <h2>🔐 Admin Login</h2>
-            <div class="gate-error" id="gateError"></div>
-            <div class="form-group">
-                <label>Admin Email</label>
-                <input type="email" id="adminEmail" placeholder="admin@email.com">
+<!-- ---------- MAIN APP ---------- -->
+<div class="app-layout" id="appLayout" style="display:none;">
+    <div class="menu-overlay" id="menuOverlay" onclick="toggleSidebar()"></div>
+
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-logo">Desi<span>Market</span><small>ADMIN CONTROL PANEL</small></div>
+        <div class="sidebar-profile">
+            <div class="avatar" id="adminAvatar">A</div>
+            <div style="color:white; font-weight:600; font-size:14.5px;" id="adminNameDisplay">Admin</div>
+            <span class="role-tag">Super Admin</span>
+        </div>
+        <div class="sidebar-nav">
+            <button class="sidebar-nav-item active" id="nav-dashboard" onclick="switchTab('dashboard')"><span class="icon">📊</span> Dashboard</button>
+            <button class="sidebar-nav-item" id="nav-sellers" onclick="switchTab('sellers')"><span class="icon">🏪</span> Sellers</button>
+            <button class="sidebar-nav-item" id="nav-buyers" onclick="switchTab('buyers')"><span class="icon">🧑‍🤝‍🧑</span> Buyers</button>
+            <button class="sidebar-nav-item" id="nav-products" onclick="switchTab('products')"><span class="icon">📦</span> Products</button>
+            <button class="sidebar-nav-item" id="nav-orders" onclick="switchTab('orders')"><span class="icon">🧾</span> Orders</button>
+        </div>
+        <div class="sidebar-logout">
+            <button id="logoutBtn">Logout</button>
+        </div>
+    </div>
+
+    <div class="main-area">
+        <div class="topbar">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <button class="hamburger-btn" onclick="toggleSidebar()">☰</button>
+                <div class="page-title" id="pageTitle">Dashboard</div>
             </div>
-            <div class="form-group">
-                <label>Password</label>
-                <input type="password" id="adminPassword" placeholder="Password">
+            <div class="topbar-right">
+                <span id="topbarDate"></span>
             </div>
-            <button class="gate-btn" id="gateLoginBtn">Login to Admin Panel</button>
+        </div>
+
+        <div class="content-pad">
+
+            <!-- DASHBOARD -->
+            <div class="admin-section active" id="section-dashboard">
+                <div class="stats-row" id="statsRow">
+                    <div class="admin-no-data">Loading stats...</div>
+                </div>
+
+                <div class="charts-row">
+                    <div class="panel">
+                        <h3>Revenue Trend</h3>
+                        <div class="panel-sub">Last 7 days platform-wide revenue</div>
+                        <div class="chart-box"><canvas id="revenueChart"></canvas></div>
+                    </div>
+                    <div class="panel">
+                        <h3>Order Status</h3>
+                        <div class="panel-sub">Breakdown of all orders</div>
+                        <div class="chart-box small"><canvas id="statusChart"></canvas></div>
+                        <div class="legend-row" id="statusLegend"></div>
+                    </div>
+                </div>
+
+                <div class="bottom-row">
+                    <div class="panel">
+                        <h3>🏆 Top Sellers</h3>
+                        <div class="panel-sub">By total revenue</div>
+                        <div id="topSellersList"><p style="color:#8a94a6; font-size:13px;">Loading...</p></div>
+                    </div>
+                    <div class="panel">
+                        <h3>🕒 Recent Orders</h3>
+                        <div class="panel-sub">Latest activity across the platform</div>
+                        <div id="recentOrdersList"><p style="color:#8a94a6; font-size:13px;">Loading...</p></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SELLERS -->
+            <div class="admin-section" id="section-sellers">
+                <div id="sellersContainer"><p>Loading sellers...</p></div>
+            </div>
+
+            <!-- BUYERS -->
+            <div class="admin-section" id="section-buyers">
+                <div id="buyersContainer"><p>Loading buyers...</p></div>
+            </div>
+
+            <!-- PRODUCTS -->
+            <div class="admin-section" id="section-products">
+                <div id="productsContainer"><p>Loading products...</p></div>
+            </div>
+
+            <!-- ORDERS -->
+            <div class="admin-section" id="section-orders">
+                <select class="filter-select" id="orderStatusFilter" onchange="filterOrdersMain()">
+                    <option value="All">All Statuses</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Accepted">Accepted</option>
+                    <option value="Shipped">Shipped</option>
+                    <option value="Delivered">Delivered</option>
+                    <option value="Cancelled">Cancelled</option>
+                </select>
+                <div id="ordersContainer"><p>Loading orders...</p></div>
+            </div>
+
         </div>
     </div>
-
-    <!-- Access Denied -->
-    <div class="access-denied" id="accessDenied" style="display:none;">
-        <h2>🚫 Access Denied</h2>
-        <p>This account does not have admin privileges.</p>
-    </div>
-
-    <!-- Dashboard -->
-    <div id="dashboardWrap" style="display:none;">
-        <div class="admin-tabs">
-            <button class="admin-tab-btn active" onclick="switchTab('overview')" id="tab-overview">📊 Overview</button>
-            <button class="admin-tab-btn" onclick="switchTab('sellers')" id="tab-sellers">🏪 Sellers</button>
-            <button class="admin-tab-btn" onclick="switchTab('buyers')" id="tab-buyers">🧑‍🤝‍🧑 Buyers</button>
-            <button class="admin-tab-btn" onclick="switchTab('products')" id="tab-products">📦 Products</button>
-            <button class="admin-tab-btn" onclick="switchTab('orders')" id="tab-orders">🧾 Orders</button>
-        </div>
-
-        <div class="admin-section active" id="section-overview">
-            <div id="overviewContainer"><p>Loading...</p></div>
-        </div>
-
-        <div class="admin-section" id="section-sellers">
-            <div id="sellersContainer"><p>Loading...</p></div>
-        </div>
-
-        <div class="admin-section" id="section-buyers">
-            <div id="buyersContainer"><p>Loading...</p></div>
-        </div>
-
-        <div class="admin-section" id="section-products">
-            <div id="productsContainer"><p>Loading...</p></div>
-        </div>
-
-        <div class="admin-section" id="section-orders">
-            <select class="filter-select" id="orderStatusFilter" onchange="filterOrdersMain()">
-                <option value="All">All Statuses</option>
-                <option value="Pending">Pending</option>
-                <option value="Accepted">Accepted</option>
-                <option value="Shipped">Shipped</option>
-                <option value="Delivered">Delivered</option>
-                <option value="Cancelled">Cancelled</option>
-            </select>
-            <div id="ordersContainer"><p>Loading...</p></div>
-        </div>
-    </div>
-
 </div>
 
 <script type="module">
@@ -139,32 +262,129 @@
     import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     import {
-        loadOverviewStats, loadSellers, loadBuyers, toggleBlockUser,
+        loadDashboardCharts, loadSellers, loadBuyers, toggleBlockUser,
         loadAllProducts, deleteProductAdmin, loadAllOrders
     } from './admin-logic.js';
 
-    let isCurrentlyAdmin = false;
+    document.getElementById('topbarDate').innerText = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+    let revenueChartInstance = null;
+    let statusChartInstance = null;
+
+    const STATUS_COLORS = { Pending: '#fbbf24', Accepted: '#38bdf8', Shipped: '#60a5fa', Delivered: '#a78bfa', Cancelled: '#f87171' };
 
     function showGate() {
         document.getElementById('gateWrap').style.display = 'flex';
         document.getElementById('accessDenied').style.display = 'none';
-        document.getElementById('dashboardWrap').style.display = 'none';
-        document.getElementById('logoutBtn').style.display = 'none';
+        document.getElementById('appLayout').style.display = 'none';
     }
-
     function showDenied() {
         document.getElementById('gateWrap').style.display = 'none';
         document.getElementById('accessDenied').style.display = 'block';
-        document.getElementById('dashboardWrap').style.display = 'none';
-        document.getElementById('logoutBtn').style.display = 'inline-block';
+        document.getElementById('appLayout').style.display = 'none';
     }
-
-    function showDashboard() {
+    function showDashboard(adminData) {
         document.getElementById('gateWrap').style.display = 'none';
         document.getElementById('accessDenied').style.display = 'none';
-        document.getElementById('dashboardWrap').style.display = 'block';
-        document.getElementById('logoutBtn').style.display = 'inline-block';
-        loadOverviewStats(db);
+        document.getElementById('appLayout').style.display = 'flex';
+
+        const name = (adminData && adminData.name) || 'Admin';
+        document.getElementById('adminNameDisplay').innerText = name;
+        document.getElementById('adminAvatar').innerText = name.charAt(0).toUpperCase();
+
+        renderDashboardData();
+    }
+
+    function renderDashboardData() {
+        loadDashboardCharts(db, (data) => {
+            // Stat cards
+            document.getElementById('statsRow').innerHTML = `
+                <div class="stat-card"><div class="stat-icon sellers">🏪</div><div class="stat-text"><div class="stat-num">${data.totalSellers}</div><div class="stat-lbl">Total Sellers</div></div></div>
+                <div class="stat-card"><div class="stat-icon buyers">🧑‍🤝‍🧑</div><div class="stat-text"><div class="stat-num">${data.totalBuyers}</div><div class="stat-lbl">Total Buyers</div></div></div>
+                <div class="stat-card"><div class="stat-icon products">📦</div><div class="stat-text"><div class="stat-num">${data.totalProducts}</div><div class="stat-lbl">Total Products</div></div></div>
+                <div class="stat-card"><div class="stat-icon orders">🧾</div><div class="stat-text"><div class="stat-num">${data.totalOrders}</div><div class="stat-lbl">Total Orders</div></div></div>
+                <div class="stat-card"><div class="stat-icon revenue">₹</div><div class="stat-text"><div class="stat-num">₹${data.totalRevenue.toFixed(0)}</div><div class="stat-lbl">Platform Revenue</div></div></div>
+                <div class="stat-card"><div class="stat-icon active">⏳</div><div class="stat-text"><div class="stat-num">${(data.statusCounts.Pending || 0) + (data.statusCounts.Accepted || 0)}</div><div class="stat-lbl">Active Orders</div></div></div>
+            `;
+
+            // Revenue line chart
+            const revCtx = document.getElementById('revenueChart').getContext('2d');
+            const gradient = revCtx.createLinearGradient(0, 0, 0, 240);
+            gradient.addColorStop(0, 'rgba(255,153,0,0.35)');
+            gradient.addColorStop(1, 'rgba(255,153,0,0)');
+
+            if (revenueChartInstance) revenueChartInstance.destroy();
+            revenueChartInstance = new Chart(revCtx, {
+                type: 'line',
+                data: {
+                    labels: data.dayLabels,
+                    datasets: [{
+                        label: 'Revenue',
+                        data: data.dayTotals,
+                        borderColor: '#ff9900',
+                        backgroundColor: gradient,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#ff9900',
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#8a94a6', font: { size: 11 } }, grid: { color: '#232b38' } },
+                        y: { ticks: { color: '#8a94a6', font: { size: 11 } }, grid: { color: '#232b38' }, beginAtZero: true }
+                    }
+                }
+            });
+
+            // Status donut chart
+            const statusLabels = Object.keys(data.statusCounts);
+            const statusValues = Object.values(data.statusCounts);
+            const statusColors = statusLabels.map(s => STATUS_COLORS[s]);
+
+            const statCtx = document.getElementById('statusChart').getContext('2d');
+            if (statusChartInstance) statusChartInstance.destroy();
+            statusChartInstance = new Chart(statCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: statusLabels,
+                    datasets: [{ data: statusValues, backgroundColor: statusColors, borderWidth: 0 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    cutout: '68%'
+                }
+            });
+
+            document.getElementById('statusLegend').innerHTML = statusLabels.map((s, i) =>
+                `<div class="legend-item"><span class="legend-dot" style="background:${statusColors[i]}"></span>${s} (${statusValues[i]})</div>`
+            ).join('');
+
+            // Top sellers
+            const maxRev = data.topSellers.length ? data.topSellers[0][1] : 1;
+            document.getElementById('topSellersList').innerHTML = data.topSellers.length === 0
+                ? `<p style="color:#8a94a6; font-size:13px;">No sales yet.</p>`
+                : data.topSellers.map(([shop, rev]) => `
+                    <div class="mini-list-row">
+                        <span class="name">${shop}</span>
+                        <div class="bar-mini-track"><div class="bar-mini-fill" style="width:${(rev / maxRev * 100).toFixed(0)}%"></div></div>
+                        <span class="amount">₹${rev.toFixed(0)}</span>
+                    </div>
+                `).join('');
+
+            // Recent orders
+            document.getElementById('recentOrdersList').innerHTML = data.recentOrders.length === 0
+                ? `<p style="color:#8a94a6; font-size:13px;">No orders yet.</p>`
+                : data.recentOrders.map(o => `
+                    <div class="mini-list-row">
+                        <span class="name">${o.productName || 'Item'} — ₹${o.price || 0}</span>
+                        <span class="status-pill-mini sp-${o.status || 'Pending'}">${o.status || 'Pending'}</span>
+                    </div>
+                `).join('');
+        });
     }
 
     onAuthStateChanged(auth, async (user) => {
@@ -172,8 +392,7 @@
         try {
             const snap = await getDoc(doc(db, "users", user.uid));
             const isAdmin = snap.exists() && snap.data().isAdmin === true;
-            isCurrentlyAdmin = isAdmin;
-            isAdmin ? showDashboard() : showDenied();
+            isAdmin ? showDashboard(snap.data()) : showDenied();
         } catch (e) {
             console.error(e);
             showDenied();
@@ -199,17 +418,26 @@
         }
     });
 
-    document.getElementById('logoutBtn').addEventListener('click', async () => {
-        await signOut(auth);
-    });
+    document.getElementById('logoutBtn').addEventListener('click', async () => { await signOut(auth); });
 
-    // ---------- Tabs ----------
+    window.toggleSidebar = function() {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('menuOverlay').style.display = document.getElementById('sidebar').classList.contains('open') ? 'block' : 'none';
+    };
+
+    const PAGE_TITLES = { dashboard: 'Dashboard', sellers: 'Sellers', buyers: 'Buyers', products: 'Products', orders: 'Orders' };
+
     window.switchTab = function(tabName) {
-        document.querySelectorAll('.admin-tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.sidebar-nav-item').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
-        document.getElementById('tab-' + tabName).classList.add('active');
+        document.getElementById('nav-' + tabName).classList.add('active');
         document.getElementById('section-' + tabName).classList.add('active');
+        document.getElementById('pageTitle').innerText = PAGE_TITLES[tabName];
 
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('menuOverlay').style.display = 'none';
+
+        if (tabName === 'dashboard') renderDashboardData();
         if (tabName === 'sellers') loadSellers(db);
         if (tabName === 'buyers') loadBuyers(db);
         if (tabName === 'products') loadAllProducts(db);
@@ -217,10 +445,7 @@
     };
 
     window.toggleBlockMain = function(uid, shouldBlock) {
-        toggleBlockUser(db, uid, shouldBlock, () => {
-            loadSellers(db);
-            loadBuyers(db);
-        });
+        toggleBlockUser(db, uid, shouldBlock, () => { loadSellers(db); loadBuyers(db); });
     };
 
     window.deleteProductMain = function(productId) {
