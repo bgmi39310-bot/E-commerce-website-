@@ -2,10 +2,11 @@ import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where } 
 
 export async function addProductToFirebase(db, currentLoggedInUser, fetchProductsCallback) {
     if (!currentLoggedInUser) return;
-    
+
     const name = document.getElementById('pName').value.trim();
     const priceVal = document.getElementById('pPrice').value.trim();
     const imageUrl = document.getElementById('pImageFile').value.trim();
+    const stockVal = document.getElementById('pStock').value.trim();
 
     if (!name || !priceVal) { alert("Please enter Product Name and Price!"); return; }
 
@@ -23,6 +24,7 @@ export async function addProductToFirebase(db, currentLoggedInUser, fetchProduct
             description: document.getElementById('pDesc').value.trim() || `${name} available in best quality.`,
             shopName: shopNameVal,
             sellerUid: currentLoggedInUser.uid,
+            stock: stockVal === '' ? 10 : Number(stockVal),
             createdAt: new Date()
         });
 
@@ -33,7 +35,8 @@ export async function addProductToFirebase(db, currentLoggedInUser, fetchProduct
         document.getElementById('pWarranty').value = '';
         document.getElementById('pImageFile').value = '';
         document.getElementById('pDesc').value = '';
-        
+        document.getElementById('pStock').value = '';
+
         fetchProductsCallback(currentLoggedInUser.uid);
     } catch (error) {
         console.error("Error adding product: ", error);
@@ -48,7 +51,7 @@ export async function fetchMyListedProducts(db, uid) {
     try {
         const q = query(collection(db, "vendors"), where("sellerUid", "==", uid));
         const querySnapshot = await getDocs(q);
-        
+
         if (querySnapshot.empty) {
             container.innerHTML = "<div class='no-data'>No products listed by you yet.</div>";
             return;
@@ -57,17 +60,19 @@ export async function fetchMyListedProducts(db, uid) {
         let html = "";
         querySnapshot.forEach((docSnap) => {
             const prod = docSnap.data();
+            const stock = prod.stock !== undefined ? prod.stock : 10;
+            const outOfStock = stock <= 0;
             html += `
                 <div class="product-item-card">
                     <div style="display: flex; gap: 15px; align-items: center;">
                         <img src="${prod.image || 'https://via.placeholder.com/60'}" class="product-thumb" alt="Product">
                         <div class="product-info">
-                            <h4>${prod.name}</h4>
+                            <h4>${prod.name} ${outOfStock ? '<span class="stock-tag out">Out of Stock</span>' : `<span class="stock-tag in">${stock} in stock</span>`}</h4>
                             <p><strong>Price:</strong> ₹${prod.price} (${prod.unit || 'Per Piece'})</p>
                         </div>
                     </div>
                     <div class="btn-group">
-                        <button class="btn-edit" onclick="editProduct('${docSnap.id}', ${prod.price})">✏️ Edit</button>
+                        <button class="btn-edit" onclick="editProduct('${docSnap.id}', ${prod.price}, ${stock})">✏️ Edit</button>
                         <button class="btn-delete" onclick="deleteProduct('${docSnap.id}')">🗑️ Delete</button>
                     </div>
                 </div>
@@ -80,23 +85,32 @@ export async function fetchMyListedProducts(db, uid) {
     }
 }
 
-export function editProduct(db, productId, currentPrice, uid, fetchProductsCallback) {
+export function editProduct(db, productId, currentPrice, currentStock, uid, fetchProductsCallback) {
     const newPrice = prompt("Enter new price:", currentPrice);
-    if (newPrice !== null && newPrice.trim() !== "") {
-        const updatedPrice = Number(newPrice);
-        if (isNaN(updatedPrice)) {
-            alert("Please enter a valid number for the price!");
-            return;
-        }
-        updateDoc(doc(db, "vendors", productId), {
-            price: updatedPrice
-        }).then(() => {
-            alert("Product price updated successfully! 🎉");
-            fetchProductsCallback(uid);
-        }).catch((error) => {
-            alert("Error updating price: " + error.message);
-        });
+    if (newPrice === null || newPrice.trim() === "") return;
+    const updatedPrice = Number(newPrice);
+    if (isNaN(updatedPrice)) {
+        alert("Please enter a valid number for the price!");
+        return;
     }
+
+    const newStock = prompt("Enter updated stock quantity:", currentStock !== undefined ? currentStock : 10);
+    if (newStock === null || newStock.trim() === "") return;
+    const updatedStock = Number(newStock);
+    if (isNaN(updatedStock) || updatedStock < 0) {
+        alert("Please enter a valid stock quantity (0 or more)!");
+        return;
+    }
+
+    updateDoc(doc(db, "vendors", productId), {
+        price: updatedPrice,
+        stock: updatedStock
+    }).then(() => {
+        alert("Product updated successfully! 🎉");
+        fetchProductsCallback(uid);
+    }).catch((error) => {
+        alert("Error updating product: " + error.message);
+    });
 }
 
 export async function deleteProduct(db, productId, uid, fetchProductsCallback) {
