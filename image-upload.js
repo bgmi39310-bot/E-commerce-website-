@@ -1,7 +1,7 @@
 import { IMGBB_API_KEY } from './imgbb-config.js';
 
 export async function uploadToImgBB(file) {
-    if (IMGBB_API_KEY === "PASTE_YOUR_IMGBB_API_KEY_HERE") {
+    if (IMGBB_API_KEY === "cb22a453a079a9422c7f87e16b41c61c") {
         throw new Error("Image upload isn't set up yet. Please paste an image URL instead, or ask the site owner to add an ImgBB API key.");
     }
 
