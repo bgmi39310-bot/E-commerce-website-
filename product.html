@@ -184,6 +184,8 @@
         const content = document.getElementById('pageContent');
         const price = parseFloat(p.price) || 0;
         const image = p.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500';
+        const stock = p.stock !== undefined ? p.stock : 10;
+        const outOfStock = stock <= 0;
 
         content.innerHTML = `
             <div class="product-layout">
@@ -198,6 +200,7 @@
                     <div class="p-badges">
                         <span class="badge">✅ ${p.material || 'Original Quality'}</span>
                         <span class="badge warranty">🛡️ ${p.warranty || 'Verified Quality'}</span>
+                        ${outOfStock ? '<span class="badge" style="background:#fdecea;color:#c0392b;">❌ Out of Stock</span>' : `<span class="badge" style="background:#eafaf1;color:#1a7f4b;">✔️ ${stock} in stock</span>`}
                     </div>
 
                     <div class="desc-block">${p.description || 'No additional description provided by the seller.'}</div>
@@ -208,19 +211,25 @@
                         <tr><td>Warranty / Validity</td><td>${p.warranty || 'N/A'}</td></tr>
                     </table>
 
-                    <div class="qty-row">
-                        <label>Quantity:</label>
-                        <div class="qty-stepper">
-                            <button onclick="changeQty(-1)">−</button>
-                            <span id="qtyDisplay">1</span>
-                            <button onclick="changeQty(1)">+</button>
+                    ${outOfStock ? `
+                        <div style="background:#fdecea; color:#c0392b; padding:12px; border-radius:8px; text-align:center; font-weight:600; margin-bottom:14px;">
+                            This product is currently out of stock.
                         </div>
-                    </div>
+                    ` : `
+                        <div class="qty-row">
+                            <label>Quantity:</label>
+                            <div class="qty-stepper">
+                                <button onclick="changeQty(-1)">−</button>
+                                <span id="qtyDisplay">1</span>
+                                <button onclick="changeQty(1)">+</button>
+                            </div>
+                        </div>
 
-                    <div class="action-row">
-                        <button class="btn-cart" onclick="addToCart()">🛒 Add to Cart</button>
-                        <button class="btn-buy" onclick="openBuyModal()">⚡ Buy Now</button>
-                    </div>
+                        <div class="action-row">
+                            <button class="btn-cart" onclick="addToCart()">🛒 Add to Cart</button>
+                            <button class="btn-buy" onclick="openBuyModal()">⚡ Buy Now</button>
+                        </div>
+                    `}
                 </div>
             </div>
             <div class="seller-card" id="sellerCard">
