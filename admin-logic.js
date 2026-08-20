@@ -262,61 +262,6 @@ export async function deleteProductAdmin(db, productId, refreshCallback) {
     }
 }
 
-// ---------- CHART DATA + RECENT ORDERS (for the new dashboard look) ----------
-export async function loadDashboardCharts(db) {
-    try {
-        const ordersSnap = await getDocs(collection(db, "orders"));
-        let orders = [];
-        ordersSnap.forEach(d => orders.push({ id: d.id, ...d.data() }));
-
-        // Revenue trend for the last 7 days
-        const days = [];
-        const dayLabels = [];
-        for (let i = 6; i >= 0; i--) {
-            const d = new Date();
-            d.setDate(d.getDate() - i);
-            d.setHours(0, 0, 0, 0);
-            days.push(d);
-            dayLabels.push(d.toLocaleDateString('en-IN', { weekday: 'short' }));
-        }
-        const revenueByDay = new Array(7).fill(0);
-        orders.forEach(o => {
-            if (o.status === 'Cancelled') return;
-            const t = o.createdAt && o.createdAt.toDate ? o.createdAt.toDate() : null;
-            if (!t) return;
-            for (let i = 0; i < 7; i++) {
-                const nextDay = new Date(days[i]);
-                nextDay.setDate(nextDay.getDate() + 1);
-                if (t >= days[i] && t < nextDay) {
-                    revenueByDay[i] += Number(o.price) || 0;
-                    break;
-                }
-            }
-        });
-
-        // Status breakdown
-        const statusCounts = { Pending: 0, Accepted: 0, Shipped: 0, Delivered: 0, Cancelled: 0 };
-        orders.forEach(o => {
-            const s = o.status || 'Pending';
-            if (statusCounts[s] !== undefined) statusCounts[s]++;
-        });
-
-        // Recent 6 orders
-        orders.sort((a, b) => {
-            const ta = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate() : 0;
-            const tb = b.createdAt && b.createdAt.toDate ? b.createdAt.toDate() : 0;
-            return tb - ta;
-        });
-        const recent = orders.slice(0, 6);
-
-        return { dayLabels, revenueByDay, statusCounts, recent };
-    } catch (error) {
-        console.error(error);
-        return { dayLabels: [], revenueByDay: [], statusCounts: {}, recent: [] };
-    }
-}
-
-
 export async function loadAllOrders(db, statusFilter = 'All') {
     const container = document.getElementById('ordersContainer');
     container.innerHTML = "<p>Loading orders...</p>";
