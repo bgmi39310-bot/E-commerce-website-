@@ -22,6 +22,11 @@
         .full-width { grid-column: span 2; }
         .file-upload-box { border: 1px solid #ddd; padding: 12px; border-radius: 5px; background: #fafafa; }
         .file-upload-box label { font-size: 13px; color: #666; display: block; margin-bottom: 5px; font-weight: bold; }
+        .img-upload-row { display: flex; gap: 8px; align-items: center; }
+        .img-upload-row input[type="url"] { flex-grow: 1; }
+        .upload-btn { flex-shrink: 0; background: #232f3e; color: white; padding: 10px 14px; border-radius: 5px; cursor: pointer; font-size: 16px; display: flex; align-items: center; }
+        .upload-btn:hover { background: #37475a; }
+        .upload-status { font-size: 11.5px; display: block; margin-top: 4px; min-height: 14px; }
         button.action-btn { background-color: #ffd814; color: #111; border: 1px solid #fcd200; padding: 12px 20px; font-weight: bold; border-radius: 5px; cursor: pointer; width: 100%; font-size: 15px; }
         button.action-btn:hover { background-color: #f7ca00; }
         .success-msg { color: green; font-weight: bold; margin-bottom: 10px; display: none; }
@@ -45,6 +50,11 @@
         .btn-delete { background-color: #dc3545; border: none; padding: 6px 12px; border-radius: 4px; color: white; font-weight: bold; font-size: 13px; cursor: pointer; }
         .call-btn { background-color: #17a2b8; text-decoration: none; display: inline-block; padding: 6px 12px; border-radius: 4px; color: white; font-weight: bold; font-size: 13px; }
         .no-data { text-align: center; color: #777; padding: 20px; font-size: 15px; }
+        .coupon-card { background: #fff9ec; border: 1px dashed #ffb300; border-radius: 8px; padding: 12px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .coupon-card.inactive { background: #f5f5f5; border-color: #ccc; opacity: 0.75; }
+        .coupon-code { font-family: monospace; font-weight: bold; font-size: 15px; background: #232f3e; color: white; padding: 3px 10px; border-radius: 4px; margin-right: 10px; }
+        .coupon-discount { font-weight: bold; color: #c7511f; }
+        .coupon-off-tag { font-size: 11px; background: #dc3545; color: white; padding: 2px 8px; border-radius: 10px; margin-left: 8px; }
         .stock-tag { font-size: 11px; font-weight: bold; padding: 2px 8px; border-radius: 10px; margin-left: 6px; vertical-align: middle; }
         .stock-tag.in { background: #d4edda; color: #1a7f4b; }
         .stock-tag.out { background: #f8d7da; color: #842029; }
@@ -128,8 +138,12 @@
                 <input type="text" id="ownerName" placeholder="Owner Name">
                 <input type="text" id="shopPhone" placeholder="Contact Number">
                 <div class="file-upload-box">
-                    <label>Shop Logo Link (Postimages URL):</label>
-                    <input type="url" id="shopLogoFile" placeholder="https://i.postimg.cc/...">
+                    <label>Shop Logo:</label>
+                    <div class="img-upload-row">
+                        <input type="url" id="shopLogoFile" placeholder="https://i.postimg.cc/... or upload →">
+                        <label class="upload-btn">📤<input type="file" id="shopLogoFileUpload" accept="image/*" hidden></label>
+                    </div>
+                    <span class="upload-status" id="shopLogoStatus"></span>
                 </div>
                 <textarea id="shopAddress" placeholder="Complete Shop Address" class="full-width" rows="2"></textarea>
                 <button onclick="saveSellerProfileMain()" class="action-btn full-width">Save Shop Profile</button>
@@ -154,11 +168,27 @@
                 <input type="text" id="pWarranty" placeholder="Warranty / Validity">
                 <input type="number" id="pStock" placeholder="Stock Quantity (e.g. 50)" min="0">
                 <div class="file-upload-box full-width">
-                    <label>Product Photos (up to 4 Postimages URLs):</label>
-                    <input type="url" id="pImageFile" placeholder="Main photo: https://i.postimg.cc/..." style="margin-bottom:8px;">
-                    <input type="url" id="pImageFile2" placeholder="Photo 2 (optional)" style="margin-bottom:8px;">
-                    <input type="url" id="pImageFile3" placeholder="Photo 3 (optional)" style="margin-bottom:8px;">
-                    <input type="url" id="pImageFile4" placeholder="Photo 4 (optional)">
+                    <label>Product Photos (up to 4):</label>
+                    <div class="img-upload-row">
+                        <input type="url" id="pImageFile" placeholder="Main photo URL, or upload →">
+                        <label class="upload-btn">📤<input type="file" id="pImageFileUpload" accept="image/*" hidden></label>
+                    </div>
+                    <span class="upload-status" id="pImageStatus"></span>
+                    <div class="img-upload-row" style="margin-top:8px;">
+                        <input type="url" id="pImageFile2" placeholder="Photo 2 (optional)">
+                        <label class="upload-btn">📤<input type="file" id="pImageFile2Upload" accept="image/*" hidden></label>
+                    </div>
+                    <span class="upload-status" id="pImage2Status"></span>
+                    <div class="img-upload-row" style="margin-top:8px;">
+                        <input type="url" id="pImageFile3" placeholder="Photo 3 (optional)">
+                        <label class="upload-btn">📤<input type="file" id="pImageFile3Upload" accept="image/*" hidden></label>
+                    </div>
+                    <span class="upload-status" id="pImage3Status"></span>
+                    <div class="img-upload-row" style="margin-top:8px;">
+                        <input type="url" id="pImageFile4" placeholder="Photo 4 (optional)">
+                        <label class="upload-btn">📤<input type="file" id="pImageFile4Upload" accept="image/*" hidden></label>
+                    </div>
+                    <span class="upload-status" id="pImage4Status"></span>
                 </div>
                 <textarea id="pDesc" placeholder="Full Details Description" class="full-width" rows="3"></textarea>
                 <button onclick="addProductMain()" class="action-btn full-width">List Product on Market</button>
@@ -189,6 +219,21 @@
             <h2>5. 📊 Shop Analytics</h2>
             <div id="analyticsContainer"><p>Loading analytics...</p></div>
         </div>
+
+        <!-- 6. Discount Coupons -->
+        <div class="card">
+            <h2>6. 🎟️ Discount Coupons</h2>
+            <div class="form-grid" style="margin-bottom:16px;">
+                <input type="text" id="couponCode" placeholder="Coupon Code (e.g. SAVE20)" style="text-transform:uppercase;">
+                <select id="couponType">
+                    <option value="percent">Percentage Off (%)</option>
+                    <option value="flat">Flat Amount Off (₹)</option>
+                </select>
+                <input type="number" id="couponValue" placeholder="Discount value" min="1">
+                <button onclick="addCouponMain()" class="action-btn">➕ Create Coupon</button>
+            </div>
+            <div id="couponsContainer"><p>Loading coupons...</p></div>
+        </div>
     </div>
 
     <script type="module">
@@ -199,6 +244,14 @@
         import { fetchDashboardOrders, filterOrders, updateOrderStatus, markAsShipped, confirmDelivery } from './order-logic.js';
         import { loadAnalytics } from './analytics-logic.js';
         import { listenForNewOrders, clearUnreadNotifications } from './notification-logic.js';
+        import { wireImageUpload } from './image-upload.js';
+        import { addCoupon, loadMyCoupons, toggleCouponActive, deleteCoupon } from './coupon-logic.js';
+
+        wireImageUpload('shopLogoFileUpload', 'shopLogoFile', 'shopLogoStatus');
+        wireImageUpload('pImageFileUpload', 'pImageFile', 'pImageStatus');
+        wireImageUpload('pImageFile2Upload', 'pImageFile2', 'pImage2Status');
+        wireImageUpload('pImageFile3Upload', 'pImageFile3', 'pImage3Status');
+        wireImageUpload('pImageFile4Upload', 'pImageFile4', 'pImage4Status');
 
         let currentLoggedInUser = null;
 
@@ -232,6 +285,7 @@
                 fetchDashboardOrders(db, user.uid);
                 fetchMyListedProducts(db, user.uid);
                 loadAnalytics(db, user.uid);
+                loadMyCoupons(db, user.uid);
 
                 // Real-time new-order notifications (bell badge + browser notification + chime)
                 listenForNewOrders(db, user.uid, (newOrders) => {
@@ -308,6 +362,28 @@
                     loadAnalytics(db, uid);
                 });
             }
+        }
+
+        window.addCouponMain = function() {
+            if (!currentLoggedInUser) return;
+            const code = document.getElementById('couponCode').value;
+            const type = document.getElementById('couponType').value;
+            const value = document.getElementById('couponValue').value;
+            addCoupon(db, currentLoggedInUser.uid, code, type, value, () => {
+                document.getElementById('couponCode').value = '';
+                document.getElementById('couponValue').value = '';
+                loadMyCoupons(db, currentLoggedInUser.uid);
+            });
+        }
+
+        window.toggleCouponMain = function(couponId, active) {
+            if (!currentLoggedInUser) return;
+            toggleCouponActive(db, couponId, active, () => loadMyCoupons(db, currentLoggedInUser.uid));
+        }
+
+        window.deleteCouponMain = function(couponId) {
+            if (!currentLoggedInUser) return;
+            deleteCoupon(db, couponId, () => loadMyCoupons(db, currentLoggedInUser.uid));
         }
     </script>
 </body>
