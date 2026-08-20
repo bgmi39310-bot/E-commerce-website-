@@ -154,8 +154,11 @@
                 <input type="text" id="pWarranty" placeholder="Warranty / Validity">
                 <input type="number" id="pStock" placeholder="Stock Quantity (e.g. 50)" min="0">
                 <div class="file-upload-box full-width">
-                    <label>Product Image Link (Postimages URL):</label>
-                    <input type="url" id="pImageFile" placeholder="https://i.postimg.cc/...">
+                    <label>Product Photos (up to 4 Postimages URLs):</label>
+                    <input type="url" id="pImageFile" placeholder="Main photo: https://i.postimg.cc/..." style="margin-bottom:8px;">
+                    <input type="url" id="pImageFile2" placeholder="Photo 2 (optional)" style="margin-bottom:8px;">
+                    <input type="url" id="pImageFile3" placeholder="Photo 3 (optional)" style="margin-bottom:8px;">
+                    <input type="url" id="pImageFile4" placeholder="Photo 4 (optional)">
                 </div>
                 <textarea id="pDesc" placeholder="Full Details Description" class="full-width" rows="3"></textarea>
                 <button onclick="addProductMain()" class="action-btn full-width">List Product on Market</button>
