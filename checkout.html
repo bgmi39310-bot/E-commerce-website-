@@ -29,6 +29,10 @@
         .order-item-row { display: flex; justify-content: space-between; font-size: 13.5px; padding: 6px 0; border-bottom: 1px solid #f2f2f2; }
         .order-item-row:last-of-type { border-bottom: none; }
         .grand-total-row { display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; padding-top: 10px; margin-top: 6px; border-top: 1px solid #eee; }
+        .coupon-row { display: flex; gap: 8px; margin-top: 12px; }
+        .coupon-row input { flex-grow: 1; }
+        .btn-apply-coupon { background: #232f3e; color: white; border: none; padding: 0 18px; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 13.5px; }
+        .discount-row { display: flex; justify-content: space-between; font-size: 13.5px; color: #28a745; font-weight: 600; padding-top: 8px; }
 
         .btn-place { background-color: #fa8900; color: white; border: none; width: 100%; padding: 13px; font-weight: bold; cursor: pointer; border-radius: 6px; font-size: 16px; margin-top: 10px; }
         .btn-place:hover { background-color: #e07b00; }
@@ -47,6 +51,15 @@
         <div class="card">
             <h2>📦 Order Summary</h2>
             <div id="orderItemsList"></div>
+            <div class="coupon-row">
+                <input type="text" id="couponInput" placeholder="Have a coupon code?" style="text-transform:uppercase;">
+                <button onclick="applyCouponCode()" class="btn-apply-coupon">Apply</button>
+            </div>
+            <div id="couponMsg" style="font-size:12.5px; margin-top:6px; display:none;"></div>
+            <div class="discount-row" id="discountRow" style="display:none;">
+                <span>Coupon Discount</span>
+                <span id="discountAmount">-₹0</span>
+            </div>
             <div class="grand-total-row">
                 <span>Total Payable</span>
                 <span id="grandTotal">₹0</span>
@@ -100,6 +113,7 @@
         import { db, auth } from './firebase-config.js';
         import { collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { validateCoupon } from './coupon-logic.js';
 
         let currentBuyerUid = null;
         onAuthStateChanged(auth, (user) => { currentBuyerUid = user ? user.uid : null; });
@@ -108,6 +122,45 @@
         window.selectPayment = function(method) {
             selectedPayment = method;
             document.querySelectorAll('.payment-card').forEach(c => c.classList.toggle('active', c.dataset.method === method));
+        };
+
+        let appliedCoupon = null; // { id, code, sellerUid, discountType, value }
+
+        function computeDiscount(cart, subtotal) {
+            if (!appliedCoupon) return 0;
+            // Coupon only discounts items belonging to that specific seller
+            const eligibleSubtotal = cart
+                .filter(item => item.sellerUid === appliedCoupon.sellerUid)
+                .reduce((sum, item) => sum + (parseInt(item.qty) || 1) * (parseFloat(item.price) || 0), 0);
+
+            if (eligibleSubtotal === 0) return 0;
+
+            if (appliedCoupon.discountType === 'percent') {
+                return Math.min(eligibleSubtotal * (appliedCoupon.value / 100), eligibleSubtotal);
+            }
+            return Math.min(appliedCoupon.value, eligibleSubtotal);
+        }
+
+        window.applyCouponCode = async function() {
+            const code = document.getElementById('couponInput').value;
+            const msgEl = document.getElementById('couponMsg');
+            if (!code.trim()) return;
+
+            const coupon = await validateCoupon(db, code);
+            if (!coupon) {
+                appliedCoupon = null;
+                msgEl.style.display = 'block';
+                msgEl.style.color = '#dc3545';
+                msgEl.innerText = '❌ Invalid or expired coupon code.';
+                renderSummary();
+                return;
+            }
+
+            appliedCoupon = coupon;
+            msgEl.style.display = 'block';
+            msgEl.style.color = '#28a745';
+            msgEl.innerText = `✅ Coupon "${coupon.code}" applied!`;
+            renderSummary();
         };
 
         function renderSummary() {
@@ -124,8 +177,18 @@
                 listEl.innerHTML += `<div class="order-item-row"><span>${item.name} × ${qty}</span><span>₹${lineTotal.toFixed(0)}</span></div>`;
             });
 
-            document.getElementById('grandTotal').innerText = '₹' + total.toFixed(0);
-            return { cart, total };
+            const discount = computeDiscount(cart, total);
+            const discountRow = document.getElementById('discountRow');
+            if (discount > 0) {
+                discountRow.style.display = 'flex';
+                document.getElementById('discountAmount').innerText = '-₹' + discount.toFixed(0);
+            } else {
+                discountRow.style.display = 'none';
+            }
+
+            const finalTotal = total - discount;
+            document.getElementById('grandTotal').innerText = '₹' + finalTotal.toFixed(0);
+            return { cart, total, discount, finalTotal };
         }
 
         function prefillFromProfile() {
@@ -169,16 +232,29 @@
             const fullAddress = `${address}, ${city}, ${state}${pincode ? ' - ' + pincode : ''}`;
 
             try {
+                const eligibleSubtotal = appliedCoupon
+                    ? cart.filter(item => item.sellerUid === appliedCoupon.sellerUid)
+                          .reduce((sum, item) => sum + (parseInt(item.qty) || 1) * (parseFloat(item.price) || 0), 0)
+                    : 0;
+                const totalDiscount = appliedCoupon ? computeDiscount(cart, 0) : 0;
+
                 // Each cart item becomes its own order, carrying its own sellerUid,
                 // so it reaches the correct seller's dashboard.
                 for (let item of cart) {
                     const qty = parseInt(item.qty) || 1;
                     const price = parseFloat(item.price) || 0;
+                    let lineTotal = price * qty;
+
+                    // If this item belongs to the coupon's seller, apply its share of the discount
+                    if (appliedCoupon && item.sellerUid === appliedCoupon.sellerUid && eligibleSubtotal > 0) {
+                        const shareOfDiscount = (lineTotal / eligibleSubtotal) * totalDiscount;
+                        lineTotal = Math.max(0, lineTotal - shareOfDiscount);
+                    }
 
                     await addDoc(collection(db, "orders"), {
                         productId: item.id || null,
                         productName: item.name,
-                        price: price * qty,
+                        price: lineTotal,
                         quantity: qty,
                         shopName: item.shopName || 'Local Shop',
                         sellerUid: item.sellerUid || null,
@@ -187,6 +263,7 @@
                         buyerPhone: phone,
                         buyerAddress: fullAddress,
                         paymentMethod: selectedPayment,
+                        couponCode: (appliedCoupon && item.sellerUid === appliedCoupon.sellerUid) ? appliedCoupon.code : null,
                         status: 'Pending',
                         createdAt: new Date()
                     });
