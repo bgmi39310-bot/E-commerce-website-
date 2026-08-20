@@ -42,6 +42,19 @@
         .category-chip { flex-shrink: 0; padding: 7px 16px; background: #f0f2f2; border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; border: 1.5px solid transparent; color: #333; }
         .category-chip.active { background: #fff3e0; border-color: var(--accent-color); color: #c7511f; }
 
+        /* Sort & Filter Bar */
+        .filter-bar { display: flex; gap: 10px; padding: 10px 15px; background: white; border-bottom: 1px solid #eee; flex-wrap: wrap; align-items: center; }
+        .filter-bar select, .filter-bar input { padding: 7px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 12.5px; background: white; }
+        .price-range-wrap { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #444; }
+        .price-range-wrap input { width: 75px; }
+
+        .out-of-stock-badge { position: absolute; top: 8px; left: 8px; background: #dc3545; color: white; font-size: 10px; font-weight: bold; padding: 3px 9px; border-radius: 10px; z-index: 5; }
+        .product-card.out-of-stock img { opacity: 0.5; }
+        .product-card.out-of-stock { position: relative; }
+
+        .wishlist-btn { position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,0.9); border: none; width: 30px; height: 30px; border-radius: 50%; font-size: 15px; cursor: pointer; z-index: 6; display: flex; align-items: center; justify-content: center; }
+        .wishlist-btn.active { color: #ff4d6d; }
+
         /* Hero Banner Section */
         .hero-banner { background: linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)), url('https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&auto=format&fit=crop&q=80') center/cover; min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; text-align: center; padding: 20px; }
         .hero-banner h1 { font-size: 28px; text-shadow: 2px 2px 4px rgba(0,0,0,0.6); margin: 0 0 6px; }
@@ -57,7 +70,7 @@
         .section-title { font-size: 19px; font-weight: bold; margin: 5px 0 15px; color: #333; }
 
         .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
-        .product-card { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.12); cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; display: flex; flex-direction: column; }
+        .product-card { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.12); cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; display: flex; flex-direction: column; position: relative; }
         .product-card:hover { transform: translateY(-3px); box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
 
         .product-img-wrap { width: 100%; aspect-ratio: 1/1; background: #f5f5f5; overflow: hidden; }
@@ -115,6 +128,7 @@
         <a href="javascript:void(0)" class="close-btn" onclick="toggleMenu()">&times;</a>
         <a href="index.html"><i class="fas fa-home"></i> Home</a>
         <a href="orders.html"><i class="fas fa-box"></i> My Orders</a>
+        <a href="wishlist.html"><i class="fas fa-heart"></i> My Wishlist</a>
         <a href="cart.html"><i class="fas fa-shopping-cart"></i> Cart</a>
         <hr style="border: 0.5px solid #444;">
         <a href="account.html"><i class="fas fa-user-circle"></i> My Account</a>
@@ -144,6 +158,21 @@
         <div class="category-chip" data-cat="electronics">Electronics</div>
         <div class="category-chip" data-cat="home">Home & Kitchen</div>
         <div class="category-chip" data-cat="beauty">Beauty</div>
+    </div>
+
+    <!-- Sort & Price Filter Bar -->
+    <div class="filter-bar">
+        <select id="sortSelect">
+            <option value="default">Sort: Recommended</option>
+            <option value="priceLow">Price: Low to High</option>
+            <option value="priceHigh">Price: High to Low</option>
+            <option value="newest">Newest First</option>
+        </select>
+        <div class="price-range-wrap">
+            <span>₹</span><input type="number" id="minPrice" placeholder="Min">
+            <span>-</span>
+            <span>₹</span><input type="number" id="maxPrice" placeholder="Max">
+        </div>
     </div>
 
     <!-- Main Content -->
@@ -216,11 +245,17 @@
                 const pName = product.name || 'Unnamed product';
                 const pShop = product.shopName || 'Local Seller';
                 const unit = product.unit || '';
+                const stock = product.stock !== undefined ? product.stock : 10;
+                const outOfStock = stock <= 0;
+                const wishlist = getWishlist();
+                const isWishlisted = wishlist.includes(product.id);
 
                 const card = document.createElement('div');
-                card.className = 'product-card';
+                card.className = 'product-card' + (outOfStock ? ' out-of-stock' : '');
                 card.onclick = () => { window.location.href = `product.html?id=${product.id}`; };
                 card.innerHTML = `
+                    ${outOfStock ? '<span class="out-of-stock-badge">Out of Stock</span>' : ''}
+                    <button class="wishlist-btn ${isWishlisted ? 'active' : ''}" onclick="event.stopPropagation(); toggleWishlist('${product.id}', this)">${isWishlisted ? '❤️' : '🤍'}</button>
                     <div class="product-img-wrap">
                         <img src="${pImage}" alt="${pName}" onerror="this.src='https://via.placeholder.com/300?text=No+Image'">
                     </div>
@@ -228,11 +263,53 @@
                         <div class="product-title">${pName}</div>
                         <div class="shop-badge"><i class="fas fa-store"></i> ${pShop}</div>
                         <div class="product-price">₹${price.toFixed(0)} <small>${unit}</small></div>
-                        <div class="view-hint">Tap to view details →</div>
+                        <div class="view-hint">${outOfStock ? 'Currently unavailable' : 'Tap to view details →'}</div>
                     </div>
                 `;
                 grid.appendChild(card);
             });
+        }
+
+        // ---------- Wishlist ----------
+        function getWishlist() {
+            return JSON.parse(localStorage.getItem('wishlist')) || [];
+        }
+        window.toggleWishlist = function(productId, btnEl) {
+            let wishlist = getWishlist();
+            if (wishlist.includes(productId)) {
+                wishlist = wishlist.filter(id => id !== productId);
+                btnEl.classList.remove('active');
+                btnEl.innerText = '🤍';
+            } else {
+                wishlist.push(productId);
+                btnEl.classList.add('active');
+                btnEl.innerText = '❤️';
+            }
+            localStorage.setItem('wishlist', JSON.stringify(wishlist));
+        };
+
+        // ---------- Sort & Price Filter ----------
+        function applySortAndPriceFilter(products) {
+            const minPrice = parseFloat(document.getElementById('minPrice').value);
+            const maxPrice = parseFloat(document.getElementById('maxPrice').value);
+            const sortMode = document.getElementById('sortSelect').value;
+
+            let result = products.filter(p => {
+                const price = parseFloat(p.price) || 0;
+                if (!isNaN(minPrice) && price < minPrice) return false;
+                if (!isNaN(maxPrice) && price > maxPrice) return false;
+                return true;
+            });
+
+            if (sortMode === 'priceLow') result.sort((a, b) => (parseFloat(a.price) || 0) - (parseFloat(b.price) || 0));
+            if (sortMode === 'priceHigh') result.sort((a, b) => (parseFloat(b.price) || 0) - (parseFloat(a.price) || 0));
+            if (sortMode === 'newest') result.sort((a, b) => {
+                const ta = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate() : 0;
+                const tb = b.createdAt && b.createdAt.toDate ? b.createdAt.toDate() : 0;
+                return tb - ta;
+            });
+
+            return result;
         }
 
         function applyFilters() {
@@ -254,8 +331,14 @@
                 );
             }
 
+            filtered = applySortAndPriceFilter(filtered);
+
             displayProducts(filtered);
         }
+
+        document.getElementById('sortSelect').addEventListener('change', applyFilters);
+        document.getElementById('minPrice').addEventListener('input', applyFilters);
+        document.getElementById('maxPrice').addEventListener('input', applyFilters);
 
         document.getElementById('searchInput').addEventListener('input', applyFilters);
         document.getElementById('mobileSearchInput').addEventListener('input', applyFilters);
@@ -277,4 +360,3 @@
     </script>
 </body>
 </html>
-
