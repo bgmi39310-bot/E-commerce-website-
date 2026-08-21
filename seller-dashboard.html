@@ -261,7 +261,7 @@
         import { auth, db } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { loadSellerProfileFromFirestore, saveSellerProfile } from './profile-logic.js';
-        import { addProductToFirebase, fetchMyListedProducts, editProduct, deleteProduct } from './product-logic.js';
+        import { addProductToFirebase, fetchMyListedProducts, editProduct, deleteProduct, stopListeningToMyProducts } from './product-logic.js';
         import { fetchDashboardOrders, filterOrders, updateOrderStatus, markAsShipped, confirmDelivery } from './order-logic.js';
         import { loadAnalytics, downloadSalesReport } from './analytics-logic.js';
         import { bulkUploadProducts } from './bulk-upload-logic.js';
@@ -432,6 +432,12 @@
             const shopName = document.getElementById('shopName').value.trim() || document.getElementById('dispShopName').innerText.trim();
             bulkUploadProducts(db, currentLoggedInUser, shopName, file, (uid) => fetchMyListedProducts(db, uid));
         }
+
+        // Close the live products listener when leaving the page, so it doesn't
+        // keep consuming Firestore reads in the background.
+        window.addEventListener('pagehide', () => {
+            stopListeningToMyProducts();
+        });
     </script>
 </body>
 </html>
