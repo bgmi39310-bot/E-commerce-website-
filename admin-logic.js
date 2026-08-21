@@ -123,6 +123,63 @@ export async function loadOverviewStats(db) {
     }
 }
 
+// ---------- REPORTS ----------
+export async function loadReports(db) {
+    const container = document.getElementById('reportsContainer');
+    container.innerHTML = "<p>Loading reports...</p>";
+
+    try {
+        const snap = await getDocs(collection(db, "reports"));
+        if (snap.empty) {
+            container.innerHTML = `<div class="admin-no-data">No reports submitted yet.</div>`;
+            return;
+        }
+
+        let reports = [];
+        snap.forEach(d => reports.push({ id: d.id, ...d.data() }));
+        reports.sort((a, b) => {
+            const ta = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate() : 0;
+            const tb = b.createdAt && b.createdAt.toDate ? b.createdAt.toDate() : 0;
+            return tb - ta;
+        });
+
+        let html = "";
+        reports.forEach(r => {
+            const resolved = r.status === 'Resolved';
+            html += `
+                <div class="admin-row-card ${resolved ? 'is-blocked' : ''}">
+                    <div class="arc-info">
+                        <h4>${r.productName || 'Unknown product'} ${resolved ? '<span class="blocked-tag">RESOLVED</span>' : ''}</h4>
+                        <p>🏪 ${r.shopName || 'Unknown shop'} &nbsp; | &nbsp; Reason: <strong>${r.reason || 'N/A'}</strong></p>
+                        ${r.details ? `<p>"${r.details}"</p>` : ''}
+                        <p class="uid-tag">Product ID: ${r.productId || 'N/A'} | Seller UID: ${r.sellerUid || 'N/A'}</p>
+                    </div>
+                    ${!resolved ? `
+                        <div class="arc-actions">
+                            <button class="admin-btn admin-btn-delete" onclick="deleteReportedProductMain('${r.id}', '${r.productId}')">🗑️ Remove Product</button>
+                            <button class="admin-btn admin-btn-unblock" onclick="dismissReportMain('${r.id}')">✅ Dismiss</button>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    } catch (error) {
+        console.error(error);
+        container.innerHTML = `<p style="color:red;">Unable to load reports.</p>`;
+    }
+}
+
+export async function resolveReport(db, reportId, refreshCallback) {
+    try {
+        await updateDoc(doc(db, "reports", reportId), { status: 'Resolved' });
+        if (refreshCallback) refreshCallback();
+    } catch (error) {
+        console.error(error);
+        alert("Error updating report.");
+    }
+}
+
 // ---------- SELLERS ----------
 export async function loadSellers(db) {
     const container = document.getElementById('sellersContainer');
