@@ -118,6 +118,7 @@
         import { collection, addDoc, doc, getDoc, updateDoc, increment } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { validateCoupon } from './coupon-logic.js';
+        import { decrementStockForCart } from './stock-logic.js';
 
         let currentBuyerUid = null;
         onAuthStateChanged(auth, (user) => { currentBuyerUid = user ? user.uid : null; });
@@ -278,6 +279,10 @@
             const fullAddress = `${address}, ${city}, ${state}${pincode ? ' - ' + pincode : ''}`;
 
             try {
+                // Reserve stock first — if any item is out of stock or short, this
+                // throws and we stop before creating any orders (no half-placed orders).
+                await decrementStockForCart(db, cart);
+
                 const eligibleSubtotal = appliedCoupon
                     ? cart.filter(item => item.sellerUid === appliedCoupon.sellerUid)
                           .reduce((sum, item) => sum + (parseInt(item.qty) || 1) * (parseFloat(item.price) || 0), 0)
