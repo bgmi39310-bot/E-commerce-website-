@@ -43,6 +43,12 @@
     .related-item .r-name { font-size: 12.5px; margin-top: 6px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .related-item .r-price { font-size: 13.5px; font-weight: bold; color: #B12704; margin-top: 2px; }
 
+    .report-link { display: block; text-align: center; font-size: 12.5px; color: #767676; margin: 16px 0 4px; cursor: pointer; text-decoration: underline; }
+    .report-modal-box { background: white; width: 100%; max-width: 420px; border-radius: 14px 14px 0 0; padding: 20px; }
+    @media(min-width: 600px) { .report-modal-box { border-radius: 12px; } }
+    .report-modal-box select, .report-modal-box textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; margin-bottom: 10px; }
+    .report-submit-btn { width: 100%; background: #dc3545; color: white; border: none; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+
     .info-panel { flex: 1.3 1 380px; background: white; border-radius: 8px; padding: 20px; }
     .p-name { font-size: 21px; font-weight: 600; margin: 0 0 8px; }
     .p-shop { font-size: 13px; color: #565959; margin-bottom: 12px; display:flex; align-items:center; gap:6px; }
@@ -122,6 +128,27 @@
         <h3>🛍️ You may also like</h3>
         <div class="related-scroll" id="relatedScroll"></div>
     </div>
+
+    <div class="report-link" onclick="openReportModal()">⚠️ Report this product or seller</div>
+</div>
+
+<div class="modal-overlay" id="reportModal">
+    <div class="report-modal-box">
+        <span class="modal-close" onclick="closeReportModal()">&times;</span>
+        <h3>Report this listing</h3>
+        <p class="modal-sub">Help us keep DesiMarket safe and trustworthy</p>
+
+        <select id="reportReason">
+            <option value="">Select a reason</option>
+            <option value="Fake or counterfeit product">Fake or counterfeit product</option>
+            <option value="Misleading price/description">Misleading price or description</option>
+            <option value="Inappropriate content">Inappropriate content</option>
+            <option value="Suspected fraud/scam">Suspected fraud or scam</option>
+            <option value="Other">Other</option>
+        </select>
+        <textarea id="reportDetails" rows="3" placeholder="Additional details (optional)"></textarea>
+        <button class="report-submit-btn" id="reportSubmitBtn">Submit Report</button>
+    </div>
 </div>
 
 <!-- Buy Now Modal -->
@@ -178,6 +205,7 @@
     import { doc, getDoc, addDoc, collection, getDocs, query, where, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { loadProductReviews } from './review-logic.js';
+    import { submitReport } from './report-logic.js';
 
     let currentBuyerUid = null;
     onAuthStateChanged(auth, (user) => { currentBuyerUid = user ? user.uid : null; });
@@ -353,6 +381,38 @@
         document.querySelectorAll('.thumb-strip img').forEach(t => t.classList.remove('active'));
         thumbEl.classList.add('active');
     };
+
+    window.openReportModal = function() {
+        if (!currentBuyerUid) {
+            alert("Please login to report a listing.");
+            window.location.href = 'login.html';
+            return;
+        }
+        document.getElementById('reportModal').classList.add('active');
+    };
+
+    window.closeReportModal = function() {
+        document.getElementById('reportModal').classList.remove('active');
+    };
+
+    document.getElementById('reportSubmitBtn').addEventListener('click', () => {
+        const reason = document.getElementById('reportReason').value;
+        const details = document.getElementById('reportDetails').value;
+        if (!currentProduct) return;
+
+        submitReport(db, {
+            productId: currentProduct.id,
+            productName: currentProduct.name,
+            sellerUid: currentProduct.sellerUid,
+            shopName: currentProduct.shopName,
+            reporterUid: currentBuyerUid,
+            reason, details
+        }, () => {
+            closeReportModal();
+            document.getElementById('reportReason').value = '';
+            document.getElementById('reportDetails').value = '';
+        });
+    });
 
     window.changeQty = function(delta) {
         currentQty = Math.max(1, currentQty + delta);
