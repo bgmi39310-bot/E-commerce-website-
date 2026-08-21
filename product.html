@@ -134,7 +134,7 @@ header { background: #232f3e; padding: 14px 18px; display: flex; align-items: ce
 
 <div class="modal-overlay" id="reportModal">
 <div class="report-modal-box">
-<span class="modal-close" onclick="closeReportModal()">×</span>
+<span class="modal-close" onclick="closeReportModal()">&times;</span>
 <h3>Report this listing</h3>
 <p class="modal-sub">Help us keep DesiMarket safe and trustworthy</p>
 
@@ -154,7 +154,7 @@ header { background: #232f3e; padding: 14px 18px; display: flex; align-items: ce
 <!-- Buy Now Modal -->
 <div class="modal-overlay" id="buyModal">
 <div class="modal-box">
-<span class="modal-close" onclick="closeBuyModal()">×</span>
+<span class="modal-close" onclick="closeBuyModal()">&times;</span>
 <h3>Delivery Details</h3>
 <p class="modal-sub">Tell us where to deliver your order</p>
 
@@ -226,44 +226,42 @@ if (count > 0) { badge.style.display = 'flex'; badge.innerText = count > 99 ? '9
 else { badge.style.display = 'none'; }
 }
 
-// Live-listens to this one product so stock/price updates reflect instantly
-// without needing a refresh. Only ONE listener is ever open per page view,
-// and it's closed automatically when the person navigates away (see pagehide below).
 function loadProduct() {
 const content = document.getElementById('pageContent');
 if (!productId) {
-content.innerHTML = <div class="error-state"&gt;Product not found. &lt;a href="index.html"&gt;Go back to homepage&lt;/a&gt;&lt;/div>;
+content.innerHTML = `<div class="error-state">Product not found. <a href="index.html">Go back to homepage</a></div>`;
 return;
 }
 
+try {
 unsubscribeProduct = onSnapshot(doc(db, "vendors", productId), (snap) => {
 if (!snap.exists()) {
-content.innerHTML = <div class="error-state"&gt;This product is no longer available. &lt;a href="index.html"&gt;Browse other products&lt;/a&gt;&lt;/div>;
+content.innerHTML = `<div class="error-state">This product is no longer available. <a href="index.html">Browse other products</a></div>`;
 return;
 }
 const previousQty = currentQty;
 currentProduct = { id: snap.id, ...snap.data() };
 renderProduct(currentProduct);
 
-// Keep the quantity stepper from silently resetting on every live update
 currentQty = previousQty;
 const qtyDisplay = document.getElementById('qtyDisplay');
 if (qtyDisplay) qtyDisplay.innerText = currentQty;
 
-// Reviews/related-products/seller-info only need to load once, not on every stock change
 if (isFirstProductLoad) {
 isFirstProductLoad = false;
 loadSellerInfo(currentProduct.sellerUid);
 loadRelatedProducts(currentProduct);
 }
 }, (error) => {
-console.error(error);
-content.innerHTML = <div class="error-state"&gt;Unable to load product. Please try again.&lt;/div>;
+console.error("Firestore Error:", error);
+content.innerHTML = `<div class="error-state" style="color:red; font-weight:bold;">Error: ${error.message}</div>`;
 });
+} catch (err) {
+console.error("Load Product Crash:", err);
+content.innerHTML = `<div class="error-state" style="color:red; font-weight:bold;">Crash: ${err.message}</div>`;
+}
 }
 
-// Stop listening the moment the person leaves this page, so we don't keep
-// burning Firestore reads on a page nobody is looking at anymore.
 window.addEventListener('pagehide', () => {
 if (unsubscribeProduct) unsubscribeProduct();
 });
@@ -276,29 +274,40 @@ const imageList = (Array.isArray(p.images) && p.images.length > 0) ? p.images : 
 const stock = p.stock !== undefined ? p.stock : 10;
 const outOfStock = stock <= 0;
 
-content.innerHTML = &lt;div class="product-layout"&gt; &lt;div class="gallery"&gt; &lt;img class="main-img" id="mainProductImg" src="${imageList[0]}" alt="${p.name}" onerror="this.src='https://via.placeholder.com/400?text=No+Image'"&gt; ${imageList.length > 1 ? &lt;div class="thumb-strip"&gt;${imageList.map((img, i) => <img src="${img}" loading="lazy" class="${i === 0 ? 'active' : ''}" onclick="switchMainImage('${img.replace(/'/g, "\'")}', this)" onerror="this.style.display='none'">).join('')} &lt;/div&gt; : ''}
+content.innerHTML = `
+<div class="product-layout">
+<div class="gallery">
+<img class="main-img" id="mainProductImg" src="${imageList[0]}" alt="${p.name}" onerror="this.src='https://via.placeholder.com/400?text=No+Image'">
+${imageList.length > 1 ? `
+<div class="thumb-strip">
+${imageList.map((img, i) => `<img src="${img}" loading="lazy" class="${i === 0 ? 'active' : ''}" onclick="switchMainImage('${img.replace(/'/g, "\\'")}', this)" onerror="this.style.display='none'">`).join('')}
+</div>
+` : ''}
 </div>
 <div class="info-panel">
-<h1 class="p-name">${p.name || 'Product'}&lt;/h1&gt; &lt;div class="p-shop"&gt;&lt;i class="fas fa-store"&gt;🏪&lt;/i&gt; Sold by &lt;strong&gt;${p.shopName || 'Local Seller'}</strong></div>
-<div class="p-price">₹${price.toFixed(0)} &lt;small&gt;${p.unit || ''}</small></div>
+<h1 class="p-name">${p.name || 'Product'}</h1>
+<div class="p-shop"><i class="fas fa-store">🏪</i> Sold by <strong>${p.shopName || 'Local Seller'}</strong></div>
+<div class="p-price">₹${price.toFixed(0)} <small>${p.unit || ''}</small></div>
 
 <div class="p-badges">
-<span class="badge">✅ ${p.material || 'Original Quality'}&lt;/span&gt; &lt;span class="badge warranty"&gt;🛡️ ${p.warranty || 'Verified Quality'}</span>
-${outOfStock ? '&lt;span class="badge" style="background:#fdecea;color:#c0392b;"&gt;❌ Out of Stock&lt;/span&gt;' :<span class="badge" style="background:#eafaf1;color:#1a7f4b;">✔️ ${stock} in stock&lt;/span>}
+<span class="badge">✅ ${p.material || 'Original Quality'}</span>
+<span class="badge warranty">🛡️ ${p.warranty || 'Verified Quality'}</span>
+${outOfStock ? '<span class="badge" style="background:#fdecea;color:#c0392b;">❌ Out of Stock</span>' : `<span class="badge" style="background:#eafaf1;color:#1a7f4b;">✔️ ${stock} in stock</span>`}
 </div>
 
-<div class="desc-block">`${p.description || 'No additional description provided by the seller.'}</div>
+<div class="desc-block">${p.description || 'No additional description provided by the seller.'}</div>
 
 <table class="spec-table">
-<tr><td>Unit</td><td> {p.material || 'N/A'}</td></tr>
-<tr><td>Warranty / Validity</td><td>$`{p.warranty || 'N/A'}</td></tr>
+<tr><td>Unit</td><td>${p.unit || 'Per Piece'}</td></tr>
+<tr><td>Material / Type</td><td>${p.material || 'N/A'}</td></tr>
+<tr><td>Warranty / Validity</td><td>${p.warranty || 'N/A'}</td></tr>
 </table>
 
-${outOfStock ?
+${outOfStock ? `
 <div style="background:#fdecea; color:#c0392b; padding:12px; border-radius:8px; text-align:center; font-weight:600; margin-bottom:14px;">
 This product is currently out of stock.
 </div>
-:
+` : `
 <div class="qty-row">
 <label>Quantity:</label>
 <div class="qty-stepper">
@@ -312,7 +321,19 @@ This product is currently out of stock.
 <button class="btn-cart" onclick="addToCart()">🛒 Add to Cart</button>
 <button class="btn-buy" onclick="openBuyModal()">⚡ Buy Now</button>
 </div>
-} &lt;/div&gt; &lt;/div&gt; &lt;div class="seller-card" id="sellerCard"&gt; &lt;img class="seller-logo" src="https://via.placeholder.com/60" id="sellerLogo" alt="Seller"&gt; &lt;div class="seller-info"&gt; &lt;h4 id="sellerName"&gt;Loading seller info...&lt;span class="verified-tick"&gt;✔️&lt;/span&gt;&lt;/h4&gt; &lt;p id="sellerAddress"&gt;&lt;/p&gt; &lt;p id="sellerPhone"&gt;&lt;/p&gt; &lt;/div&gt; &lt;button id="askSellerBtn" onclick="askSeller()" style="background:#232f3e; color:white; border:none; padding:9px 16px; border-radius:6px; font-size:12.5px; font-weight:bold; cursor:pointer; white-space:nowrap;"&gt;💬 Ask Seller&lt;/button&gt; &lt;/div&gt;;
+`}
+</div>
+</div>
+<div class="seller-card" id="sellerCard">
+<img class="seller-logo" src="https://via.placeholder.com/60" id="sellerLogo" alt="Seller">
+<div class="seller-info">
+<h4 id="sellerName">Loading seller info...<span class="verified-tick">✔️</span></h4>
+<p id="sellerAddress"></p>
+<p id="sellerPhone"></p>
+</div>
+<button id="askSellerBtn" onclick="askSeller()" style="background:#232f3e; color:white; border:none; padding:9px 16px; border-radius:6px; font-size:12.5px; font-weight:bold; cursor:pointer; white-space:nowrap;">💬 Ask Seller</button>
+</div>
+`;
 }
 
 async function loadSellerInfo(sellerUid) {
@@ -325,7 +346,7 @@ const snap = await getDoc(doc(db, "sellers_profiles", sellerUid));
 if (snap.exists()) {
 const seller = snap.data();
 document.getElementById('sellerLogo').src = seller.logo || 'https://via.placeholder.com/60';
-document.getElementById('sellerName').innerHTML = ${seller.shopName || 'Local Seller'} <span class="verified-tick">✔️ Verified</span>`;
+document.getElementById('sellerName').innerHTML = `${seller.shopName || 'Local Seller'} <span class="verified-tick">✔️ Verified</span>`;
 document.getElementById('sellerAddress').innerText = '📍 ' + (seller.address || 'Address not provided');
 document.getElementById('sellerPhone').innerText = '📞 Contact after order confirmation';
 } else {
@@ -342,15 +363,12 @@ const scrollEl = document.getElementById('relatedScroll');
 
 try {
 let related = [];
-
-// First try: other products from the same shop
 if (product.shopName) {
 const q = query(collection(db, "vendors"), where("shopName", "==", product.shopName), limit(8));
 const snap = await getDocs(q);
 snap.forEach(d => { if (d.id !== product.id) related.push({ id: d.id, ...d.data() }); });
 }
 
-// Fallback: fill up with any other products if not enough from same shop
 if (related.length < 4) {
 const allSnap = await getDocs(query(collection(db, "vendors"), limit(20)));
 allSnap.forEach(d => {
@@ -361,13 +379,16 @@ related.push({ id: d.id, ...d.data() });
 }
 
 related = related.slice(0, 8);
-
 if (related.length === 0) return;
 
 card.style.display = 'block';
-scrollEl.innerHTML = related.map(p => &lt;div class="related-item" onclick="window.location.href='product.html?id=${p.id}'">
-<img src=" {p.name || 'Product'}</div>
-<div class="r-price">₹${(parseFloat(p.price) || 0).toFixed(0)}&lt;/div&gt; &lt;/div&gt;).join('');
+scrollEl.innerHTML = related.map(p => `
+<div class="related-item" onclick="window.location.href='product.html?id=${p.id}'">
+<img src="${p.image || 'https://via.placeholder.com/150'}" loading="lazy" onerror="this.src='https://via.placeholder.com/150?text=No+Image'">
+<div class="r-name">${p.name || 'Product'}</div>
+<div class="r-price">₹${(parseFloat(p.price) || 0).toFixed(0)}</div>
+</div>
+`).join('');
 } catch (error) {
 console.error('Error loading related products:', error);
 }
@@ -397,7 +418,7 @@ try {
 const userSnap = await getDoc(doc(db, "users", currentBuyerUid));
 const buyerName = userSnap.exists() ? userSnap.data().name : 'DesiMarket Buyer';
 const chatId = await getOrCreateChat(db, currentBuyerUid, currentProduct.sellerUid, buyerName, currentProduct.shopName);
-window.location.href = chat.html?chatId=${chatId}`;
+window.location.href = `chat.html?chatId=${chatId}`;
 } catch (error) {
 console.error(error);
 alert("Unable to start chat right now.");
@@ -444,8 +465,6 @@ document.getElementById('qtyDisplay').innerText = currentQty;
 window.addToCart = function() {
 if (!currentProduct) return;
 let cart = JSON.parse(localStorage.getItem('cart')) || [];
-
-// If product already in cart, just bump quantity instead of duplicating
 const existing = cart.find(item => item.id === currentProduct.id);
 if (existing) {
 existing.qty = (parseInt(existing.qty) || 1) + currentQty;
@@ -462,16 +481,17 @@ sellerUid: currentProduct.sellerUid || null
 }
 localStorage.setItem('cart', JSON.stringify(cart));
 updateCartBadge();
-alert(${currentQty} x ${currentProduct.name} added to cart! 🛍️);
+alert(`${currentQty} x ${currentProduct.name} added to cart! 🛍️`);
 };
 
 window.openBuyModal = function() {
 if (!currentProduct) return;
 const total = (parseFloat(currentProduct.price) || 0) * currentQty;
-document.getElementById('orderSummary').innerHTML = &lt;span&gt;${currentQty} x ${currentProduct.name}&lt;/span&gt; &lt;strong&gt;₹${total.toFixed(0)}</strong>
+document.getElementById('orderSummary').innerHTML = `
+<span>${currentQty} x ${currentProduct.name}</span>
+<strong>₹${total.toFixed(0)}</strong>
 `;
 
-// Pre-fill from saved profile if available
 const user = JSON.parse(localStorage.getItem('currentUser'));
 if (user) {
 document.getElementById('buyName').value = (user.name || '') + (user.surname ? ' ' + user.surname : '');
@@ -501,7 +521,7 @@ if (!name || !phone || !address || !city) {
 alert('Please fill in all required delivery details.');
 return;
 }
-if (!/^\d{10}`$/.test(phone)) {
+if (!/^\d{10}$/.test(phone)) {
 alert('Please enter a valid 10-digit mobile number.');
 return;
 }
@@ -511,7 +531,7 @@ btn.disabled = true;
 btn.innerText = 'Placing order...';
 
 try {
-const fullAddress = ${address}, ${city}, ${state} ${pincode ? '- ' + pincode : ''};
+const fullAddress = `${address}, ${city}, ${state} ${pincode ? '- ' + pincode : ''}`;
 await addDoc(collection(db, "orders"), {
 productId: currentProduct.id,
 productName: currentProduct.name,
@@ -528,7 +548,6 @@ status: 'Pending',
 createdAt: new Date()
 });
 
-// Reduce stock live so it's accurate for everyone browsing right now
 try {
 await updateDoc(doc(db, "vendors", currentProduct.id), { stock: increment(-currentQty) });
 } catch (stockErr) {
@@ -550,7 +569,7 @@ window.location.href = 'orders.html';
 } catch (error) {
 console.error(error);
 alert('Error placing order: ' + error.message);
-btn.disabled = false;
+btn.disabled = False;
 btn.innerText = 'Place Order';
 }
 });
@@ -563,3 +582,4 @@ if (productId) loadProductReviews(db, productId);
 </script>
 </body>
 </html>
+
