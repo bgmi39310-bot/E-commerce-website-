@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Messages - DesiMarket</title>
+<style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #eaeded; margin: 0; color: #0f1111; }
+    header { background: #232f3e; color: white; padding: 15px 20px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 998; }
+    .back-arrow { font-size: 20px; cursor: pointer; }
+    .header-title { font-size: 18px; font-weight: bold; }
+
+    .container { max-width: 700px; margin: 0 auto; padding: 15px; }
+
+    .thread-card { background: white; border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; display: flex; align-items: center; gap: 12px; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .thread-avatar { width: 44px; height: 44px; border-radius: 50%; background: #232f3e; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; flex-shrink: 0; }
+    .thread-info { flex-grow: 1; min-width: 0; }
+    .thread-name { font-weight: 600; font-size: 14.5px; margin-bottom: 2px; }
+    .thread-preview { font-size: 12.5px; color: #767676; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .thread-badge { background: #ff9900; color: white; font-size: 10.5px; font-weight: bold; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .role-tag { font-size: 10px; background: #f0f2f2; color: #555; padding: 2px 8px; border-radius: 8px; margin-left: 6px; }
+
+    .empty-inbox { text-align: center; padding: 60px 20px; background: white; border-radius: 8px; color: #666; }
+</style>
+</head>
+<body>
+
+<header>
+    <div class="back-arrow" onclick="history.back()">⬅️</div>
+    <div class="header-title">My Messages</div>
+</header>
+
+<div class="container" id="threadsContainer">
+    <p style="text-align:center; color:#888;">Loading conversations...</p>
+</div>
+
+<script type="module">
+    import { db, auth } from './firebase-config.js';
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { loadMyChats } from './chat-logic.js';
+
+    async function loadInbox(uid) {
+        const container = document.getElementById('threadsContainer');
+
+        const [buyerChats, sellerChats] = await Promise.all([
+            loadMyChats(db, uid, 'buyer'),
+            loadMyChats(db, uid, 'seller')
+        ]);
+
+        let allChats = [...buyerChats.map(c => ({ ...c, myRole: 'buyer' })), ...sellerChats.map(c => ({ ...c, myRole: 'seller' }))];
+        allChats.sort((a, b) => {
+            const ta = a.lastMessageAt && a.lastMessageAt.toDate ? a.lastMessageAt.toDate() : 0;
+            const tb = b.lastMessageAt && b.lastMessageAt.toDate ? b.lastMessageAt.toDate() : 0;
+            return tb - ta;
+        });
+
+        if (allChats.length === 0) {
+            container.innerHTML = `<div class="empty-inbox">No conversations yet.<br>Message a seller from any product page to get started!</div>`;
+            return;
+        }
+
+        container.innerHTML = allChats.map(chat => {
+            const displayName = chat.myRole === 'buyer' ? (chat.shopName || 'Seller') : (chat.buyerName || 'Buyer');
+            const unread = chat.myRole === 'buyer' ? (chat.unreadByBuyer || 0) : (chat.unreadBySeller || 0);
+            const initial = displayName.charAt(0).toUpperCase();
+
+            return `
+                <div class="thread-card" onclick="window.location.href='chat.html?chatId=${chat.id}'">
+                    <div class="thread-avatar">${initial}</div>
+                    <div class="thread-info">
+                        <div class="thread-name">${displayName} <span class="role-tag">${chat.myRole === 'buyer' ? 'Seller' : 'Buyer'}</span></div>
+                        <div class="thread-preview">${chat.lastMessage || 'No messages yet'}</div>
+                    </div>
+                    ${unread > 0 ? `<div class="thread-badge">${unread}</div>` : ''}
+                </div>
+            `;
+        }).join('');
+    }
+
+    onAuthStateChanged(auth, (user) => {
+        if (!user) {
+            document.getElementById('threadsContainer').innerHTML = `<div class="empty-inbox">Please login to view your messages.<br><a href="login.html">Login</a></div>`;
+            return;
+        }
+        loadInbox(user.uid);
+    });
+</script>
+</body>
+</html>
+
