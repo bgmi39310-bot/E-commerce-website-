@@ -202,10 +202,11 @@
 
 <script type="module">
     import { db, auth } from './firebase-config.js';
-    import { doc, getDoc, addDoc, collection, getDocs, query, where, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { doc, getDoc, addDoc, collection, getDocs, query, where, limit, updateDoc, increment, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { loadProductReviews } from './review-logic.js';
     import { submitReport } from './report-logic.js';
+    import { getOrCreateChat } from './chat-logic.js';
 
     let currentBuyerUid = null;
     onAuthStateChanged(auth, (user) => { currentBuyerUid = user ? user.uid : null; });
@@ -214,6 +215,8 @@
     const productId = params.get('id');
     let currentProduct = null;
     let currentQty = 1;
+    let unsubscribeProduct = null;
+    let isFirstProductLoad = true;
 
     function updateCartBadge() {
         const cart = JSON.parse(localStorage.getItem('cart')) || [];
@@ -223,27 +226,47 @@
         else { badge.style.display = 'none'; }
     }
 
-    async function loadProduct() {
+    // Live-listens to this one product so stock/price updates reflect instantly
+    // without needing a refresh. Only ONE listener is ever open per page view,
+    // and it's closed automatically when the person navigates away (see pagehide below).
+    function loadProduct() {
         const content = document.getElementById('pageContent');
         if (!productId) {
             content.innerHTML = `<div class="error-state">Product not found. <a href="index.html">Go back to homepage</a></div>`;
             return;
         }
-        try {
-            const snap = await getDoc(doc(db, "vendors", productId));
+
+        unsubscribeProduct = onSnapshot(doc(db, "vendors", productId), (snap) => {
             if (!snap.exists()) {
                 content.innerHTML = `<div class="error-state">This product is no longer available. <a href="index.html">Browse other products</a></div>`;
                 return;
             }
+            const previousQty = currentQty;
             currentProduct = { id: snap.id, ...snap.data() };
             renderProduct(currentProduct);
-            loadSellerInfo(currentProduct.sellerUid);
-            loadRelatedProducts(currentProduct);
-        } catch (error) {
+
+            // Keep the quantity stepper from silently resetting on every live update
+            currentQty = previousQty;
+            const qtyDisplay = document.getElementById('qtyDisplay');
+            if (qtyDisplay) qtyDisplay.innerText = currentQty;
+
+            // Reviews/related-products/seller-info only need to load once, not on every stock change
+            if (isFirstProductLoad) {
+                isFirstProductLoad = false;
+                loadSellerInfo(currentProduct.sellerUid);
+                loadRelatedProducts(currentProduct);
+            }
+        }, (error) => {
             console.error(error);
             content.innerHTML = `<div class="error-state">Unable to load product. Please try again.</div>`;
-        }
+        });
     }
+
+    // Stop listening the moment the person leaves this page, so we don't keep
+    // burning Firestore reads on a page nobody is looking at anymore.
+    window.addEventListener('pagehide', () => {
+        if (unsubscribeProduct) unsubscribeProduct();
+    });
 
     function renderProduct(p) {
         const content = document.getElementById('pageContent');
@@ -259,7 +282,7 @@
                     <img class="main-img" id="mainProductImg" src="${imageList[0]}" alt="${p.name}" onerror="this.src='https://via.placeholder.com/400?text=No+Image'">
                     ${imageList.length > 1 ? `
                         <div class="thumb-strip">
-                            ${imageList.map((img, i) => `<img src="${img}" class="${i === 0 ? 'active' : ''}" onclick="switchMainImage('${img.replace(/'/g, "\\'")}', this)" onerror="this.style.display='none'">`).join('')}
+                            ${imageList.map((img, i) => `<img src="${img}" loading="lazy" class="${i === 0 ? 'active' : ''}" onclick="switchMainImage('${img.replace(/'/g, "\\'")}', this)" onerror="this.style.display='none'">`).join('')}
                         </div>
                     ` : ''}
                 </div>
@@ -310,6 +333,7 @@
                     <p id="sellerAddress"></p>
                     <p id="sellerPhone"></p>
                 </div>
+                <button id="askSellerBtn" onclick="askSeller()" style="background:#232f3e; color:white; border:none; padding:9px 16px; border-radius:6px; font-size:12.5px; font-weight:bold; cursor:pointer; white-space:nowrap;">💬 Ask Seller</button>
             </div>
         `;
     }
@@ -366,7 +390,7 @@
             card.style.display = 'block';
             scrollEl.innerHTML = related.map(p => `
                 <div class="related-item" onclick="window.location.href='product.html?id=${p.id}'">
-                    <img src="${p.image || 'https://via.placeholder.com/150'}" onerror="this.src='https://via.placeholder.com/150?text=No+Image'">
+                    <img src="${p.image || 'https://via.placeholder.com/150'}" loading="lazy" onerror="this.src='https://via.placeholder.com/150?text=No+Image'">
                     <div class="r-name">${p.name || 'Product'}</div>
                     <div class="r-price">₹${(parseFloat(p.price) || 0).toFixed(0)}</div>
                 </div>
@@ -380,6 +404,31 @@
         document.getElementById('mainProductImg').src = src;
         document.querySelectorAll('.thumb-strip img').forEach(t => t.classList.remove('active'));
         thumbEl.classList.add('active');
+    };
+
+    window.askSeller = async function() {
+        if (!currentBuyerUid) {
+            alert("Please login to message the seller.");
+            window.location.href = 'login.html';
+            return;
+        }
+        if (!currentProduct || !currentProduct.sellerUid) {
+            alert("Seller info not available right now.");
+            return;
+        }
+        if (currentProduct.sellerUid === currentBuyerUid) {
+            alert("This is your own product listing.");
+            return;
+        }
+        try {
+            const userSnap = await getDoc(doc(db, "users", currentBuyerUid));
+            const buyerName = userSnap.exists() ? userSnap.data().name : 'DesiMarket Buyer';
+            const chatId = await getOrCreateChat(db, currentBuyerUid, currentProduct.sellerUid, buyerName, currentProduct.shopName);
+            window.location.href = `chat.html?chatId=${chatId}`;
+        } catch (error) {
+            console.error(error);
+            alert("Unable to start chat right now.");
+        }
     };
 
     window.openReportModal = function() {
@@ -507,6 +556,13 @@
                 status: 'Pending',
                 createdAt: new Date()
             });
+
+            // Reduce stock live so it's accurate for everyone browsing right now
+            try {
+                await updateDoc(doc(db, "vendors", currentProduct.id), { stock: increment(-currentQty) });
+            } catch (stockErr) {
+                console.error('Stock update failed:', stockErr);
+            }
 
             let myOrders = JSON.parse(localStorage.getItem('myOrders')) || [];
             myOrders.unshift({
