@@ -21,6 +21,8 @@ export async function loadSellerProfileFromFirestore(db, uid) {
             document.getElementById('shopPhone').value = profile.phone || '';
             document.getElementById('shopLogoFile').value = profile.logo || '';
             document.getElementById('shopAddress').value = profile.address || '';
+            const upiField = document.getElementById('shopUpiId');
+            if (upiField) upiField.value = profile.upiId || '';
         } else {
             document.getElementById('profileDisplay').style.display = 'none';
             document.getElementById('profileForm').style.display = 'grid';
@@ -35,15 +37,17 @@ export async function saveSellerProfile(db, currentLoggedInUser, loadProfileCall
     const shopName = document.getElementById('shopName').value.trim();
     const ownerName = document.getElementById('ownerName').value.trim();
     if (!shopName || !ownerName) { alert("Please enter Shop and Owner Name!"); return; }
-    
+
     const logoUrl = document.getElementById('shopLogoFile').value.trim();
+    const upiField = document.getElementById('shopUpiId');
 
     const profile = {
         uid: currentLoggedInUser.uid,
-        shopName, 
+        shopName,
         ownerName,
         phone: document.getElementById('shopPhone').value.trim(),
         address: document.getElementById('shopAddress').value.trim(),
+        upiId: upiField ? upiField.value.trim() : '',
         logo: logoUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
     };
 
