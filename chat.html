@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat - DesiMarket</title>
+<style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #eaeded; margin: 0; height: 100vh; display: flex; flex-direction: column; }
+
+    header { background: #232f3e; padding: 14px 18px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+    .back-arrow { color: white; font-size: 20px; cursor: pointer; text-decoration: none; }
+    .chat-title { color: white; }
+    .chat-title h3 { margin: 0; font-size: 15.5px; }
+    .chat-title small { color: #cbd3dc; font-size: 11.5px; }
+
+    .messages-wrap { flex-grow: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+    .msg-bubble { max-width: 75%; padding: 9px 13px; border-radius: 14px; font-size: 14px; line-height: 1.4; }
+    .msg-mine { align-self: flex-end; background: #ffd814; color: #111; border-bottom-right-radius: 3px; }
+    .msg-theirs { align-self: flex-start; background: white; color: #111; border-bottom-left-radius: 3px; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+    .msg-time { font-size: 10px; color: #888; margin-top: 3px; }
+
+    .empty-chat { text-align: center; color: #888; padding: 40px 20px; font-size: 13.5px; }
+
+    .input-bar { display: flex; gap: 8px; padding: 12px; background: white; border-top: 1px solid #eee; flex-shrink: 0; }
+    .input-bar input { flex-grow: 1; padding: 11px 14px; border: 1px solid #ddd; border-radius: 20px; font-size: 14px; outline: none; }
+    .send-btn { background: #ff9900; color: white; border: none; width: 42px; height: 42px; border-radius: 50%; font-size: 16px; cursor: pointer; flex-shrink: 0; }
+
+    .login-needed { text-align: center; padding: 60px 20px; color: #666; }
+    .login-needed a { display:inline-block; margin-top:10px; background:#ffd814; padding:10px 22px; border-radius:5px; text-decoration:none; color:#111; font-weight:bold; }
+</style>
+</head>
+<body>
+
+<header>
+    <a href="javascript:history.back()" class="back-arrow">⬅️</a>
+    <div class="chat-title">
+        <h3 id="chatWithName">Loading...</h3>
+        <small id="chatSubtitle"></small>
+    </div>
+</header>
+
+<div class="messages-wrap" id="messagesWrap">
+    <p class="empty-chat">Loading conversation...</p>
+</div>
+
+<div class="input-bar" id="inputBar" style="display:none;">
+    <input type="text" id="msgInput" placeholder="Type a message...">
+    <button class="send-btn" id="sendBtn">➤</button>
+</div>
+
+<script type="module">
+    import { db, auth } from './firebase-config.js';
+    import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getOrCreateChat, sendMessage, listenToMessages, markChatRead } from './chat-logic.js';
+
+    const params = new URLSearchParams(window.location.search);
+    let chatId = params.get('chatId');
+    const sellerUidParam = params.get('sellerUid');
+    const shopNameParam = params.get('shopName');
+
+    let currentUid = null;
+    let currentRole = null; // 'buyer' or 'seller'
+    let currentName = 'DesiMarket User';
+
+    async function initChat(user) {
+        currentUid = user.uid;
+
+        // Get this user's name + role
+        const userSnap = await getDoc(doc(db, "users", user.uid));
+        const userData = userSnap.exists() ? userSnap.data() : {};
+        currentName = userData.name || user.displayName || 'DesiMarket User';
+
+        if (!chatId) {
+            // Starting a NEW chat as a buyer messaging a seller
+            if (!sellerUidParam) {
+                document.getElementById('messagesWrap').innerHTML = `<p class="empty-chat">Conversation not found.</p>`;
+                return;
+            }
+            currentRole = 'buyer';
+            chatId = await getOrCreateChat(db, user.uid, sellerUidParam, currentName, shopNameParam);
+        } else {
+            // Opening an existing chat — figure out whether I'm the buyer or seller in it
+            const [uidA, uidB] = chatId.split('_');
+            currentRole = (uidA === user.uid) ? 'buyer' : 'seller';
+        }
+
+        const chatSnap = await getDoc(doc(db, "chats", chatId));
+        const chatData = chatSnap.exists() ? chatSnap.data() : {};
+
+        document.getElementById('chatWithName').innerText = currentRole === 'buyer'
+            ? (chatData.shopName || 'Seller')
+            : (chatData.buyerName || 'Buyer');
+        document.getElementById('chatSubtitle').innerText = currentRole === 'buyer' ? 'Seller' : 'Customer';
+
+        document.getElementById('inputBar').style.display = 'flex';
+        markChatRead(db, chatId, currentRole);
+
+        listenToMessages(db, chatId, renderMessages);
+    }
+
+    function renderMessages(messages) {
+        const wrap = document.getElementById('messagesWrap');
+        if (messages.length === 0) {
+            wrap.innerHTML = `<p class="empty-chat">No messages yet. Say hello! 👋</p>`;
+            return;
+        }
+        wrap.innerHTML = messages.map(m => {
+            const mine = m.senderUid === currentUid;
+            const time = m.createdAt && m.createdAt.toDate ? m.createdAt.toDate().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '';
+            return `
+                <div class="msg-bubble ${mine ? 'msg-mine' : 'msg-theirs'}">
+                    ${m.text}
+                    <div class="msg-time">${time}</div>
+                </div>
+            `;
+        }).join('');
+        wrap.scrollTop = wrap.scrollHeight;
+    }
+
+    document.getElementById('sendBtn').addEventListener('click', sendCurrentMessage);
+    document.getElementById('msgInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendCurrentMessage(); });
+
+    function sendCurrentMessage() {
+        const input = document.getElementById('msgInput');
+        const text = input.value.trim();
+        if (!text || !chatId) return;
+        sendMessage(db, chatId, currentUid, currentRole, text);
+        input.value = '';
+    }
+
+    onAuthStateChanged(auth, (user) => {
+        if (!user) {
+            document.getElementById('messagesWrap').innerHTML = '';
+            document.getElementById('messagesWrap').outerHTML = `
+                <div class="login-needed">
+                    <p>Please login to chat.</p>
+                    <a href="login.html">Login / Create Account</a>
+                </div>`;
+            return;
+        }
+        initChat(user);
+    });
+</script>
+</body>
+</html>
+
