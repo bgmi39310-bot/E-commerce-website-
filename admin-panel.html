@@ -172,6 +172,7 @@
             <button class="sidebar-nav-item" id="nav-buyers" onclick="switchTab('buyers')"><span class="icon">🧑‍🤝‍🧑</span> Buyers</button>
             <button class="sidebar-nav-item" id="nav-products" onclick="switchTab('products')"><span class="icon">📦</span> Products</button>
             <button class="sidebar-nav-item" id="nav-orders" onclick="switchTab('orders')"><span class="icon">🧾</span> Orders</button>
+            <button class="sidebar-nav-item" id="nav-reports" onclick="switchTab('reports')"><span class="icon">⚠️</span> Reports</button>
         </div>
         <div class="sidebar-logout">
             <button id="logoutBtn">Logout</button>
@@ -253,6 +254,11 @@
                 <div id="ordersContainer"><p>Loading orders...</p></div>
             </div>
 
+            <!-- REPORTS -->
+            <div class="admin-section" id="section-reports">
+                <div id="reportsContainer"><p>Loading reports...</p></div>
+            </div>
+
         </div>
     </div>
 </div>
@@ -263,7 +269,7 @@
     import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     import {
         loadDashboardCharts, loadSellers, loadBuyers, toggleBlockUser,
-        loadAllProducts, deleteProductAdmin, loadAllOrders
+        loadAllProducts, deleteProductAdmin, loadAllOrders, loadReports, resolveReport
     } from './admin-logic.js';
 
     document.getElementById('topbarDate').innerText = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -425,7 +431,7 @@
         document.getElementById('menuOverlay').style.display = document.getElementById('sidebar').classList.contains('open') ? 'block' : 'none';
     };
 
-    const PAGE_TITLES = { dashboard: 'Dashboard', sellers: 'Sellers', buyers: 'Buyers', products: 'Products', orders: 'Orders' };
+    const PAGE_TITLES = { dashboard: 'Dashboard', sellers: 'Sellers', buyers: 'Buyers', products: 'Products', orders: 'Orders', reports: 'Reports' };
 
     window.switchTab = function(tabName) {
         document.querySelectorAll('.sidebar-nav-item').forEach(b => b.classList.remove('active'));
@@ -442,6 +448,18 @@
         if (tabName === 'buyers') loadBuyers(db);
         if (tabName === 'products') loadAllProducts(db);
         if (tabName === 'orders') loadAllOrders(db, document.getElementById('orderStatusFilter').value);
+        if (tabName === 'reports') loadReports(db);
+    };
+
+    window.dismissReportMain = function(reportId) {
+        resolveReport(db, reportId, () => loadReports(db));
+    };
+
+    window.deleteReportedProductMain = function(reportId, productId) {
+        if (!confirm('Remove this reported product from the marketplace?')) return;
+        deleteProductAdmin(db, productId, () => {
+            resolveReport(db, reportId, () => loadReports(db));
+        });
     };
 
     window.toggleBlockMain = function(uid, shouldBlock) {
