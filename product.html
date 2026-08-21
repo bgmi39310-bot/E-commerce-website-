@@ -7,102 +7,18 @@
 <style>
     * { box-sizing: border-box; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f2f2f2; margin: 0; color: #0f1111; }
-
     header { background: #232f3e; padding: 14px 18px; display: flex; align-items: center; gap: 14px; position: sticky; top: 0; z-index: 100; }
     .back-arrow { color: white; font-size: 20px; cursor: pointer; text-decoration: none; }
     .logo-area { color: white; font-size: 19px; font-weight: bold; text-decoration: none; flex-grow: 1; }
     .logo-area span { color: #ff9900; }
-    .header-cart { color: white; font-size: 19px; text-decoration: none; position: relative; }
-    .cart-badge { position: absolute; top: -7px; right: -10px; background: #ff9900; color: white; font-size: 10px; font-weight: bold; border-radius: 50%; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
-
     .container { max-width: 950px; margin: 0 auto; padding: 15px; }
     .product-layout { display: flex; gap: 22px; flex-wrap: wrap; }
-
     .gallery { flex: 1 1 320px; background: white; border-radius: 8px; padding: 15px; text-align: center; }
     .gallery img.main-img { width: 100%; max-width: 400px; aspect-ratio: 1/1; object-fit: cover; border-radius: 8px; }
-    .thumb-strip { display: flex; gap: 8px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
-    .thumb-strip img { width: 55px; height: 55px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 2px solid transparent; opacity: 0.7; }
-    .thumb-strip img.active { border-color: #fa8900; opacity: 1; }
-
-    /* Reviews */
-    .reviews-card { background: white; border-radius: 8px; padding: 18px; margin-top: 20px; }
-    .reviews-card h3 { font-size: 16px; margin-bottom: 10px; }
-    .review-item { border-top: 1px solid #f0f0f0; padding: 12px 0; }
-    .review-item:first-child { border-top: none; }
-    .review-top { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
-    .review-stars { color: #ff9900; font-size: 14px; }
-    .review-author { font-size: 13px; color: #565959; font-weight: 600; }
-    .review-comment { font-size: 13.5px; color: #333; line-height: 1.5; margin: 0; }
-
-    /* Related Products */
-    .related-card { background: white; border-radius: 8px; padding: 18px; margin-top: 20px; }
-    .related-card h3 { font-size: 16px; margin-bottom: 12px; }
-    .related-scroll { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; }
-    .related-item { flex-shrink: 0; width: 130px; cursor: pointer; }
-    .related-item img { width: 100%; aspect-ratio: 1/1; object-fit: cover; border-radius: 8px; background: #f5f5f5; }
-    .related-item .r-name { font-size: 12.5px; margin-top: 6px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .related-item .r-price { font-size: 13.5px; font-weight: bold; color: #B12704; margin-top: 2px; }
-
-    .report-link { display: block; text-align: center; font-size: 12.5px; color: #767676; margin: 16px 0 4px; cursor: pointer; text-decoration: underline; }
-    .report-modal-box { background: white; width: 100%; max-width: 420px; border-radius: 14px 14px 0 0; padding: 20px; }
-    @media(min-width: 600px) { .report-modal-box { border-radius: 12px; } }
-    .report-modal-box select, .report-modal-box textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; margin-bottom: 10px; }
-    .report-submit-btn { width: 100%; background: #dc3545; color: white; border: none; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; }
-
     .info-panel { flex: 1.3 1 380px; background: white; border-radius: 8px; padding: 20px; }
     .p-name { font-size: 21px; font-weight: 600; margin: 0 0 8px; }
-    .p-shop { font-size: 13px; color: #565959; margin-bottom: 12px; display:flex; align-items:center; gap:6px; }
-    .p-shop i { color: #007185; }
     .p-price { font-size: 26px; font-weight: bold; color: #B12704; margin-bottom: 4px; }
-    .p-price small { font-size: 13px; color: #565959; font-weight: normal; }
-    .p-badges { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 16px; }
-    .badge { font-size: 11.5px; background: #eafaf1; color: #1a7f4b; padding: 4px 10px; border-radius: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px; }
-    .badge.warranty { background: #eef3ff; color: #1a4d9f; }
-
-    .desc-block { font-size: 14px; line-height: 1.7; color: #333; margin-bottom: 16px; }
-    .spec-table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-bottom: 18px; }
-    .spec-table td { padding: 6px 4px; border-bottom: 1px solid #f0f0f0; }
-    .spec-table td:first-child { color: #565959; width: 40%; }
-
-    .qty-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-    .qty-row label { font-size: 14px; font-weight: bold; }
-    .qty-stepper { display: flex; align-items: center; border: 1px solid #ccc; border-radius: 6px; overflow: hidden; }
-    .qty-stepper button { background: #f0f2f2; border: none; width: 34px; height: 34px; font-size: 16px; cursor: pointer; }
-    .qty-stepper span { width: 40px; text-align: center; font-weight: bold; }
-
-    .action-row { display: flex; gap: 10px; }
-    .btn-cart, .btn-buy { flex: 1; padding: 13px; border-radius: 6px; font-weight: bold; font-size: 14.5px; cursor: pointer; border: none; }
-    .btn-cart { background: #ffd814; border: 1px solid #fcd200; }
-    .btn-cart:hover { background: #f7ca00; }
-    .btn-buy { background: #fa8900; color: white; }
-    .btn-buy:hover { background: #e07b00; }
-
-    /* Seller Card */
-    .seller-card { background: white; border-radius: 8px; padding: 18px; margin-top: 20px; display: flex; gap: 15px; align-items: center; }
-    .seller-logo { width: 55px; height: 55px; border-radius: 50%; object-fit: cover; border: 2px solid #eee; }
-    .seller-info { flex-grow: 1; }
-    .seller-info h4 { margin: 0 0 3px; font-size: 15px; display: flex; align-items: center; gap: 6px; }
-    .verified-tick { color: #1a7f4b; font-size: 13px; }
-    .seller-info p { margin: 2px 0; font-size: 12.5px; color: #565959; }
-
-    .loading-state, .error-state { text-align: center; padding: 60px 20px; background: white; border-radius: 8px; color: #666; }
-
-    /* Buy Now Modal */
-    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 500; align-items: flex-end; justify-content: center; }
-    .modal-overlay.active { display: flex; }
-    .modal-box { background: white; width: 100%; max-width: 480px; border-radius: 14px 14px 0 0; padding: 20px 20px 25px; max-height: 88vh; overflow-y: auto; }
-    @media(min-width: 600px) { .modal-overlay { align-items: center; } .modal-box { border-radius: 12px; } }
-    .modal-box h3 { margin: 0 0 4px; font-size: 18px; }
-    .modal-box .modal-sub { font-size: 12.5px; color: #767676; margin-bottom: 16px; }
-    .modal-close { float: right; font-size: 22px; cursor: pointer; color: #767676; }
-    .form-group { margin-bottom: 12px; }
-    .form-group label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 4px; }
-    .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; }
-    .form-row { display: flex; gap: 10px; }
-    .form-row .form-group { flex: 1; }
-    .order-summary { background: #f8f9fa; border-radius: 6px; padding: 10px 12px; font-size: 13.5px; margin-bottom: 14px; display: flex; justify-content: space-between; }
-    .btn-submit-order { width: 100%; background: #fa8900; color: white; border: none; padding: 13px; border-radius: 6px; font-weight: bold; font-size: 15px; cursor: pointer; margin-top: 6px; }
-    .btn-submit-order:disabled { opacity: 0.6; }
+    .loading-state, .error-state { text-align: center; padding: 60px 20px; background: white; border-radius: 8px; color: #333; font-size: 16px; }
 </style>
 </head>
 <body>
@@ -110,471 +26,64 @@
 <header>
     <a href="javascript:history.back()" class="back-arrow">⬅️</a>
     <a href="index.html" class="logo-area">Desi<span>Market</span></a>
-    <a href="cart.html" class="header-cart"><i class="fas fa-shopping-cart">🛒</i><span class="cart-badge" id="cartBadge" style="display:none;">0</span></a>
 </header>
 
 <div class="container" id="pageContent">
-    <div class="loading-state">Loading product details...</div>
-</div>
-
-<div class="container" style="padding-top:0;">
-    <div class="reviews-card">
-        <h3>⭐ Customer Reviews</h3>
-        <div id="reviewsSummary" style="margin-bottom:14px;"></div>
-        <div id="reviewsContainer"></div>
-    </div>
-
-    <div class="related-card" id="relatedCard" style="display:none;">
-        <h3>🛍️ You may also like</h3>
-        <div class="related-scroll" id="relatedScroll"></div>
-    </div>
-
-    <div class="report-link" onclick="openReportModal()">⚠️ Report this product or seller</div>
-</div>
-
-<div class="modal-overlay" id="reportModal">
-    <div class="report-modal-box">
-        <span class="modal-close" onclick="closeReportModal()">&times;</span>
-        <h3>Report this listing</h3>
-        <p class="modal-sub">Help us keep DesiMarket safe and trustworthy</p>
-
-        <select id="reportReason">
-            <option value="">Select a reason</option>
-            <option value="Fake or counterfeit product">Fake or counterfeit product</option>
-            <option value="Misleading price/description">Misleading price or description</option>
-            <option value="Inappropriate content">Inappropriate content</option>
-            <option value="Suspected fraud/scam">Suspected fraud or scam</option>
-            <option value="Other">Other</option>
-        </select>
-        <textarea id="reportDetails" rows="3" placeholder="Additional details (optional)"></textarea>
-        <button class="report-submit-btn" id="reportSubmitBtn">Submit Report</button>
-    </div>
-</div>
-
-<!-- Buy Now Modal -->
-<div class="modal-overlay" id="buyModal">
-    <div class="modal-box">
-        <span class="modal-close" onclick="closeBuyModal()">&times;</span>
-        <h3>Delivery Details</h3>
-        <p class="modal-sub">Tell us where to deliver your order</p>
-
-        <div class="order-summary" id="orderSummary"></div>
-
-        <div class="form-group">
-            <label>Full Name</label>
-            <input type="text" id="buyName" placeholder="Your name">
-        </div>
-        <div class="form-row">
-            <div class="form-group">
-                <label>Mobile Number</label>
-                <input type="tel" id="buyPhone" placeholder="10-digit number" maxlength="10">
-            </div>
-            <div class="form-group">
-                <label>Pincode</label>
-                <input type="text" id="buyPincode" placeholder="e.g. 226001" maxlength="6">
-            </div>
-        </div>
-        <div class="form-group">
-            <label>Complete Address (House No, Street, Landmark)</label>
-            <textarea id="buyAddress" rows="2" placeholder="Enter full delivery address"></textarea>
-        </div>
-        <div class="form-row">
-            <div class="form-group">
-                <label>City / Village</label>
-                <input type="text" id="buyCity" placeholder="City">
-            </div>
-            <div class="form-group">
-                <label>State</label>
-                <input type="text" id="buyState" placeholder="State">
-            </div>
-        </div>
-        <div class="form-group">
-            <label>Payment Method</label>
-            <select id="buyPayment">
-                <option value="COD">Cash on Delivery</option>
-                <option value="UPI">UPI (Pay to seller on delivery)</option>
-            </select>
-        </div>
-
-        <button class="btn-submit-order" id="submitOrderBtn">Place Order</button>
-    </div>
+    <div class="loading-state" id="loadingText">Connecting to database...</div>
 </div>
 
 <script type="module">
-    import { db, auth } from './firebase-config.js';
-    import { doc, getDoc, addDoc, collection, getDocs, query, where, limit, updateDoc, increment, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-    import { loadProductReviews } from './review-logic.js';
-    import { submitReport } from './report-logic.js';
-    import { getOrCreateChat } from './chat-logic.js';
-
-    let currentBuyerUid = null;
-    onAuthStateChanged(auth, (user) => { currentBuyerUid = user ? user.uid : null; });
+    import { db } from './firebase-config.js';
+    import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     const params = new URLSearchParams(window.location.search);
     const productId = params.get('id');
-    let currentProduct = null;
-    let currentQty = 1;
-    let unsubscribeProduct = null;
-    let isFirstProductLoad = true;
+    const content = document.getElementById('pageContent');
 
-    function updateCartBadge() {
-        const cart = JSON.parse(localStorage.getItem('cart')) || [];
-        const badge = document.getElementById('cartBadge');
-        const count = cart.reduce((sum, item) => sum + (parseInt(item.qty) || 1), 0);
-        if (count > 0) { badge.style.display = 'flex'; badge.innerText = count > 99 ? '99+' : count; }
-        else { badge.style.display = 'none'; }
-    }
+    // सुरक्षा टाइमर: अगर 4 सेकंड में जवाब नहीं आया, तो एरर दिखा देगा
+    const safetyTimer = setTimeout(() => {
+        content.innerHTML = `<div class="error-state" style="color:red;">⚠️ Connection Timeout! Firebase से जुड़ने में समय लग रहा है। कृपया अपना इंटरनेट या Firebase Config चेक करें।</div>`;
+    }, 4000);
 
-    function loadProduct() {
-        const content = document.getElementById('pageContent');
-        if (!productId) {
-            content.innerHTML = `<div class="error-state">Product not found. <a href="index.html">Go back to homepage</a></div>`;
-            return;
-        }
-
-        unsubscribeProduct = onSnapshot(doc(db, "vendors", productId), (snap) => {
-            if (!snap.exists()) {
-                content.innerHTML = `<div class="error-state">This product is no longer available. <a href="index.html">Browse other products</a></div>`;
+    async function testLoad() {
+        try {
+            if (!productId) {
+                clearTimeout(safetyTimer);
+                content.innerHTML = `<div class="error-state" style="color:red;">⚠️ Error: URL में Product ID (?id=...) गायब है!</div>`;
                 return;
             }
-            const previousQty = currentQty;
-            currentProduct = { id: snap.id, ...snap.data() };
-            renderProduct(currentProduct);
 
-            currentQty = previousQty;
-            const qtyDisplay = document.getElementById('qtyDisplay');
-            if (qtyDisplay) qtyDisplay.innerText = currentQty;
+            console.log("Fetching product ID:", productId);
+            const docRef = doc(db, "vendors", productId);
+            const snap = await getDoc(docRef);
 
-            if (isFirstProductLoad) {
-                isFirstProductLoad = false;
-                loadSellerInfo(currentProduct.sellerUid);
-                loadRelatedProducts(currentProduct);
-            }
-        }, (error) => {
-            console.error(error);
-            content.innerHTML = `<div class="error-state" style="color:red; font-weight:bold;">Error: ${error.message}</div>`;
-        });
-    }
+            clearTimeout(safetyTimer);
 
-    window.addEventListener('pagehide', () => {
-        if (unsubscribeProduct) unsubscribeProduct();
-    });
-
-    function renderProduct(p) {
-        const content = document.getElementById('pageContent');
-        const price = parseFloat(p.price) || 0;
-        const image = p.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500';
-        const imageList = (Array.isArray(p.images) && p.images.length > 0) ? p.images : [image];
-        const stock = p.stock !== undefined ? p.stock : 10;
-        const outOfStock = stock <= 0;
-
-        content.innerHTML = `
-            <div class="product-layout">
-                <div class="gallery">
-                    <img class="main-img" id="mainProductImg" src="${imageList[0]}" alt="${p.name}" onerror="this.src='https://via.placeholder.com/400?text=No+Image'">
-                    ${imageList.length > 1 ? `
-                        <div class="thumb-strip">
-                            ${imageList.map((img, i) => `<img src="${img}" loading="lazy" class="${i === 0 ? 'active' : ''}" onclick="switchMainImage('${img.replace(/'/g, "\\'")}', this)" onerror="this.style.display='none'">`).join('')}
-                        </div>
-                    ` : ''}
-                </div>
-                <div class="info-panel">
-                    <h1 class="p-name">${p.name || 'Product'}</h1>
-                    <div class="p-shop"><i class="fas fa-store">🏪</i> Sold by <strong>${p.shopName || 'Local Seller'}</strong></div>
-                    <div class="p-price">₹${price.toFixed(0)} <small>${p.unit || ''}</small></div>
-
-                    <div class="p-badges">
-                        <span class="badge">✅ ${p.material || 'Original Quality'}</span>
-                        <span class="badge warranty">🛡️ ${p.warranty || 'Verified Quality'}</span>
-                        ${outOfStock ? '<span class="badge" style="background:#fdecea;color:#c0392b;">❌ Out of Stock</span>' : `<span class="badge" style="background:#eafaf1;color:#1a7f4b;">✔️ ${stock} in stock</span>`}
-                    </div>
-
-                    <div class="desc-block">${p.description || 'No additional description provided by the seller.'}</div>
-
-                    <table class="spec-table">
-                        <tr><td>Unit</td><td>${p.unit || 'Per Piece'}</td></tr>
-                        <tr><td>Material / Type</td><td>${p.material || 'N/A'}</td></tr>
-                        <tr><td>Warranty / Validity</td><td>${p.warranty || 'N/A'}</td></tr>
-                    </table>
-
-                    ${outOfStock ? `
-                        <div style="background:#fdecea; color:#c0392b; padding:12px; border-radius:8px; text-align:center; font-weight:600; margin-bottom:14px;">
-                            This product is currently out of stock.
-                        </div>
-                    ` : `
-                        <div class="qty-row">
-                            <label>Quantity:</label>
-                            <div class="qty-stepper">
-                                <button onclick="changeQty(-1)">−</button>
-                                <span id="qtyDisplay">1</span>
-                                <button onclick="changeQty(1)">+</button>
-                            </div>
-                        </div>
-
-                        <div class="action-row">
-                            <button class="btn-cart" onclick="addToCart()">🛒 Add to Cart</button>
-                            <button class="btn-buy" onclick="openBuyModal()">⚡ Buy Now</button>
-                        </div>
-                    `}
-                </div>
-            </div>
-            <div class="seller-card" id="sellerCard">
-                <img class="seller-logo" src="https://via.placeholder.com/60" id="sellerLogo" alt="Seller">
-                <div class="seller-info">
-                    <h4 id="sellerName">Loading seller info...<span class="verified-tick">✔️</span></h4>
-                    <p id="sellerAddress"></p>
-                    <p id="sellerPhone"></p>
-                </div>
-                <button id="askSellerBtn" onclick="askSeller()" style="background:#232f3e; color:white; border:none; padding:9px 16px; border-radius:6px; font-size:12.5px; font-weight:bold; cursor:pointer; white-space:nowrap;">💬 Ask Seller</button>
-            </div>
-        `;
-    }
-
-    async function loadSellerInfo(sellerUid) {
-        if (!sellerUid) {
-            document.getElementById('sellerName').innerText = 'Local Seller';
-            return;
-        }
-        try {
-            const snap = await getDoc(doc(db, "sellers_profiles", sellerUid));
             if (snap.exists()) {
-                const seller = snap.data();
-                document.getElementById('sellerLogo').src = seller.logo || 'https://via.placeholder.com/60';
-                document.getElementById('sellerName').innerHTML = `${seller.shopName || 'Local Seller'} <span class="verified-tick">✔️ Verified</span>`;
-                document.getElementById('sellerAddress').innerText = '📍 ' + (seller.address || 'Address not provided');
-                document.getElementById('sellerPhone').innerText = '📞 Contact after order confirmation';
+                const data = snap.data();
+                content.innerHTML = `
+                    <div class="product-layout">
+                        <div class="gallery">
+                            <img class="main-img" src="${data.image || 'https://via.placeholder.com/400'}" alt="Product">
+                        </div>
+                        <div class="info-panel">
+                            <h1 class="p-name">${data.name || 'Unnamed'}</h1>
+                            <div class="p-price">₹${data.price || 0}</div>
+                            <p style="color:green; font-weight:bold; margin-top:20px;">✅ Database Connection Successful! डेटा बिल्कुल सही लोड हो रहा है।</p>
+                        </div>
+                    </div>
+                `;
             } else {
-                document.getElementById('sellerName').innerText = 'Local Seller';
+                content.innerHTML = `<div class="error-state" style="color:red;">⚠️ Error: इस ID (${productId}) का प्रोडक्ट डेटाबेस (vendors) में मौजूद नहीं है!</div>`;
             }
-        } catch (e) {
-            console.error(e);
+        } catch (error) {
+            clearTimeout(safetyTimer);
+            console.error("Firebase Error:", error);
+            content.innerHTML = `<div class="error-state" style="color:red; font-weight:bold;">🚨 Firebase Crash Error: ${error.message}</div>`;
         }
     }
 
-    async function loadRelatedProducts(product) {
-        const card = document.getElementById('relatedCard');
-        const scrollEl = document.getElementById('relatedScroll');
-
-        try {
-            let related = [];
-            if (product.shopName) {
-                const q = query(collection(db, "vendors"), where("shopName", "==", product.shopName), limit(8));
-                const snap = await getDocs(q);
-                snap.forEach(d => { if (d.id !== product.id) related.push({ id: d.id, ...d.data() }); });
-            }
-
-            if (related.length < 4) {
-                const allSnap = await getDocs(query(collection(db, "vendors"), limit(20)));
-                allSnap.forEach(d => {
-                    if (d.id !== product.id && !related.find(r => r.id === d.id)) {
-                        related.push({ id: d.id, ...d.data() });
-                    }
-                });
-            }
-
-            related = related.slice(0, 8);
-            if (related.length === 0) return;
-
-            card.style.display = 'block';
-            scrollEl.innerHTML = related.map(p => `
-                <div class="related-item" onclick="window.location.href='product.html?id=${p.id}'">
-                    <img src="${p.image || 'https://via.placeholder.com/150'}" loading="lazy" onerror="this.src='https://via.placeholder.com/150?text=No+Image'">
-                    <div class="r-name">${p.name || 'Product'}</div>
-                    <div class="r-price">₹${(parseFloat(p.price) || 0).toFixed(0)}</div>
-                </div>
-            `).join('');
-        } catch (error) {
-            console.error('Error loading related products:', error);
-        }
-    }
-
-    window.switchMainImage = function(src, thumbEl) {
-        document.getElementById('mainProductImg').src = src;
-        document.querySelectorAll('.thumb-strip img').forEach(t => t.classList.remove('active'));
-        thumbEl.classList.add('active');
-    };
-
-    window.askSeller = async function() {
-        if (!currentBuyerUid) {
-            alert("Please login to message the seller.");
-            window.location.href = 'login.html';
-            return;
-        }
-        if (!currentProduct || !currentProduct.sellerUid) {
-            alert("Seller info not available right now.");
-            return;
-        }
-        if (currentProduct.sellerUid === currentBuyerUid) {
-            alert("This is your own product listing.");
-            return;
-        }
-        try {
-            const userSnap = await getDoc(doc(db, "users", currentBuyerUid));
-            const buyerName = userSnap.exists() ? userSnap.data().name : 'DesiMarket Buyer';
-            const chatId = await getOrCreateChat(db, currentBuyerUid, currentProduct.sellerUid, buyerName, currentProduct.shopName);
-            window.location.href = `chat.html?chatId=${chatId}`;
-        } catch (error) {
-            console.error(error);
-            alert("Unable to start chat right now.");
-        }
-    };
-
-    window.openReportModal = function() {
-        if (!currentBuyerUid) {
-            alert("Please login to report a listing.");
-            window.location.href = 'login.html';
-            return;
-        }
-        document.getElementById('reportModal').classList.add('active');
-    };
-
-    window.closeReportModal = function() {
-        document.getElementById('reportModal').classList.remove('active');
-    };
-
-    document.getElementById('reportSubmitBtn').addEventListener('click', () => {
-        const reason = document.getElementById('reportReason').value;
-        const details = document.getElementById('reportDetails').value;
-        if (!currentProduct) return;
-
-        submitReport(db, {
-            productId: currentProduct.id,
-            productName: currentProduct.name,
-            sellerUid: currentProduct.sellerUid,
-            shopName: currentProduct.shopName,
-            reporterUid: currentBuyerUid,
-            reason, details
-        }, () => {
-            closeReportModal();
-            document.getElementById('reportReason').value = '';
-            document.getElementById('reportDetails').value = '';
-        });
-    });
-
-    window.changeQty = function(delta) {
-        currentQty = Math.max(1, currentQty + delta);
-        document.getElementById('qtyDisplay').innerText = currentQty;
-    };
-
-    window.addToCart = function() {
-        if (!currentProduct) return;
-        let cart = JSON.parse(localStorage.getItem('cart')) || [];
-        const existing = cart.find(item => item.id === currentProduct.id);
-        if (existing) {
-            existing.qty = (parseInt(existing.qty) || 1) + currentQty;
-        } else {
-            cart.push({
-                id: currentProduct.id,
-                name: currentProduct.name,
-                price: parseFloat(currentProduct.price) || 0,
-                qty: currentQty,
-                image: currentProduct.image,
-                shopName: currentProduct.shopName || 'Local Shop',
-                sellerUid: currentProduct.sellerUid || null
-            });
-        }
-        localStorage.setItem('cart', JSON.stringify(cart));
-        updateCartBadge();
-        alert(`${currentQty} x ${currentProduct.name} added to cart! 🛍️`);
-    };
-
-    window.openBuyModal = function() {
-        if (!currentProduct) return;
-        const total = (parseFloat(currentProduct.price) || 0) * currentQty;
-        document.getElementById('orderSummary').innerHTML = `
-            <span>${currentQty} x ${currentProduct.name}</span>
-            <strong>₹${total.toFixed(0)}</strong>
-        `;
-
-        const user = JSON.parse(localStorage.getItem('currentUser'));
-        if (user) {
-            document.getElementById('buyName').value = (user.name || '') + (user.surname ? ' ' + user.surname : '');
-            document.getElementById('buyPhone').value = user.phone || '';
-            document.getElementById('buyAddress').value = '';
-            document.getElementById('buyCity').value = user.city || '';
-            document.getElementById('buyState').value = user.state || '';
-        }
-
-        document.getElementById('buyModal').classList.add('action active');
-        document.getElementById('buyModal').classList.add('active');
-    };
-
-    window.closeBuyModal = function() {
-        document.getElementById('buyModal').classList.remove('active');
-    };
-
-    document.getElementById('submitOrderBtn').addEventListener('click', async function() {
-        const name = document.getElementById('buyName').value.trim();
-        const phone = document.getElementById('buyPhone').value.trim();
-        const pincode = document.getElementById('buyPincode').value.trim();
-        const address = document.getElementById('buyAddress').value.trim();
-        const city = document.getElementById('buyCity').value.trim();
-        const state = document.getElementById('buyState').value.trim();
-        const payment = document.getElementById('buyPayment').value;
-
-        if (!name || !phone || !address || !city) {
-            alert('Please fill in all required delivery details.');
-            return;
-        }
-        if (!/^\d{10}$/.test(phone)) {
-            alert('Please enter a valid 10-digit mobile number.');
-            return;
-        }
-
-        const btn = document.getElementById('submitOrderBtn');
-        btn.disabled = true;
-        btn.innerText = 'Placing order...';
-
-        try {
-            const fullAddress = `${address}, ${city}, ${state} ${pincode ? '- ' + pincode : ''}`;
-            await addDoc(collection(db, "orders"), {
-                productId: currentProduct.id,
-                productName: currentProduct.name,
-                price: (parseFloat(currentProduct.price) || 0) * currentQty,
-                quantity: currentQty,
-                shopName: currentProduct.shopName || 'Local Shop',
-                sellerUid: currentProduct.sellerUid || null,
-                buyerUid: currentBuyerUid,
-                buyerName: name,
-                buyerPhone: phone,
-                buyerAddress: fullAddress,
-                paymentMethod: payment,
-                status: 'Pending',
-                createdAt: new Date()
-            });
-
-            try {
-                await updateDoc(doc(db, "vendors", currentProduct.id), { stock: increment(-currentQty) });
-            } catch (stockErr) {
-                console.error('Stock update failed:', stockErr);
-            }
-
-            let myOrders = JSON.parse(localStorage.getItem('myOrders')) || [];
-            myOrders.unshift({
-                id: 'ORD' + Math.floor(100000 + Math.random() * 900000),
-                name: currentProduct.name,
-                price: (parseFloat(currentProduct.price) || 0) * currentQty,
-                date: new Date().toLocaleDateString(),
-                status: 'Pending'
-            });
-            localStorage.setItem('myOrders', JSON.stringify(myOrders));
-
-            alert('Order placed successfully! 🎉 The seller has been notified.');
-            window.location.href = 'orders.html';
-        } catch (error) {
-            console.error(error);
-            alert('Error placing order: ' + error.message);
-            btn.disabled = false;
-            btn.innerText = 'Place Order';
-        }
-    });
-
-    window.onload = function() {
-        loadProduct();
-        updateCartBadge();
-        if (productId) loadProductReviews(db, productId);
-    };
+    testLoad();
 </script>
 </body>
 </html>
