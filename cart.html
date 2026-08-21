@@ -79,7 +79,7 @@
                 const div = document.createElement('div');
                 div.className = 'cart-item';
                 div.innerHTML = `
-                    <img src="${item.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100'}" alt="Item" onerror="this.src='https://via.placeholder.com/100?text=No+Image'" onclick="goToProduct('${item.id}')">
+                    <img src="${item.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100'}" alt="Item" loading="lazy" onerror="this.src='https://via.placeholder.com/100?text=No+Image'" onclick="goToProduct('${item.id}')">
                     <div class="item-details">
                         <h4 onclick="goToProduct('${item.id}')">${item.name || 'Product'}</h4>
                         <div class="item-price-row">₹${itemPrice.toFixed(0)} each</div>
