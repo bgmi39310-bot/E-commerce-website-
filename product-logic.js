@@ -1,4 +1,8 @@
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+// Keeps track of the active listener so we never stack up duplicate onSnapshot
+// subscriptions (which would waste Firestore reads) if this gets called more than once.
+let unsubscribeMyProducts = null;
 
 export async function addProductToFirebase(db, currentLoggedInUser, fetchProductsCallback) {
     if (!currentLoggedInUser) return;
@@ -55,14 +59,26 @@ export async function addProductToFirebase(db, currentLoggedInUser, fetchProduct
     }
 }
 
-export async function fetchMyListedProducts(db, uid) {
+export function stopListeningToMyProducts() {
+    if (unsubscribeMyProducts) {
+        unsubscribeMyProducts();
+        unsubscribeMyProducts = null;
+    }
+}
+
+export function fetchMyListedProducts(db, uid) {
     const container = document.getElementById('myProductsContainer');
     container.innerHTML = "<p>Loading your products...</p>";
 
-    try {
-        const q = query(collection(db, "vendors"), where("sellerUid", "==", uid));
-        const querySnapshot = await getDocs(q);
+    // Stop any previous listener before starting a new one
+    if (unsubscribeMyProducts) {
+        unsubscribeMyProducts();
+        unsubscribeMyProducts = null;
+    }
 
+    const q = query(collection(db, "vendors"), where("sellerUid", "==", uid));
+
+    unsubscribeMyProducts = onSnapshot(q, (querySnapshot) => {
         if (querySnapshot.empty) {
             container.innerHTML = "<div class='no-data'>No products listed by you yet.</div>";
             return;
@@ -90,10 +106,10 @@ export async function fetchMyListedProducts(db, uid) {
             `;
         });
         container.innerHTML = html;
-    } catch (error) {
+    }, (error) => {
         console.error("Error loading products: ", error);
         container.innerHTML = "<p style='color:red;'>Error loading your products.</p>";
-    }
+    });
 }
 
 export function editProduct(db, productId, currentPrice, currentStock, uid, fetchProductsCallback) {
