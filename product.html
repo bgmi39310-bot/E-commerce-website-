@@ -226,9 +226,6 @@
         else { badge.style.display = 'none'; }
     }
 
-    // Live-listens to this one product so stock/price updates reflect instantly
-    // without needing a refresh. Only ONE listener is ever open per page view,
-    // and it's closed automatically when the person navigates away (see pagehide below).
     function loadProduct() {
         const content = document.getElementById('pageContent');
         if (!productId) {
@@ -245,12 +242,10 @@
             currentProduct = { id: snap.id, ...snap.data() };
             renderProduct(currentProduct);
 
-            // Keep the quantity stepper from silently resetting on every live update
             currentQty = previousQty;
             const qtyDisplay = document.getElementById('qtyDisplay');
             if (qtyDisplay) qtyDisplay.innerText = currentQty;
 
-            // Reviews/related-products/seller-info only need to load once, not on every stock change
             if (isFirstProductLoad) {
                 isFirstProductLoad = false;
                 loadSellerInfo(currentProduct.sellerUid);
@@ -258,12 +253,10 @@
             }
         }, (error) => {
             console.error(error);
-            content.innerHTML = `<div class="error-state">Unable to load product. Please try again.</div>`;
+            content.innerHTML = `<div class="error-state" style="color:red; font-weight:bold;">Error: ${error.message}</div>`;
         });
     }
 
-    // Stop listening the moment the person leaves this page, so we don't keep
-    // burning Firestore reads on a page nobody is looking at anymore.
     window.addEventListener('pagehide', () => {
         if (unsubscribeProduct) unsubscribeProduct();
     });
@@ -365,15 +358,12 @@
 
         try {
             let related = [];
-
-            // First try: other products from the same shop
             if (product.shopName) {
                 const q = query(collection(db, "vendors"), where("shopName", "==", product.shopName), limit(8));
                 const snap = await getDocs(q);
                 snap.forEach(d => { if (d.id !== product.id) related.push({ id: d.id, ...d.data() }); });
             }
 
-            // Fallback: fill up with any other products if not enough from same shop
             if (related.length < 4) {
                 const allSnap = await getDocs(query(collection(db, "vendors"), limit(20)));
                 allSnap.forEach(d => {
@@ -384,7 +374,6 @@
             }
 
             related = related.slice(0, 8);
-
             if (related.length === 0) return;
 
             card.style.display = 'block';
@@ -471,8 +460,6 @@
     window.addToCart = function() {
         if (!currentProduct) return;
         let cart = JSON.parse(localStorage.getItem('cart')) || [];
-
-        // If product already in cart, just bump quantity instead of duplicating
         const existing = cart.find(item => item.id === currentProduct.id);
         if (existing) {
             existing.qty = (parseInt(existing.qty) || 1) + currentQty;
@@ -500,7 +487,6 @@
             <strong>₹${total.toFixed(0)}</strong>
         `;
 
-        // Pre-fill from saved profile if available
         const user = JSON.parse(localStorage.getItem('currentUser'));
         if (user) {
             document.getElementById('buyName').value = (user.name || '') + (user.surname ? ' ' + user.surname : '');
@@ -510,6 +496,7 @@
             document.getElementById('buyState').value = user.state || '';
         }
 
+        document.getElementById('buyModal').classList.add('action active');
         document.getElementById('buyModal').classList.add('active');
     };
 
@@ -557,7 +544,6 @@
                 createdAt: new Date()
             });
 
-            // Reduce stock live so it's accurate for everyone browsing right now
             try {
                 await updateDoc(doc(db, "vendors", currentProduct.id), { stock: increment(-currentQty) });
             } catch (stockErr) {
