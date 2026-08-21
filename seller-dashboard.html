@@ -195,6 +195,18 @@
             </div>
         </div>
 
+        <!-- 2b. Bulk Upload via CSV -->
+        <div class="card">
+            <h2>2b. 📑 Bulk Upload Products (CSV)</h2>
+            <p style="font-size:13px; color:#666; margin-top:0;">
+                Upload many products at once using a CSV file. Columns required (in this exact order):<br>
+                <code style="background:#f0f2f2; padding:2px 6px; border-radius:4px;">name,price,unit,stock,material,warranty,image,description</code>
+            </p>
+            <input type="file" id="csvFileInput" accept=".csv" style="margin-bottom:10px;">
+            <button onclick="bulkUploadMain()" class="action-btn">⬆️ Upload CSV</button>
+            <div id="bulkUploadStatus" style="margin-top:10px; font-size:13px;"></div>
+        </div>
+
         <!-- 3. Customer Orders Management Section -->
         <div class="card">
             <h2>3. Customer Orders Management</h2>
@@ -217,6 +229,7 @@
         <!-- 5. Shop Analytics -->
         <div class="card">
             <h2>5. 📊 Shop Analytics</h2>
+            <button onclick="downloadReportMain()" class="action-btn" style="width:auto; padding:8px 16px; margin-bottom:14px; font-size:13px;">⬇️ Download Sales Report (CSV)</button>
             <div id="analyticsContainer"><p>Loading analytics...</p></div>
         </div>
 
@@ -234,6 +247,12 @@
             </div>
             <div id="couponsContainer"><p>Loading coupons...</p></div>
         </div>
+
+        <!-- 7. Return / Refund Requests -->
+        <div class="card">
+            <h2>7. ↩️ Return / Refund Requests</h2>
+            <div id="returnsContainer"><p>Loading return requests...</p></div>
+        </div>
     </div>
 
     <script type="module">
@@ -242,10 +261,12 @@
         import { loadSellerProfileFromFirestore, saveSellerProfile } from './profile-logic.js';
         import { addProductToFirebase, fetchMyListedProducts, editProduct, deleteProduct } from './product-logic.js';
         import { fetchDashboardOrders, filterOrders, updateOrderStatus, markAsShipped, confirmDelivery } from './order-logic.js';
-        import { loadAnalytics } from './analytics-logic.js';
+        import { loadAnalytics, downloadSalesReport } from './analytics-logic.js';
+        import { bulkUploadProducts } from './bulk-upload-logic.js';
         import { listenForNewOrders, clearUnreadNotifications } from './notification-logic.js';
         import { wireImageUpload } from './image-upload.js';
         import { addCoupon, loadMyCoupons, toggleCouponActive, deleteCoupon } from './coupon-logic.js';
+        import { loadReturnRequests, updateReturnStatus } from './return-logic.js';
 
         wireImageUpload('shopLogoFileUpload', 'shopLogoFile', 'shopLogoStatus');
         wireImageUpload('pImageFileUpload', 'pImageFile', 'pImageStatus');
@@ -286,6 +307,7 @@
                 fetchMyListedProducts(db, user.uid);
                 loadAnalytics(db, user.uid);
                 loadMyCoupons(db, user.uid);
+                loadReturnRequests(db, user.uid);
 
                 // Real-time new-order notifications (bell badge + browser notification + chime)
                 listenForNewOrders(db, user.uid, (newOrders) => {
@@ -384,6 +406,29 @@
         window.deleteCouponMain = function(couponId) {
             if (!currentLoggedInUser) return;
             deleteCoupon(db, couponId, () => loadMyCoupons(db, currentLoggedInUser.uid));
+        }
+
+        window.approveReturnMain = function(orderId) {
+            if (!currentLoggedInUser) return;
+            if (!confirm('Approve this return? The order will be marked as Returned.')) return;
+            updateReturnStatus(db, orderId, 'Approved', () => loadReturnRequests(db, currentLoggedInUser.uid));
+        }
+
+        window.rejectReturnMain = function(orderId) {
+            if (!currentLoggedInUser) return;
+            updateReturnStatus(db, orderId, 'Rejected', () => loadReturnRequests(db, currentLoggedInUser.uid));
+        }
+
+        window.downloadReportMain = function() {
+            if (!currentLoggedInUser) return;
+            downloadSalesReport(db, currentLoggedInUser.uid);
+        }
+
+        window.bulkUploadMain = function() {
+            if (!currentLoggedInUser) return;
+            const file = document.getElementById('csvFileInput').files[0];
+            const shopName = document.getElementById('shopName').value.trim() || document.getElementById('dispShopName').innerText.trim();
+            bulkUploadProducts(db, currentLoggedInUser, shopName, file, (uid) => fetchMyListedProducts(db, uid));
         }
     </script>
 </body>
