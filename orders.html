@@ -92,7 +92,6 @@
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { submitReview } from './review-logic.js';
         import { submitReturnRequest } from './return-logic.js';
-        import { submitReturnRequest } from './return-logic.js';
 
         let currentBuyerUid = null;
         let currentBuyerName = 'DesiMarket Buyer';
@@ -245,18 +244,6 @@
                 buyerName: currentBuyerName,
                 rating, comment
             }, () => fetchMyOrders(currentBuyerUid));
-        };
-
-        window.toggleReturnForm = function(orderId) {
-            const form = document.getElementById('returnForm-' + orderId);
-            form.style.display = form.style.display === 'none' ? 'block' : 'none';
-        };
-
-        window.submitMyReturn = function(orderId) {
-            const reason = document.getElementById('returnReason-' + orderId).value;
-            submitReturnRequest(db, orderId, reason, () => {
-                if (currentBuyerUid) fetchMyOrders(currentBuyerUid);
-            });
         };
 
         window.toggleReturnForm = function(orderId) {
