@@ -70,6 +70,12 @@
     .qty-stepper button { background: #f0f2f2; border: none; width: 34px; height: 34px; font-size: 16px; cursor: pointer; }
     .qty-stepper span { width: 40px; text-align: center; font-weight: bold; }
 
+    .variant-group { margin-bottom: 14px; }
+    .variant-group label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px; }
+    .variant-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .variant-chip { padding: 7px 16px; border: 1.5px solid #ccc; border-radius: 20px; font-size: 13px; cursor: pointer; background: white; }
+    .variant-chip.selected { border-color: #fa8900; background: #fff3e0; color: #c7511f; font-weight: bold; }
+
     .action-row { display: flex; gap: 10px; }
     .btn-cart, .btn-buy { flex: 1; padding: 13px; border-radius: 6px; font-weight: bold; font-size: 14.5px; cursor: pointer; border: none; }
     .btn-cart { background: #ffd814; border: 1px solid #fcd200; }
@@ -203,19 +209,29 @@
 <script type="module">
     import { db, auth } from './firebase-config.js';
     import { doc, getDoc, addDoc, collection, getDocs, query, where, limit, updateDoc, increment, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { loadProductReviews } from './review-logic.js';
     import { submitReport } from './report-logic.js';
     import { getOrCreateChat } from './chat-logic.js';
     import { decrementStock } from './stock-logic.js';
 
     let currentBuyerUid = null;
+
+    // Guest checkout: if the visitor isn't logged in, silently create an
+    // anonymous session (no email/password needed) so they can still buy.
+    async function ensureAuthenticated() {
+        if (currentBuyerUid) return currentBuyerUid;
+        const cred = await signInAnonymously(auth);
+        currentBuyerUid = cred.user.uid;
+        return currentBuyerUid;
+    }
     onAuthStateChanged(auth, (user) => { currentBuyerUid = user ? user.uid : null; });
 
     const params = new URLSearchParams(window.location.search);
     const productId = params.get('id');
     let currentProduct = null;
     let currentQty = 1;
+    let selectedVariants = { size: null, color: null };
     let unsubscribeProduct = null;
     let isFirstProductLoad = true;
 
@@ -311,6 +327,22 @@
                             This product is currently out of stock.
                         </div>
                     ` : `
+                        ${(p.sizes && p.sizes.length > 0) ? `
+                            <div class="variant-group">
+                                <label>Size:</label>
+                                <div class="variant-chips" id="sizeChips">
+                                    ${p.sizes.map(s => `<div class="variant-chip" data-value="${s}" onclick="selectVariant('size', '${s}', this)">${s}</div>`).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${(p.colors && p.colors.length > 0) ? `
+                            <div class="variant-group">
+                                <label>Color:</label>
+                                <div class="variant-chips" id="colorChips">
+                                    ${p.colors.map(c => `<div class="variant-chip" data-value="${c}" onclick="selectVariant('color', '${c}', this)">${c}</div>`).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
                         <div class="qty-row">
                             <label>Quantity:</label>
                             <div class="qty-stepper">
@@ -464,17 +496,39 @@
         });
     });
 
+    window.selectVariant = function(type, value, chipEl) {
+        selectedVariants[type] = value;
+        const containerId = type === 'size' ? 'sizeChips' : 'colorChips';
+        document.querySelectorAll(`#${containerId} .variant-chip`).forEach(c => c.classList.remove('selected'));
+        chipEl.classList.add('selected');
+    };
+
+    function variantsSelected() {
+        const sizeChips = document.getElementById('sizeChips');
+        const colorChips = document.getElementById('colorChips');
+        if (sizeChips && !selectedVariants.size) { alert('Please select a size.'); return false; }
+        if (colorChips && !selectedVariants.color) { alert('Please select a color.'); return false; }
+        return true;
+    }
+
     window.changeQty = function(delta) {
         currentQty = Math.max(1, currentQty + delta);
         document.getElementById('qtyDisplay').innerText = currentQty;
     };
 
-    window.addToCart = function() {
+    window.addToCart = async function() {
         if (!currentProduct) return;
+        if (!variantsSelected()) return;
+        await ensureAuthenticated();
         let cart = JSON.parse(localStorage.getItem('cart')) || [];
 
-        // If product already in cart, just bump quantity instead of duplicating
-        const existing = cart.find(item => item.id === currentProduct.id);
+        // If the SAME product with the SAME variant is already in cart, bump quantity;
+        // otherwise (different size/color) add it as a new, separate line item.
+        const existing = cart.find(item =>
+            item.id === currentProduct.id &&
+            item.selectedSize === selectedVariants.size &&
+            item.selectedColor === selectedVariants.color
+        );
         if (existing) {
             existing.qty = (parseInt(existing.qty) || 1) + currentQty;
         } else {
@@ -485,7 +539,9 @@
                 qty: currentQty,
                 image: currentProduct.image,
                 shopName: currentProduct.shopName || 'Local Shop',
-                sellerUid: currentProduct.sellerUid || null
+                sellerUid: currentProduct.sellerUid || null,
+                selectedSize: selectedVariants.size || null,
+                selectedColor: selectedVariants.color || null
             });
         }
         localStorage.setItem('cart', JSON.stringify(cart));
@@ -493,8 +549,10 @@
         alert(`${currentQty} x ${currentProduct.name} added to cart! 🛍️`);
     };
 
-    window.openBuyModal = function() {
+    window.openBuyModal = async function() {
         if (!currentProduct) return;
+        if (!variantsSelected()) return;
+        await ensureAuthenticated();
         const total = (parseFloat(currentProduct.price) || 0) * currentQty;
         document.getElementById('orderSummary').innerHTML = `
             <span>${currentQty} x ${currentProduct.name}</span>
@@ -549,6 +607,8 @@
             await addDoc(collection(db, "orders"), {
                 productId: currentProduct.id,
                 productName: currentProduct.name,
+                selectedSize: selectedVariants.size || null,
+                selectedColor: selectedVariants.color || null,
                 price: (parseFloat(currentProduct.price) || 0) * currentQty,
                 quantity: currentQty,
                 shopName: currentProduct.shopName || 'Local Shop',
