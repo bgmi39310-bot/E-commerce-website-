@@ -143,6 +143,7 @@
                         <div class="order-top">
                             <div>
                                 <h4>📦 ${order.productName || 'Item'} (Qty: ${order.quantity || 1})</h4>
+                                ${(order.selectedSize || order.selectedColor) ? `<p style="color:#6f42c1; font-weight:600; font-size:13px;">${order.selectedSize ? 'Size: ' + order.selectedSize + ' ' : ''}${order.selectedColor ? 'Color: ' + order.selectedColor : ''}</p>` : ''}
                                 <div class="order-shop">🏪 ${order.shopName || 'Local Shop'}</div>
                             </div>
                             <span class="status-pill status-${status}">${status}</span>
@@ -304,4 +305,3 @@
     </script>
 </body>
 </html>
-
