@@ -46,6 +46,7 @@ function displayDashboardOrders() {
             <div class="order-card">
                 <div class="order-info">
                     <h4>📦 ${order.productName || 'Item'} (Qty: ${order.quantity || 1})</h4>
+                    ${(order.selectedSize || order.selectedColor) ? `<p style="color:#6f42c1; font-weight:600;">${order.selectedSize ? 'Size: ' + order.selectedSize + ' ' : ''}${order.selectedColor ? 'Color: ' + order.selectedColor : ''}</p>` : ''}
                     <p><strong>Buyer:</strong> ${order.buyerName || 'Customer'}</p>
                     <p><strong>Phone:</strong> ${order.buyerPhone || 'N/A'}</p>
                     <p><strong>Address:</strong> ${order.buyerAddress || 'N/A'}</p>
