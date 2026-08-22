@@ -83,6 +83,7 @@
                     <div class="item-details">
                         <h4 onclick="goToProduct('${item.id}')">${item.name || 'Product'}</h4>
                         <div class="item-price-row">₹${itemPrice.toFixed(0)} each</div>
+                        ${(item.selectedSize || item.selectedColor) ? `<small style="color:#666;">${item.selectedSize ? 'Size: ' + item.selectedSize + ' ' : ''}${item.selectedColor ? 'Color: ' + item.selectedColor : ''}</small><br>` : ''}
                         <div class="qty-stepper">
                             <button onclick="changeQty(${index}, -1)">−</button>
                             <span>${itemQty}</span>
@@ -129,4 +130,3 @@
     </script>
 </body>
 </html>
-
