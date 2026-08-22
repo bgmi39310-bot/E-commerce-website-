@@ -354,6 +354,8 @@
                     await addDoc(collection(db, "orders"), {
                         productId: item.id || null,
                         productName: item.name,
+                        selectedSize: item.selectedSize || null,
+                        selectedColor: item.selectedColor || null,
                         price: lineTotal,
                         quantity: qty,
                         shopName: item.shopName || 'Local Shop',
