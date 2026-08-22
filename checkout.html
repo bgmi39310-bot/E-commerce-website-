@@ -20,6 +20,12 @@
         label { display: block; font-weight: bold; margin-bottom: 5px; color: #444; font-size: 13px; }
         input, textarea, select { width: 100%; padding: 11px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; font-size: 14.5px; }
         .form-row { display: flex; gap: 12px; }
+
+        .saved-addr-card { border: 1.5px solid #ddd; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; cursor: pointer; font-size: 13px; }
+        .saved-addr-card.selected { border-color: #fa8900; background: #fff8ee; }
+        .saved-addr-card strong { font-size: 13.5px; }
+        .saved-addr-card .default-tag { background: #d4edda; color: #1a7f4b; font-size: 10px; padding: 1px 7px; border-radius: 8px; margin-left: 6px; }
+        .new-addr-link { font-size: 12.5px; color: #007185; cursor: pointer; text-decoration: underline; display: inline-block; margin-top: 4px; }
         .form-row .form-group { flex: 1; }
 
         .payment-options { display: flex; gap: 10px; }
@@ -68,6 +74,7 @@
 
         <div class="card">
             <h2>🚚 Delivery Details</h2>
+            <div id="savedAddressList" style="margin-bottom:14px;"></div>
             <div class="form-group">
                 <label>Full Name</label>
                 <input type="text" id="cName" placeholder="Enter your name">
@@ -119,9 +126,51 @@
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { validateCoupon } from './coupon-logic.js';
         import { decrementStockForCart } from './stock-logic.js';
+        import { loadAddresses } from './address-logic.js';
 
         let currentBuyerUid = null;
-        onAuthStateChanged(auth, (user) => { currentBuyerUid = user ? user.uid : null; });
+        onAuthStateChanged(auth, (user) => {
+            currentBuyerUid = user ? user.uid : null;
+            if (currentBuyerUid) loadSavedAddresses();
+        });
+
+        async function loadSavedAddresses() {
+            const listEl = document.getElementById('savedAddressList');
+            const addresses = await loadAddresses(db, currentBuyerUid);
+
+            if (addresses.length === 0) {
+                listEl.innerHTML = '';
+                return;
+            }
+
+            listEl.innerHTML = addresses.map((a, i) => `
+                <div class="saved-addr-card ${i === 0 ? 'selected' : ''}" onclick='selectSavedAddress(${JSON.stringify(a)}, this)'>
+                    <strong>${a.label || 'Address'}</strong> ${a.isDefault ? '<span class="default-tag">DEFAULT</span>' : ''}<br>
+                    ${a.name}, ${a.phone}<br>
+                    ${a.addressLine}, ${a.city}, ${a.state} ${a.pincode ? '- ' + a.pincode : ''}
+                </div>
+            `).join('') + `<div class="new-addr-link" onclick="clearAddressSelection()">+ Enter a different address</div>`;
+
+            // Auto-fill using the default (or first) saved address
+            selectSavedAddress(addresses[0], listEl.querySelector('.saved-addr-card'));
+        }
+
+        window.selectSavedAddress = function(addr, cardEl) {
+            document.querySelectorAll('.saved-addr-card').forEach(c => c.classList.remove('selected'));
+            if (cardEl) cardEl.classList.add('selected');
+
+            document.getElementById('cName').value = addr.name || '';
+            document.getElementById('cPhone').value = addr.phone || '';
+            document.getElementById('cPincode').value = addr.pincode || '';
+            document.getElementById('cAddress').value = addr.addressLine || '';
+            document.getElementById('cCity').value = addr.city || '';
+            document.getElementById('cState').value = addr.state || '';
+        };
+
+        window.clearAddressSelection = function() {
+            document.querySelectorAll('.saved-addr-card').forEach(c => c.classList.remove('selected'));
+            ['cName', 'cPhone', 'cPincode', 'cAddress', 'cCity', 'cState'].forEach(id => document.getElementById(id).value = '');
+        };
 
         let selectedPayment = 'COD';
         window.selectPayment = async function(method) {
