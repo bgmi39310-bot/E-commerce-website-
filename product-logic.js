@@ -14,6 +14,8 @@ export async function addProductToFirebase(db, currentLoggedInUser, fetchProduct
     const imageUrl3 = document.getElementById('pImageFile3').value.trim();
     const imageUrl4 = document.getElementById('pImageFile4').value.trim();
     const stockVal = document.getElementById('pStock').value.trim();
+    const sizesVal = document.getElementById('pSizes').value.trim();
+    const colorsVal = document.getElementById('pColors').value.trim();
 
     if (!name || !priceVal) { alert("Please enter Product Name and Price!"); return; }
 
@@ -37,6 +39,8 @@ export async function addProductToFirebase(db, currentLoggedInUser, fetchProduct
             shopName: shopNameVal,
             sellerUid: currentLoggedInUser.uid,
             stock: stockVal === '' ? 10 : Number(stockVal),
+            sizes: sizesVal ? sizesVal.split(',').map(s => s.trim()).filter(s => s) : [],
+            colors: colorsVal ? colorsVal.split(',').map(c => c.trim()).filter(c => c) : [],
             createdAt: new Date()
         });
 
@@ -51,6 +55,8 @@ export async function addProductToFirebase(db, currentLoggedInUser, fetchProduct
         document.getElementById('pImageFile4').value = '';
         document.getElementById('pDesc').value = '';
         document.getElementById('pStock').value = '';
+        document.getElementById('pSizes').value = '';
+        document.getElementById('pColors').value = '';
 
         fetchProductsCallback(currentLoggedInUser.uid);
     } catch (error) {
