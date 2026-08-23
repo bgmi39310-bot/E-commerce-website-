@@ -174,6 +174,7 @@
             <button class="sidebar-nav-item" id="nav-orders" onclick="switchTab('orders')"><span class="icon">🧾</span> Orders</button>
             <button class="sidebar-nav-item" id="nav-reports" onclick="switchTab('reports')"><span class="icon">⚠️</span> Reports</button>
             <button class="sidebar-nav-item" id="nav-kyc" onclick="switchTab('kyc')"><span class="icon">🪪</span> Seller KYC</button>
+            <button class="sidebar-nav-item" id="nav-banners" onclick="switchTab('banners')"><span class="icon">🖼️</span> Banners</button>
         </div>
         <div class="sidebar-logout">
             <button id="logoutBtn">Logout</button>
@@ -265,8 +266,22 @@
                 <div id="kycReviewContainer"><p>Loading KYC submissions...</p></div>
             </div>
 
+            <!-- BANNERS -->
+            <div class="admin-section" id="section-banners">
+                <div class="panel" style="margin-bottom:16px;">
+                    <h3 style="margin-top:0;">Create New Banner</h3>
+                    <input type="url" id="bannerImageUrl" placeholder="Banner image URL" style="width:100%; padding:9px; margin-bottom:8px; border-radius:6px; border:1px solid #30363d; background:#0d1117; color:white;">
+                    <input type="text" id="bannerTitle" placeholder="Title" style="width:100%; padding:9px; margin-bottom:8px; border-radius:6px; border:1px solid #30363d; background:#0d1117; color:white;">
+                    <input type="text" id="bannerSubtitle" placeholder="Subtitle (optional)" style="width:100%; padding:9px; margin-bottom:8px; border-radius:6px; border:1px solid #30363d; background:#0d1117; color:white;">
+                    <input type="url" id="bannerLinkUrl" placeholder="Link URL when tapped (optional, e.g. product.html?id=...)" style="width:100%; padding:9px; margin-bottom:10px; border-radius:6px; border:1px solid #30363d; background:#0d1117; color:white;">
+                    <button onclick="createBannerMain()" style="background:#ff9900; color:#111; border:none; padding:10px 20px; border-radius:6px; font-weight:bold; cursor:pointer;">Create Banner</button>
+                </div>
+                <div id="bannersContainer"><p>Loading banners...</p></div>
+            </div>
+
         </div>
     </div>
+
 </div>
 
 <script type="module">
@@ -278,6 +293,7 @@
         loadAllProducts, deleteProductAdmin, loadAllOrders, loadReports, resolveReport,
         loadPendingKyc, updateKycStatus
     } from './admin-logic.js';
+    import { loadAllBanners, createBanner, toggleBannerActive, deleteBanner } from './banner-logic.js';
 
     document.getElementById('topbarDate').innerText = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -438,7 +454,7 @@
         document.getElementById('menuOverlay').style.display = document.getElementById('sidebar').classList.contains('open') ? 'block' : 'none';
     };
 
-    const PAGE_TITLES = { dashboard: 'Dashboard', sellers: 'Sellers', buyers: 'Buyers', products: 'Products', orders: 'Orders', reports: 'Reports', kyc: 'Seller KYC' };
+    const PAGE_TITLES = { dashboard: 'Dashboard', sellers: 'Sellers', buyers: 'Buyers', products: 'Products', orders: 'Orders', reports: 'Reports', kyc: 'Seller KYC', banners: 'Banners' };
 
     window.switchTab = function(tabName) {
         document.querySelectorAll('.sidebar-nav-item').forEach(b => b.classList.remove('active'));
@@ -457,6 +473,30 @@
         if (tabName === 'orders') loadAllOrders(db, document.getElementById('orderStatusFilter').value);
         if (tabName === 'reports') loadReports(db);
         if (tabName === 'kyc') loadPendingKyc(db);
+        if (tabName === 'banners') loadAllBanners(db);
+    };
+
+    window.createBannerMain = function() {
+        const imageUrl = document.getElementById('bannerImageUrl').value.trim();
+        const title = document.getElementById('bannerTitle').value.trim();
+        const subtitle = document.getElementById('bannerSubtitle').value.trim();
+        const linkUrl = document.getElementById('bannerLinkUrl').value.trim();
+
+        createBanner(db, { imageUrl, title, subtitle, linkUrl }, () => {
+            document.getElementById('bannerImageUrl').value = '';
+            document.getElementById('bannerTitle').value = '';
+            document.getElementById('bannerSubtitle').value = '';
+            document.getElementById('bannerLinkUrl').value = '';
+            loadAllBanners(db);
+        });
+    };
+
+    window.toggleBannerMain = function(bannerId, active) {
+        toggleBannerActive(db, bannerId, active, () => loadAllBanners(db));
+    };
+
+    window.deleteBannerMain = function(bannerId) {
+        deleteBanner(db, bannerId, () => loadAllBanners(db));
     };
 
     window.approveKycMain = function(sellerUid) {
