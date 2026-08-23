@@ -73,6 +73,16 @@
         <div id="userProfileSection" style="display: none;">
             <h2>My Account</h2>
 
+            <div id="guestBanner" style="display:none; background:#fff3e0; border:1.5px dashed #fa8900; border-radius:8px; padding:14px; margin-bottom:18px; text-align:left;">
+                <p style="margin:0 0 10px; font-size:13px; color:#c7511f; font-weight:600;">
+                    🕶️ You're browsing as a Guest. Create an account to keep your orders and cart safe permanently!
+                </p>
+                <input type="email" id="guestEmail" placeholder="Email" style="width:100%; padding:9px; margin-bottom:8px; border:1px solid #ddd; border-radius:5px; box-sizing:border-box;">
+                <input type="password" id="guestPassword" placeholder="Create a password" style="width:100%; padding:9px; margin-bottom:8px; border:1px solid #ddd; border-radius:5px; box-sizing:border-box;">
+                <button id="upgradeGuestBtn" style="width:100%; background:#ffd814; border:1px solid #fcd200; padding:10px; border-radius:5px; font-weight:bold; cursor:pointer;">Create Account & Keep My Data</button>
+                <div id="guestUpgradeMsg" style="font-size:12px; margin-top:6px; display:none;"></div>
+            </div>
+
             <div class="profile-header">
                 <img id="accPhoto" class="profile-img" src="" alt="Profile Photo">
                 <div class="profile-name" id="accFullName">User Name</div>
@@ -127,8 +137,8 @@
 
     <script type="module">
         import { auth, db } from './firebase-config.js';
-        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { onAuthStateChanged, signOut, EmailAuthProvider, linkWithCredential } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         function toggleMenu() {
             const menu = document.getElementById('sideMenu');
@@ -152,6 +162,7 @@
 
             document.getElementById('userProfileSection').style.display = 'block';
             document.getElementById('guestSection').style.display = 'none';
+            document.getElementById('guestBanner').style.display = user.isAnonymous ? 'block' : 'none';
 
             try {
                 const snap = await getDoc(doc(db, "users", user.uid));
@@ -169,7 +180,52 @@
                 console.error('Error loading profile:', error);
             }
         });
+
+        document.getElementById('upgradeGuestBtn').addEventListener('click', async () => {
+            const email = document.getElementById('guestEmail').value.trim();
+            const password = document.getElementById('guestPassword').value;
+            const msgEl = document.getElementById('guestUpgradeMsg');
+            msgEl.style.display = 'none';
+
+            if (!email || !password) {
+                msgEl.innerText = 'Please enter both email and password.';
+                msgEl.style.color = '#dc3545';
+                msgEl.style.display = 'block';
+                return;
+            }
+            if (password.length < 6) {
+                msgEl.innerText = 'Password should be at least 6 characters.';
+                msgEl.style.color = '#dc3545';
+                msgEl.style.display = 'block';
+                return;
+            }
+
+            try {
+                // linkWithCredential keeps the SAME uid, so all existing guest
+                // orders/cart/wishlist stay linked to this account permanently.
+                const credential = EmailAuthProvider.credential(email, password);
+                const result = await linkWithCredential(auth.currentUser, credential);
+
+                await setDoc(doc(db, "users", result.user.uid), {
+                    uid: result.user.uid,
+                    email: email,
+                    role: 'customer',
+                    createdAt: new Date()
+                }, { merge: true });
+
+                msgEl.innerText = '✅ Account created! Your orders and data are now safely saved.';
+                msgEl.style.color = '#28a745';
+                msgEl.style.display = 'block';
+                document.getElementById('guestBanner').style.display = 'none';
+            } catch (error) {
+                console.error(error);
+                msgEl.innerText = error.code === 'auth/email-already-in-use'
+                    ? 'This email is already registered. Please login instead from a different device.'
+                    : 'Error: ' + error.message;
+                msgEl.style.color = '#dc3545';
+                msgEl.style.display = 'block';
+            }
+        });
     </script>
 </body>
 </html>
-
