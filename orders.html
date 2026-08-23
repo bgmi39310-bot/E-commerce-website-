@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Orders - DesiMarket</title>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-XXXXXXXXXX');
+    </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         * { box-sizing: border-box; }
@@ -93,7 +100,7 @@
 
     <script type="module">
         import { db, auth } from './firebase-config.js';
-        import { collection, getDocs, query, where, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { collection, getDocs, query, where, doc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { submitReview } from './review-logic.js';
         import { submitReturnRequest } from './return-logic.js';
@@ -158,6 +165,7 @@
                         ` : ''}
                         <div class="order-price">₹${order.price || 0}</div>
                         <button class="invoice-btn" onclick="downloadInvoice('${order.id}')">🧾 Download Invoice</button>
+                        ${status === 'Delivered' && order.productId ? `<button class="invoice-btn" onclick="buyAgain('${order.productId}')">🔁 Buy Again</button>` : ''}
                         ${status === 'Pending' ? `<button class="cancel-order-btn" onclick="cancelMyOrder('${order.id}')">Cancel Order</button>` : ''}
                         ${status === 'Delivered' && !order.reviewed ? `
                             <button class="review-btn" onclick="toggleReviewForm('${order.id}')">⭐ Write a Review</button>
@@ -275,6 +283,39 @@
             const order = ordersById[orderId];
             if (!order) { alert('Order details not found.'); return; }
             generateInvoice(order, orderId);
+        };
+
+        window.buyAgain = async function(productId) {
+            try {
+                const snap = await getDoc(doc(db, "vendors", productId));
+                if (!snap.exists()) {
+                    alert('This product is no longer available.');
+                    return;
+                }
+                const p = snap.data();
+                const stock = p.stock !== undefined ? p.stock : 10;
+                if (stock <= 0) {
+                    alert('This product is currently out of stock.');
+                    return;
+                }
+
+                let cart = JSON.parse(localStorage.getItem('cart')) || [];
+                const existing = cart.find(item => item.id === productId);
+                if (existing) {
+                    existing.qty = (parseInt(existing.qty) || 1) + 1;
+                } else {
+                    cart.push({
+                        id: productId, name: p.name, price: parseFloat(p.price) || 0, qty: 1,
+                        image: p.image, shopName: p.shopName || 'Local Shop', sellerUid: p.sellerUid || null
+                    });
+                }
+                localStorage.setItem('cart', JSON.stringify(cart));
+                alert(`${p.name} added to cart! 🛍️`);
+                window.location.href = 'cart.html';
+            } catch (error) {
+                console.error(error);
+                alert('Unable to add this item right now.');
+            }
         };
 
         window.cancelMyOrder = async function(orderId) {
