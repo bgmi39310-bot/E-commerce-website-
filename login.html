@@ -79,6 +79,10 @@
 
         <button class="btn-primary" id="loginBtn">Login</button>
 
+        <button id="googleSignInBtn" style="width:100%; background:white; border:1px solid #ddd; padding:10px; border-radius:6px; font-size:13.5px; font-weight:600; cursor:pointer; margin-top:10px; display:flex; align-items:center; justify-content:center; gap:8px;">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:16px;"> Continue with Google
+        </button>
+
         <p class="terms-note">
             By continuing, you agree to DesiMarket's <a href="terms.html">Terms & Conditions</a> and <a href="terms.html#privacy">Privacy Policy</a>.
         </p>
@@ -100,8 +104,8 @@
 
 <script type="module">
     import { auth } from './firebase-config.js';
-    import { signInWithEmailAndPassword, sendPasswordResetEmail, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-    import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { signInWithEmailAndPassword, sendPasswordResetEmail, signInAnonymously, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     import { db } from './firebase-config.js';
 
     const emailInput = document.getElementById('loginEmail');
@@ -207,6 +211,40 @@
         } catch (error) {
             console.error(error);
             showError('Unable to continue as guest right now. Please try again.');
+        }
+    });
+
+    document.getElementById('googleSignInBtn').addEventListener('click', async () => {
+        hideError();
+        try {
+            const provider = new GoogleAuthProvider();
+            const cred = await signInWithPopup(auth, provider);
+            const user = cred.user;
+
+            const userSnap = await getDoc(doc(db, "users", user.uid));
+            if (userSnap.exists() && userSnap.data().blocked === true) {
+                await auth.signOut();
+                showError('Your account has been suspended. Please contact support.');
+                return;
+            }
+
+            // First-time Google sign-in: create their user profile
+            if (!userSnap.exists()) {
+                await setDoc(doc(db, "users", user.uid), {
+                    uid: user.uid,
+                    name: user.displayName || 'DesiMarket User',
+                    email: user.email || '',
+                    role: 'customer',
+                    createdAt: new Date()
+                });
+            }
+
+            await redirectAfterLogin(user.uid);
+        } catch (error) {
+            console.error(error);
+            if (error.code !== 'auth/popup-closed-by-user') {
+                showError('Google sign-in failed. Please try again.');
+            }
         }
     });
 </script>
