@@ -180,6 +180,54 @@ export async function resolveReport(db, reportId, refreshCallback) {
     }
 }
 
+// ---------- SELLER KYC REVIEW ----------
+export async function loadPendingKyc(db) {
+    const container = document.getElementById('kycReviewContainer');
+    container.innerHTML = "<p>Loading KYC submissions...</p>";
+
+    try {
+        const q = query(collection(db, "sellers_profiles"), where("kycStatus", "==", "Pending"));
+        const snap = await getDocs(q);
+
+        if (snap.empty) {
+            container.innerHTML = `<div class="admin-no-data">No pending KYC submissions.</div>`;
+            return;
+        }
+
+        let html = "";
+        snap.forEach(d => {
+            const s = d.data();
+            html += `
+                <div class="admin-row-card">
+                    <div class="arc-info">
+                        <h4>${s.shopName || 'Unnamed Shop'}</h4>
+                        <p>Owner: ${s.ownerName || 'N/A'} &nbsp; | &nbsp; PAN: ${s.kycPan || 'N/A'} &nbsp; | &nbsp; Aadhar: xxxx-xxxx-${s.kycAadharLast4 || '----'}</p>
+                        <p class="uid-tag">Seller UID: ${d.id}</p>
+                    </div>
+                    <div class="arc-actions">
+                        <button class="admin-btn admin-btn-unblock" onclick="approveKycMain('${d.id}')">✅ Verify</button>
+                        <button class="admin-btn admin-btn-block" onclick="rejectKycMain('${d.id}')">❌ Reject</button>
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    } catch (error) {
+        console.error(error);
+        container.innerHTML = `<p style="color:red;">Unable to load KYC submissions.</p>`;
+    }
+}
+
+export async function updateKycStatus(db, sellerUid, newStatus, refreshCallback) {
+    try {
+        await updateDoc(doc(db, "sellers_profiles", sellerUid), { kycStatus: newStatus });
+        if (refreshCallback) refreshCallback();
+    } catch (error) {
+        console.error(error);
+        alert("Error updating KYC status.");
+    }
+}
+
 // ---------- SELLERS ----------
 export async function loadSellers(db) {
     const container = document.getElementById('sellersContainer');
@@ -361,4 +409,3 @@ export async function loadAllOrders(db, statusFilter = 'All') {
         container.innerHTML = `<p style="color:red;">Unable to load orders.</p>`;
     }
 }
-
