@@ -77,6 +77,8 @@ export async function loadAnalytics(db, uid) {
         });
 
         const totalOrders = orders.length;
+        const fulfillmentRate = totalOrders > 0 ? ((counts.Delivered / totalOrders) * 100).toFixed(0) : 0;
+        const cancellationRate = totalOrders > 0 ? ((counts.Cancelled / totalOrders) * 100).toFixed(0) : 0;
         const topProductEntry = Object.entries(productFrequency).sort((a, b) => b[1] - a[1])[0];
         const topProduct = topProductEntry ? `${topProductEntry[0]} (${topProductEntry[1]} sold)` : 'N/A';
 
@@ -95,6 +97,14 @@ export async function loadAnalytics(db, uid) {
                 <div class="stat-card">
                     <div class="stat-value">${counts.Pending}</div>
                     <div class="stat-label">Pending Right Now</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color:#28a745;">${fulfillmentRate}%</div>
+                    <div class="stat-label">Fulfillment Rate</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color:${cancellationRate > 15 ? '#dc3545' : '#232f3e'};">${cancellationRate}%</div>
+                    <div class="stat-label">Cancellation Rate</div>
                 </div>
             </div>
 
@@ -117,4 +127,3 @@ export async function loadAnalytics(db, uid) {
         container.innerHTML = `<p style="color:red;">Unable to load analytics right now.</p>`;
     }
 }
-
