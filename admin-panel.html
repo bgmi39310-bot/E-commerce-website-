@@ -173,6 +173,7 @@
             <button class="sidebar-nav-item" id="nav-products" onclick="switchTab('products')"><span class="icon">📦</span> Products</button>
             <button class="sidebar-nav-item" id="nav-orders" onclick="switchTab('orders')"><span class="icon">🧾</span> Orders</button>
             <button class="sidebar-nav-item" id="nav-reports" onclick="switchTab('reports')"><span class="icon">⚠️</span> Reports</button>
+            <button class="sidebar-nav-item" id="nav-kyc" onclick="switchTab('kyc')"><span class="icon">🪪</span> Seller KYC</button>
         </div>
         <div class="sidebar-logout">
             <button id="logoutBtn">Logout</button>
@@ -259,6 +260,11 @@
                 <div id="reportsContainer"><p>Loading reports...</p></div>
             </div>
 
+            <!-- SELLER KYC -->
+            <div class="admin-section" id="section-kyc">
+                <div id="kycReviewContainer"><p>Loading KYC submissions...</p></div>
+            </div>
+
         </div>
     </div>
 </div>
@@ -269,7 +275,8 @@
     import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     import {
         loadDashboardCharts, loadSellers, loadBuyers, toggleBlockUser,
-        loadAllProducts, deleteProductAdmin, loadAllOrders, loadReports, resolveReport
+        loadAllProducts, deleteProductAdmin, loadAllOrders, loadReports, resolveReport,
+        loadPendingKyc, updateKycStatus
     } from './admin-logic.js';
 
     document.getElementById('topbarDate').innerText = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -431,7 +438,7 @@
         document.getElementById('menuOverlay').style.display = document.getElementById('sidebar').classList.contains('open') ? 'block' : 'none';
     };
 
-    const PAGE_TITLES = { dashboard: 'Dashboard', sellers: 'Sellers', buyers: 'Buyers', products: 'Products', orders: 'Orders', reports: 'Reports' };
+    const PAGE_TITLES = { dashboard: 'Dashboard', sellers: 'Sellers', buyers: 'Buyers', products: 'Products', orders: 'Orders', reports: 'Reports', kyc: 'Seller KYC' };
 
     window.switchTab = function(tabName) {
         document.querySelectorAll('.sidebar-nav-item').forEach(b => b.classList.remove('active'));
@@ -449,6 +456,15 @@
         if (tabName === 'products') loadAllProducts(db);
         if (tabName === 'orders') loadAllOrders(db, document.getElementById('orderStatusFilter').value);
         if (tabName === 'reports') loadReports(db);
+        if (tabName === 'kyc') loadPendingKyc(db);
+    };
+
+    window.approveKycMain = function(sellerUid) {
+        updateKycStatus(db, sellerUid, 'Verified', () => loadPendingKyc(db));
+    };
+
+    window.rejectKycMain = function(sellerUid) {
+        updateKycStatus(db, sellerUid, 'Rejected', () => loadPendingKyc(db));
     };
 
     window.dismissReportMain = function(reportId) {
@@ -477,4 +493,3 @@
 </script>
 </body>
 </html>
-
