@@ -299,6 +299,12 @@
             <h2>9. 🪪 Seller Verification (KYC)</h2>
             <div id="kycContainer"><p>Loading verification status...</p></div>
         </div>
+
+        <!-- 10. Customer Questions -->
+        <div class="card">
+            <h2>10. 💬 Customer Questions</h2>
+            <div id="qaSellerContainer"><p>Loading questions...</p></div>
+        </div>
     </div>
 
     <script type="module">
@@ -315,6 +321,7 @@
         import { loadReturnRequests, updateReturnStatus } from './return-logic.js';
         import { loadPayoutSummary } from './payout-logic.js';
         import { loadKycStatus } from './kyc-logic.js';
+        import { loadSellerQuestions, submitAnswer } from './qa-logic.js';
 
         wireImageUpload('shopLogoFileUpload', 'shopLogoFile', 'shopLogoStatus');
         wireImageUpload('pImageFileUpload', 'pImageFile', 'pImageStatus');
@@ -376,6 +383,7 @@
                 loadReturnRequests(db, user.uid);
                 loadPayoutSummary(db, user.uid);
                 loadKycStatus(db, user.uid);
+                loadSellerQuestions(db, user.uid);
 
                 // Real-time new-order notifications (bell badge + browser notification + chime)
                 listenForNewOrders(db, user.uid, (newOrders) => {
@@ -490,6 +498,12 @@
         window.downloadReportMain = function() {
             if (!currentLoggedInUser) return;
             downloadSalesReport(db, currentLoggedInUser.uid);
+        }
+
+        window.submitAnswerMain = function(questionId) {
+            if (!currentLoggedInUser) return;
+            const answerText = document.getElementById('answerInput-' + questionId).value;
+            submitAnswer(db, questionId, answerText, () => loadSellerQuestions(db, currentLoggedInUser.uid));
         }
 
         window.bulkUploadMain = function() {
