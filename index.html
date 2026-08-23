@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DesiMarket - India's Desi Online Marketplace</title>
+    <!-- Google Analytics: create a free GA4 property at analytics.google.com and replace G-XXXXXXXXXX below -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-XXXXXXXXXX');
+    </script>
     <meta name="description" content="Shop directly from verified local vendors near you. Buy groceries, clothing, electronics and more on DesiMarket — India's local online marketplace. Vocal for Local.">
     <meta name="keywords" content="local marketplace, buy online India, local vendors, desi shopping, online shopping India">
     <meta property="og:title" content="DesiMarket - India's Desi Online Marketplace">
@@ -147,10 +155,11 @@
     </div>
 
     <!-- Hero Banner -->
-    <div class="hero-banner">
-        <h1 data-i18n="heroTitle">Vocal for Local</h1>
-        <p data-i18n="heroSubtitle">Shop directly from verified local vendors near you</p>
+    <div class="hero-banner" id="heroBanner">
+        <h1 id="heroTitle" data-i18n="heroTitle">Vocal for Local</h1>
+        <p id="heroSubtitle" data-i18n="heroSubtitle">Shop directly from verified local vendors near you</p>
     </div>
+    <div id="heroDots" style="display:none; justify-content:center; gap:6px; padding:8px 0; background:white;"></div>
 
     <div class="trust-strip">
         <span><i class="fas fa-shield-alt"></i> <span data-i18n="verifiedSellers">Verified Sellers</span></span>
@@ -205,6 +214,7 @@
     <script type="module">
         import { db } from './firebase-config.js';
         import { applyTranslations, toggleLanguage, t } from './i18n.js';
+        import { loadActiveBanners } from './banner-logic.js';
         import { collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         let allProducts = [];
@@ -434,10 +444,46 @@
             toggleLanguage(() => renderVisibleProducts());
         };
 
+        async function setupHeroBanners() {
+            const banners = await loadActiveBanners(db);
+            if (banners.length === 0) return; // keep default static hero
+
+            let current = 0;
+            const heroEl = document.getElementById('heroBanner');
+            const titleEl = document.getElementById('heroTitle');
+            const subEl = document.getElementById('heroSubtitle');
+            const dotsWrap = document.getElementById('heroDots');
+
+            function render() {
+                const b = banners[current];
+                heroEl.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)), url('${b.imageUrl}')`;
+                titleEl.innerText = b.title || '';
+                titleEl.removeAttribute('data-i18n');
+                subEl.innerText = b.subtitle || '';
+                subEl.removeAttribute('data-i18n');
+                heroEl.onclick = b.linkUrl ? () => { window.location.href = b.linkUrl; } : null;
+                heroEl.style.cursor = b.linkUrl ? 'pointer' : 'default';
+
+                dotsWrap.innerHTML = banners.map((_, i) =>
+                    `<span style="width:7px; height:7px; border-radius:50%; background:${i === current ? '#ff9900' : '#ccc'};"></span>`
+                ).join('');
+            }
+
+            render();
+            if (banners.length > 1) {
+                dotsWrap.style.display = 'flex';
+                setInterval(() => {
+                    current = (current + 1) % banners.length;
+                    render();
+                }, 4000);
+            }
+        }
+
         window.onload = function() {
             applyTranslations();
             fetchLiveProducts();
             updateCartBadge();
+            setupHeroBanners();
         };
     </script>
 </body>
