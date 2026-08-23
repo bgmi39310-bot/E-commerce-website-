@@ -55,9 +55,33 @@
         .coupon-code { font-family: monospace; font-weight: bold; font-size: 15px; background: #232f3e; color: white; padding: 3px 10px; border-radius: 4px; margin-right: 10px; }
         .coupon-discount { font-weight: bold; color: #c7511f; }
         .coupon-off-tag { font-size: 11px; background: #dc3545; color: white; padding: 2px 8px; border-radius: 10px; margin-left: 8px; }
+
+        .payout-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 12px; }
+        .payout-card { border-radius: 8px; padding: 16px 10px; text-align: center; }
+        .payout-card.earned { background: #eafaf1; }
+        .payout-card.pending { background: #fff8ee; }
+        .payout-card.lost { background: #fdecea; }
+        .payout-value { font-size: 20px; font-weight: bold; }
+        .payout-card.earned .payout-value { color: #1a7f4b; }
+        .payout-card.pending .payout-value { color: #c7511f; }
+        .payout-card.lost .payout-value { color: #c0392b; }
+        .payout-label { font-size: 11.5px; color: #666; margin-top: 4px; }
+        .payout-note { font-size: 12px; color: #888; margin: 0; }
+
+        .kyc-status-box { padding: 12px 14px; border-radius: 8px; font-size: 13.5px; }
+        .kyc-status-box.verified { background: #eafaf1; color: #1a7f4b; }
+        .kyc-status-box.pending { background: #fff8ee; color: #c7511f; }
+        .kyc-status-box.rejected { background: #fdecea; color: #c0392b; margin-bottom: 14px; }
         .stock-tag { font-size: 11px; font-weight: bold; padding: 2px 8px; border-radius: 10px; margin-left: 6px; vertical-align: middle; }
         .stock-tag.in { background: #d4edda; color: #1a7f4b; }
         .stock-tag.out { background: #f8d7da; color: #842029; }
+        .stock-tag.low { background: #fff3cd; color: #8a6800; }
+
+        .low-stock-alert-card { background: #fff8ee; border: 1.5px dashed #fa8900; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; }
+        .low-stock-alert-card h3 { margin: 0 0 8px; font-size: 15px; color: #c7511f; }
+        .low-stock-item { display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0; border-bottom: 1px solid #ffe0a3; }
+        .low-stock-item:last-child { border-bottom: none; }
+        .low-stock-item .warn-count { font-weight: bold; color: #dc3545; }
         .tab-buttons { display: flex; gap: 5px; margin-bottom: 15px; overflow-x: auto; }
         .tab-btn { padding: 8px 12px; background: #eee; border: none; font-weight: bold; cursor: pointer; border-radius: 5px; font-size: 12px; white-space: nowrap; }
         .tab-btn.active { background: #232f3e; color: white; }
@@ -224,6 +248,12 @@
             <div id="dashboardOrdersContainer"><p>Loading database orders...</p></div>
         </div>
 
+        <!-- Low Stock Alerts -->
+        <div class="low-stock-alert-card" id="lowStockAlertCard" style="display:none;">
+            <h3>⚠️ Low Stock Alerts</h3>
+            <div id="lowStockList"></div>
+        </div>
+
         <!-- 4. My Listed Products Hub -->
         <div class="card">
             <h2>4. My Listed Products Hub (Manage Your Inventory)</h2>
@@ -257,6 +287,18 @@
             <h2>7. ↩️ Return / Refund Requests</h2>
             <div id="returnsContainer"><p>Loading return requests...</p></div>
         </div>
+
+        <!-- 8. Earnings / Payout Summary -->
+        <div class="card">
+            <h2>8. 💰 Earnings Summary</h2>
+            <div id="payoutContainer"><p>Loading earnings...</p></div>
+        </div>
+
+        <!-- 9. Seller Verification (KYC) -->
+        <div class="card">
+            <h2>9. 🪪 Seller Verification (KYC)</h2>
+            <div id="kycContainer"><p>Loading verification status...</p></div>
+        </div>
     </div>
 
     <script type="module">
@@ -271,6 +313,8 @@
         import { wireImageUpload } from './image-upload.js';
         import { addCoupon, loadMyCoupons, toggleCouponActive, deleteCoupon } from './coupon-logic.js';
         import { loadReturnRequests, updateReturnStatus } from './return-logic.js';
+        import { loadPayoutSummary } from './payout-logic.js';
+        import { loadKycStatus } from './kyc-logic.js';
 
         wireImageUpload('shopLogoFileUpload', 'shopLogoFile', 'shopLogoStatus');
         wireImageUpload('pImageFileUpload', 'pImageFile', 'pImageStatus');
@@ -285,6 +329,24 @@
             menu.style.width = menu.style.width === '250px' ? '0' : '250px';
         }
         window.toggleMenu = toggleMenu;
+
+        function renderLowStockAlerts(lowStockList) {
+            const card = document.getElementById('lowStockAlertCard');
+            const listEl = document.getElementById('lowStockList');
+
+            if (!lowStockList || lowStockList.length === 0) {
+                card.style.display = 'none';
+                return;
+            }
+
+            card.style.display = 'block';
+            listEl.innerHTML = lowStockList.map(p => `
+                <div class="low-stock-item">
+                    <span>${p.name}</span>
+                    <span class="warn-count">${p.stock <= 0 ? 'Out of Stock' : p.stock + ' left'}</span>
+                </div>
+            `).join('');
+        }
 
         window.logoutSeller = async function() {
             await signOut(auth);
@@ -308,10 +370,12 @@
 
                 await loadSellerProfileFromFirestore(db, user.uid);
                 fetchDashboardOrders(db, user.uid);
-                fetchMyListedProducts(db, user.uid);
+                fetchMyListedProducts(db, user.uid, renderLowStockAlerts);
                 loadAnalytics(db, user.uid);
                 loadMyCoupons(db, user.uid);
                 loadReturnRequests(db, user.uid);
+                loadPayoutSummary(db, user.uid);
+                loadKycStatus(db, user.uid);
 
                 // Real-time new-order notifications (bell badge + browser notification + chime)
                 listenForNewOrders(db, user.uid, (newOrders) => {
@@ -443,4 +507,3 @@
     </script>
 </body>
 </html>
-
