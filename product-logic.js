@@ -4,6 +4,11 @@ import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, o
 // subscriptions (which would waste Firestore reads) if this gets called more than once.
 let unsubscribeMyProducts = null;
 
+const LOW_STOCK_THRESHOLD = 5;
+// Tracks each product's previous stock level so we only alert ONCE when it
+// crosses below the threshold, not on every single snapshot re-render.
+const previousStockLevels = {};
+
 export async function addProductToFirebase(db, currentLoggedInUser, fetchProductsCallback) {
     if (!currentLoggedInUser) return;
 
@@ -72,7 +77,7 @@ export function stopListeningToMyProducts() {
     }
 }
 
-export function fetchMyListedProducts(db, uid) {
+export function fetchMyListedProducts(db, uid, onLowStockUpdate) {
     const container = document.getElementById('myProductsContainer');
     container.innerHTML = "<p>Loading your products...</p>";
 
@@ -87,21 +92,48 @@ export function fetchMyListedProducts(db, uid) {
     unsubscribeMyProducts = onSnapshot(q, (querySnapshot) => {
         if (querySnapshot.empty) {
             container.innerHTML = "<div class='no-data'>No products listed by you yet.</div>";
+            if (onLowStockUpdate) onLowStockUpdate([]);
             return;
         }
 
         let html = "";
+        const lowStockList = [];
+
         querySnapshot.forEach((docSnap) => {
             const prod = docSnap.data();
             const stock = prod.stock !== undefined ? prod.stock : 10;
             const outOfStock = stock <= 0;
+            const isLow = stock > 0 && stock <= LOW_STOCK_THRESHOLD;
+
+            let stockTag;
+            if (outOfStock) stockTag = '<span class="stock-tag out">Out of Stock</span>';
+            else if (isLow) stockTag = `<span class="stock-tag low">⚠️ Only ${stock} left</span>`;
+            else stockTag = `<span class="stock-tag in">${stock} in stock</span>`;
+
+            if (outOfStock || isLow) {
+                lowStockList.push({ id: docSnap.id, name: prod.name, stock });
+            }
+
+            // Fire a one-time browser notification only when stock NEWLY crosses
+            // into low/out territory (not on every re-render of the same value).
+            const prevStock = previousStockLevels[docSnap.id];
+            if (prevStock !== undefined && prevStock > LOW_STOCK_THRESHOLD && (outOfStock || isLow)) {
+                if ("Notification" in window && Notification.permission === "granted") {
+                    new Notification("⚠️ Low Stock Alert", {
+                        body: `${prod.name} is ${outOfStock ? 'out of stock' : 'running low (' + stock + ' left)'}.`
+                    });
+                }
+            }
+            previousStockLevels[docSnap.id] = stock;
+
             html += `
                 <div class="product-item-card">
                     <div style="display: flex; gap: 15px; align-items: center;">
                         <img src="${prod.image || 'https://via.placeholder.com/60'}" class="product-thumb" alt="Product">
                         <div class="product-info">
-                            <h4>${prod.name} ${outOfStock ? '<span class="stock-tag out">Out of Stock</span>' : `<span class="stock-tag in">${stock} in stock</span>`}</h4>
+                            <h4>${prod.name} ${stockTag}</h4>
                             <p><strong>Price:</strong> ₹${prod.price} (${prod.unit || 'Per Piece'})</p>
+                            <p style="font-size:12px; color:#888;">👁️ ${prod.views || 0} views &nbsp; | &nbsp; 🛒 ${prod.unitsSold || 0} sold</p>
                         </div>
                     </div>
                     <div class="btn-group">
@@ -112,6 +144,7 @@ export function fetchMyListedProducts(db, uid) {
             `;
         });
         container.innerHTML = html;
+        if (onLowStockUpdate) onLowStockUpdate(lowStockList);
     }, (error) => {
         console.error("Error loading products: ", error);
         container.innerHTML = "<p style='color:red;'>Error loading your products.</p>";
@@ -158,4 +191,3 @@ export async function deleteProduct(db, productId, uid, fetchProductsCallback) {
         }
     }
 }
-
