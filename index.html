@@ -111,7 +111,7 @@
         <a href="index.html" class="logo-area">Desi<span>Market</span></a>
 
         <div class="search-container">
-            <input type="text" id="searchInput" placeholder="Search products, local shops, items...">
+            <input type="text" id="searchInput" data-i18n-placeholder="searchPlaceholder" placeholder="Search products, local shops, items...">
             <button class="search-btn"><i class="fas fa-search"></i></button>
         </div>
 
@@ -120,12 +120,13 @@
             <a href="cart.html" class="nav-link"><i class="fas fa-shopping-cart"></i><span>Cart</span><span class="cart-badge" id="cartBadge" style="display:none;">0</span></a>
             <a href="account.html" class="nav-link"><i class="fas fa-user"></i><span>Account</span></a>
             <div class="nav-link" onclick="toggleMenu()" style="cursor: pointer;"><i class="fas fa-bars"></i><span>Menu</span></div>
+            <button class="lang-toggle-btn" onclick="switchLanguage()" style="background:none; border:1px solid rgba(255,255,255,0.4); color:white; padding:6px 10px; border-radius:5px; font-size:11.5px; cursor:pointer; white-space:nowrap;">🌐 हिंदी</button>
         </div>
     </header>
 
     <!-- Mobile Search Bar -->
     <div class="mobile-search">
-        <input type="text" id="mobileSearchInput" placeholder="Search products...">
+        <input type="text" id="mobileSearchInput" data-i18n-placeholder="searchPlaceholder" placeholder="Search products...">
     </div>
 
     <!-- Side Menu Drawer -->
@@ -133,47 +134,47 @@
     <div id="sideMenu" class="side-menu">
         <a href="javascript:void(0)" class="close-btn" onclick="toggleMenu()">&times;</a>
         <a href="index.html"><i class="fas fa-home"></i> Home</a>
-        <a href="orders.html"><i class="fas fa-box"></i> My Orders</a>
-        <a href="wishlist.html"><i class="fas fa-heart"></i> My Wishlist</a>
-        <a href="messages.html"><i class="fas fa-comment-dots"></i> My Messages</a>
+        <a href="orders.html"><i class="fas fa-box"></i> <span data-i18n="myOrders">My Orders</span></a>
+        <a href="wishlist.html"><i class="fas fa-heart"></i> <span data-i18n="myWishlist">My Wishlist</span></a>
+        <a href="messages.html"><i class="fas fa-comment-dots"></i> <span data-i18n="myMessages">My Messages</span></a>
         <a href="cart.html"><i class="fas fa-shopping-cart"></i> Cart</a>
         <hr style="border: 0.5px solid #444;">
         <a href="account.html"><i class="fas fa-user-circle"></i> My Account</a>
-        <a href="seller-dashboard.html"><i class="fas fa-store"></i> Seller Hub (डैशबोर्ड)</a>
-        <a href="signup.html?role=seller"><i class="fas fa-rocket"></i> Become a Seller</a>
+        <a href="seller-dashboard.html"><i class="fas fa-store"></i> <span data-i18n="sellerHub">Seller Hub (डैशबोर्ड)</span></a>
+        <a href="signup.html?role=seller"><i class="fas fa-rocket"></i> <span data-i18n="becomeSeller">Become a Seller</span></a>
         <hr style="border: 0.5px solid #444;">
-        <a href="terms.html"><i class="fas fa-file-contract"></i> Terms & Privacy</a>
+        <a href="terms.html"><i class="fas fa-file-contract"></i> <span data-i18n="termsPrivacy">Terms & Privacy</span></a>
     </div>
 
     <!-- Hero Banner -->
     <div class="hero-banner">
-        <h1>Vocal for Local</h1>
-        <p>Shop directly from verified local vendors near you</p>
+        <h1 data-i18n="heroTitle">Vocal for Local</h1>
+        <p data-i18n="heroSubtitle">Shop directly from verified local vendors near you</p>
     </div>
 
     <div class="trust-strip">
-        <span><i class="fas fa-shield-alt"></i> Verified Sellers</span>
-        <span><i class="fas fa-truck"></i> Local Fast Delivery</span>
-        <span><i class="fas fa-headset"></i> Direct Seller Contact</span>
+        <span><i class="fas fa-shield-alt"></i> <span data-i18n="verifiedSellers">Verified Sellers</span></span>
+        <span><i class="fas fa-truck"></i> <span data-i18n="fastDelivery">Local Fast Delivery</span></span>
+        <span><i class="fas fa-headset"></i> <span data-i18n="directContact">Direct Seller Contact</span></span>
     </div>
 
     <!-- Category chips (cosmetic filter based on product name/description match) -->
     <div class="category-strip" id="categoryStrip">
-        <div class="category-chip active" data-cat="all">All</div>
-        <div class="category-chip" data-cat="grocery">Grocery</div>
-        <div class="category-chip" data-cat="clothing">Clothing</div>
-        <div class="category-chip" data-cat="electronics">Electronics</div>
-        <div class="category-chip" data-cat="home">Home & Kitchen</div>
-        <div class="category-chip" data-cat="beauty">Beauty</div>
+        <div class="category-chip active" data-cat="all" data-i18n="categoryAll">All</div>
+        <div class="category-chip" data-cat="grocery" data-i18n="categoryGrocery">Grocery</div>
+        <div class="category-chip" data-cat="clothing" data-i18n="categoryClothing">Clothing</div>
+        <div class="category-chip" data-cat="electronics" data-i18n="categoryElectronics">Electronics</div>
+        <div class="category-chip" data-cat="home" data-i18n="categoryHome">Home & Kitchen</div>
+        <div class="category-chip" data-cat="beauty" data-i18n="categoryBeauty">Beauty</div>
     </div>
 
     <!-- Sort & Price Filter Bar -->
     <div class="filter-bar">
         <select id="sortSelect">
-            <option value="default">Sort: Recommended</option>
-            <option value="priceLow">Price: Low to High</option>
-            <option value="priceHigh">Price: High to Low</option>
-            <option value="newest">Newest First</option>
+            <option value="default" data-i18n="sortRecommended">Sort: Recommended</option>
+            <option value="priceLow" data-i18n="priceLowHigh">Price: Low to High</option>
+            <option value="priceHigh" data-i18n="priceHighLow">Price: High to Low</option>
+            <option value="newest" data-i18n="newestFirst">Newest First</option>
         </select>
         <div class="price-range-wrap">
             <span>₹</span><input type="number" id="minPrice" placeholder="Min">
@@ -184,13 +185,18 @@
 
     <!-- Main Content -->
     <div class="container">
-        <div class="section-title">Trending Products Near You</div>
+        <div id="recentlyViewedWrap" style="display:none; margin-bottom:24px;">
+            <div class="section-title">🕒 Recently Viewed</div>
+            <div id="recentlyViewedScroll" style="display:flex; gap:12px; overflow-x:auto; padding-bottom:6px;"></div>
+        </div>
+
+        <div class="section-title" data-i18n="trendingProducts">Trending Products Near You</div>
         <div id="productGrid" class="product-grid">
             <div class="loading-text">Loading live products...</div>
         </div>
         <div id="loadMoreWrap" style="display:none; text-align:center; margin-top:20px;">
             <button onclick="loadMoreProducts()" style="background:white; border:1.5px solid var(--primary-color); color:var(--primary-color); padding:11px 28px; border-radius:6px; font-weight:bold; font-size:14px; cursor:pointer;">
-                Load More Products (<span id="loadMoreCount">0</span> more)
+                <span data-i18n="loadMore">Load More Products</span> (<span id="loadMoreCount">0</span> more)
             </button>
         </div>
     </div>
@@ -198,6 +204,7 @@
     <!-- Firebase Live Fetch Logic -->
     <script type="module">
         import { db } from './firebase-config.js';
+        import { applyTranslations, toggleLanguage, t } from './i18n.js';
         import { collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         let allProducts = [];
@@ -237,6 +244,7 @@
                     allProducts.push({ id: docSnap.id, ...docSnap.data() });
                 });
                 applyFilters();
+                renderRecentlyViewed();
             }, (error) => {
                 console.error("Error fetching products: ", error);
                 grid.innerHTML = `<div class="no-product">Unable to load products right now. Please check your connection and try again.</div>`;
@@ -263,7 +271,7 @@
             grid.innerHTML = '';
 
             if (currentFilteredProducts.length === 0) {
-                grid.innerHTML = `<div class="no-product">No products found. Want to sell here? <a href="signup.html?role=seller">Become a Seller</a>!</div>`;
+                grid.innerHTML = `<div class="no-product">${t('noProductsFound')} <a href="signup.html?role=seller">${t('becomeSellerLink')}</a>!</div>`;
                 document.getElementById('loadMoreWrap').style.display = 'none';
                 return;
             }
@@ -295,7 +303,7 @@
                         <div class="product-title">${pName}</div>
                         <div class="shop-badge"><i class="fas fa-store"></i> ${pShop}</div>
                         <div class="product-price">₹${price.toFixed(0)} <small>${unit}</small></div>
-                        <div class="view-hint">${outOfStock ? 'Currently unavailable' : 'Tap to view details →'}</div>
+                        <div class="view-hint">${outOfStock ? t('currentlyUnavailable') : t('tapToView')}</div>
                     </div>
                 `;
                 grid.appendChild(card);
@@ -316,6 +324,30 @@
         };
 
         // ---------- Wishlist ----------
+        function renderRecentlyViewed() {
+            const recentIds = JSON.parse(localStorage.getItem('recentlyViewed')) || [];
+            const wrap = document.getElementById('recentlyViewedWrap');
+            const scrollEl = document.getElementById('recentlyViewedScroll');
+
+            const recentProducts = recentIds
+                .map(id => allProducts.find(p => p.id === id))
+                .filter(p => p); // drop any that no longer exist
+
+            if (recentProducts.length === 0) {
+                wrap.style.display = 'none';
+                return;
+            }
+
+            wrap.style.display = 'block';
+            scrollEl.innerHTML = recentProducts.slice(0, 10).map(p => `
+                <div style="flex-shrink:0; width:110px; cursor:pointer;" onclick="window.location.href='product.html?id=${p.id}'">
+                    <img src="${p.image || 'https://via.placeholder.com/110'}" loading="lazy" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:8px; background:#f5f5f5;" onerror="this.src='https://via.placeholder.com/110?text=No+Image'">
+                    <div style="font-size:11.5px; margin-top:4px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${p.name || 'Product'}</div>
+                    <div style="font-size:12.5px; font-weight:bold; color:#B12704;">₹${(parseFloat(p.price) || 0).toFixed(0)}</div>
+                </div>
+            `).join('');
+        }
+
         function getWishlist() {
             return JSON.parse(localStorage.getItem('wishlist')) || [];
         }
@@ -398,11 +430,15 @@
         });
 
         // Load products when page opens
+        window.switchLanguage = function() {
+            toggleLanguage(() => renderVisibleProducts());
+        };
+
         window.onload = function() {
+            applyTranslations();
             fetchLiveProducts();
             updateCartBadge();
         };
     </script>
 </body>
 </html>
-
