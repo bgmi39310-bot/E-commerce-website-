@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Product - DesiMarket</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#232f3e">
+    <link rel="icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <script src="pwa-init.js" defer></script>
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
 <script>
     window.dataLayer = window.dataLayer || [];
@@ -434,7 +439,7 @@
             if (snap.exists()) {
                 const seller = snap.data();
                 document.getElementById('sellerLogo').src = seller.logo || 'https://via.placeholder.com/60';
-                document.getElementById('sellerName').innerHTML = `${seller.shopName || 'Local Seller'} <span class="verified-tick">✔️ Verified</span>`;
+                document.getElementById('sellerName').innerHTML = `${seller.shopName || 'Local Seller'} <span class="verified-tick">✔️ Verified</span> ${seller.isPremium ? '<span style="background:linear-gradient(135deg,#ffd700,#ff9900); color:#111; font-size:10px; font-weight:bold; padding:2px 8px; border-radius:10px; margin-left:4px;">🌟 PREMIUM</span>' : ''}`;
                 document.getElementById('sellerAddress').innerText = '📍 ' + (seller.address || 'Address not provided');
                 document.getElementById('sellerPhone').innerText = '📞 Contact after order confirmation';
             } else {
