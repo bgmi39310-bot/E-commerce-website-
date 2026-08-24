@@ -1,5 +1,5 @@
 import {
-    collection, getDocs, query, where, doc, updateDoc, deleteDoc
+    collection, getDocs, query, where, doc, updateDoc, deleteDoc, getDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // ---------- DASHBOARD CHARTS DATA ----------
@@ -290,18 +290,29 @@ export async function loadSellers(db) {
             return;
         }
 
+        // Fetch premium status for each seller from their shop profile
+        const sellerDocs = snap.docs;
+        const profileSnaps = await Promise.all(
+            sellerDocs.map(d => getDoc(doc(db, "sellers_profiles", d.id)))
+        );
+
         let html = "";
-        snap.forEach(d => {
+        sellerDocs.forEach((d, i) => {
             const u = d.data();
             const blocked = u.blocked === true;
+            const profile = profileSnaps[i].exists() ? profileSnaps[i].data() : {};
+            const isPremium = profile.isPremium === true;
             html += `
                 <div class="admin-row-card ${blocked ? 'is-blocked' : ''}">
                     <div class="arc-info">
-                        <h4>${u.name || 'Unnamed'} ${blocked ? '<span class="blocked-tag">BLOCKED</span>' : ''}</h4>
+                        <h4>${u.name || 'Unnamed'} ${blocked ? '<span class="blocked-tag">BLOCKED</span>' : ''} ${isPremium ? '<span class="blocked-tag" style="background:#ff9900; color:#111;">🌟 PREMIUM</span>' : ''}</h4>
                         <p>📞 ${u.phone || 'N/A'} &nbsp; ✉️ ${u.email || 'N/A'}</p>
                         <p class="uid-tag">UID: ${d.id}</p>
                     </div>
                     <div class="arc-actions">
+                        <button class="admin-btn ${isPremium ? 'admin-btn-block' : 'admin-btn-unblock'}" onclick="togglePremiumMain('${d.id}', ${!isPremium})" style="${isPremium ? '' : 'background:#ff9900; color:#111;'}">
+                            ${isPremium ? '⬇️ Remove Premium' : '🌟 Make Premium'}
+                        </button>
                         <button class="admin-btn ${blocked ? 'admin-btn-unblock' : 'admin-btn-block'}" onclick="toggleBlockMain('${d.id}', ${!blocked})">
                             ${blocked ? '✅ Unblock' : '🚫 Block'}
                         </button>
