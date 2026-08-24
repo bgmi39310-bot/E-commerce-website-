@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Seller Hub - DesiMarket</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#232f3e">
+    <link rel="icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <script src="pwa-init.js" defer></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
         header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 998; }
@@ -141,6 +146,7 @@
         <div class="card">
             <h2>1. Seller / Shop Profile</h2>
             <div id="sellerIdDisplay" style="background: #e9ecef; padding: 10px; border-radius: 5px; margin-bottom: 15px; font-weight: bold; color: #333; border: 1px dashed #232f3e; font-size: 14px;">Unique Seller ID: Loading...</div>
+            <div id="premiumStatusBox" style="padding: 10px; border-radius: 5px; margin-bottom: 15px; font-size: 13px; display:none;"></div>
             <div id="profileMsg" class="success-msg">Profile Saved Successfully!</div>
 
             <div id="profileDisplay" style="display: none;">
@@ -322,6 +328,7 @@
         import { loadReturnRequests, updateReturnStatus } from './return-logic.js';
         import { loadPayoutSummary } from './payout-logic.js';
         import { loadKycStatus } from './kyc-logic.js';
+        import { isPremiumSeller } from './premium-logic.js';
         import { loadSellerQuestions, submitAnswer } from './qa-logic.js';
 
         wireImageUpload('shopLogoFileUpload', 'shopLogoFile', 'shopLogoStatus');
@@ -375,6 +382,20 @@
 
                 currentLoggedInUser = user;
                 document.getElementById('sellerIdDisplay').innerText = "Unique Seller ID: " + user.uid;
+
+                isPremiumSeller(db, user.uid).then(premium => {
+                    const box = document.getElementById('premiumStatusBox');
+                    box.style.display = 'block';
+                    if (premium) {
+                        box.style.background = 'linear-gradient(135deg,#fff3d6,#ffe4a3)';
+                        box.style.color = '#8a6800';
+                        box.innerHTML = '🌟 <strong>Premium Seller</strong> — unlimited products, coupons, photos & bulk upload unlocked!';
+                    } else {
+                        box.style.background = '#f0f2f2';
+                        box.style.color = '#555';
+                        box.innerHTML = '🆓 <strong>Free Plan</strong> — up to 30 products, 1 photo/product, 1 active coupon. Contact us to upgrade to Premium!';
+                    }
+                });
 
                 await loadSellerProfileFromFirestore(db, user.uid);
                 fetchDashboardOrders(db, user.uid);
