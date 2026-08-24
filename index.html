@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DesiMarket - India's Desi Online Marketplace</title>
+
+    <!-- PWA: makes the site installable as an app on phones -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#232f3e">
+    <link rel="icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <script src="pwa-init.js" defer></script>
     <!-- Google Analytics: create a free GA4 property at analytics.google.com and replace G-XXXXXXXXXX below -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
     <script>
@@ -129,6 +136,7 @@
             <a href="account.html" class="nav-link"><i class="fas fa-user"></i><span>Account</span></a>
             <div class="nav-link" onclick="toggleMenu()" style="cursor: pointer;"><i class="fas fa-bars"></i><span>Menu</span></div>
             <button class="lang-toggle-btn" onclick="switchLanguage()" style="background:none; border:1px solid rgba(255,255,255,0.4); color:white; padding:6px 10px; border-radius:5px; font-size:11.5px; cursor:pointer; white-space:nowrap;">🌐 हिंदी</button>
+            <button id="installAppBtn" style="display:none; background:#ff9900; border:none; color:#111; padding:6px 10px; border-radius:5px; font-size:11.5px; font-weight:bold; cursor:pointer; white-space:nowrap;">📲 Install App</button>
         </div>
     </header>
 
@@ -443,6 +451,27 @@
         window.switchLanguage = function() {
             toggleLanguage(() => renderVisibleProducts());
         };
+
+        // PWA "Install App" button — shows only when the browser signals the
+        // site is actually installable (Chrome/Edge/Android support this).
+        let deferredInstallPrompt = null;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+            document.getElementById('installAppBtn').style.display = 'inline-block';
+        });
+
+        document.getElementById('installAppBtn').addEventListener('click', async () => {
+            if (!deferredInstallPrompt) return;
+            deferredInstallPrompt.prompt();
+            await deferredInstallPrompt.userChoice;
+            deferredInstallPrompt = null;
+            document.getElementById('installAppBtn').style.display = 'none';
+        });
+
+        window.addEventListener('appinstalled', () => {
+            document.getElementById('installAppBtn').style.display = 'none';
+        });
 
         async function setupHeroBanners() {
             const banners = await loadActiveBanners(db);
