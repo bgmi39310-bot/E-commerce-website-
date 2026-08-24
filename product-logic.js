@@ -1,4 +1,5 @@
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { isPremiumSeller, countSellerProducts, FREE_TIER_LIMITS } from './premium-logic.js';
 
 // Keeps track of the active listener so we never stack up duplicate onSnapshot
 // subscriptions (which would waste Firestore reads) if this gets called more than once.
@@ -24,11 +25,24 @@ export async function addProductToFirebase(db, currentLoggedInUser, fetchProduct
 
     if (!name || !priceVal) { alert("Please enter Product Name and Price!"); return; }
 
+    // ---------- Free vs Premium limits ----------
+    const premium = await isPremiumSeller(db, currentLoggedInUser.uid);
+    if (!premium) {
+        const currentCount = await countSellerProducts(db, currentLoggedInUser.uid);
+        if (currentCount >= FREE_TIER_LIMITS.maxProducts) {
+            alert(`Free sellers can list up to ${FREE_TIER_LIMITS.maxProducts} products. Upgrade to Premium for unlimited listings!`);
+            return;
+        }
+    }
+
     const shopNameVal = document.getElementById('shopName').value.trim();
     if (!shopNameVal) { alert("Please save Shop Profile first!"); return; }
 
     const defaultImg = "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80";
-    const imagesArray = [imageUrl, imageUrl2, imageUrl3, imageUrl4].filter(url => url !== '');
+    let imagesArray = [imageUrl, imageUrl2, imageUrl3, imageUrl4].filter(url => url !== '');
+    if (!premium && imagesArray.length > FREE_TIER_LIMITS.maxPhotosPerProduct) {
+        imagesArray = imagesArray.slice(0, FREE_TIER_LIMITS.maxPhotosPerProduct);
+    }
     if (imagesArray.length === 0) imagesArray.push(defaultImg);
 
     try {
