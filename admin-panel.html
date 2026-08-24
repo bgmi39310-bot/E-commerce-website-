@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin Panel - DesiMarket</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#232f3e">
+    <link rel="icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <script src="pwa-init.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -307,6 +312,7 @@
     } from './admin-logic.js';
     import { loadAllBanners, createBanner, toggleBannerActive, deleteBanner } from './banner-logic.js';
     import { loadAllDisputes } from './dispute-logic.js';
+    import { setSellerPremium } from './premium-logic.js';
 
     document.getElementById('topbarDate').innerText = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -536,6 +542,10 @@
         deleteProductAdmin(db, productId, () => {
             resolveReport(db, reportId, () => loadReports(db));
         });
+    };
+
+    window.togglePremiumMain = function(sellerUid, isPremium) {
+        setSellerPremium(db, sellerUid, isPremium, () => loadSellers(db));
     };
 
     window.toggleBlockMain = function(uid, shouldBlock) {
