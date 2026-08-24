@@ -83,6 +83,14 @@
                 <div id="guestUpgradeMsg" style="font-size:12px; margin-top:6px; display:none;"></div>
             </div>
 
+            <div id="emailVerifyBanner" style="display:none; background:#e8f4fd; border:1.5px dashed #007185; border-radius:8px; padding:14px; margin-bottom:18px; text-align:left;">
+                <p style="margin:0 0 10px; font-size:13px; color:#007185; font-weight:600;">
+                    ✉️ Please verify your email address to secure your account and build trust with buyers/sellers.
+                </p>
+                <button id="resendVerifyBtn" style="width:100%; background:#007185; color:white; border:none; padding:9px; border-radius:5px; font-weight:bold; cursor:pointer; font-size:13px;">Resend Verification Email</button>
+                <div id="verifyMsg" style="font-size:12px; margin-top:6px; display:none;"></div>
+            </div>
+
             <div class="profile-header">
                 <img id="accPhoto" class="profile-img" src="" alt="Profile Photo">
                 <div class="profile-name" id="accFullName">User Name</div>
@@ -137,7 +145,7 @@
 
     <script type="module">
         import { auth, db } from './firebase-config.js';
-        import { onAuthStateChanged, signOut, EmailAuthProvider, linkWithCredential } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { onAuthStateChanged, signOut, EmailAuthProvider, linkWithCredential, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         function toggleMenu() {
@@ -164,6 +172,9 @@
             document.getElementById('guestSection').style.display = 'none';
             document.getElementById('guestBanner').style.display = user.isAnonymous ? 'block' : 'none';
 
+            const hasPasswordProvider = user.providerData.some(p => p.providerId === 'password');
+            document.getElementById('emailVerifyBanner').style.display = (hasPasswordProvider && !user.emailVerified) ? 'block' : 'none';
+
             try {
                 const snap = await getDoc(doc(db, "users", user.uid));
                 const data = snap.exists() ? snap.data() : {};
@@ -178,6 +189,20 @@
                 document.getElementById('accPhoto').src = data.photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(fullName) + '&background=232f3e&color=fff';
             } catch (error) {
                 console.error('Error loading profile:', error);
+            }
+        });
+
+        document.getElementById('resendVerifyBtn').addEventListener('click', async () => {
+            const msgEl = document.getElementById('verifyMsg');
+            try {
+                await sendEmailVerification(auth.currentUser);
+                msgEl.innerText = '✅ Verification email sent! Please check your inbox (and spam folder).';
+                msgEl.style.color = '#28a745';
+                msgEl.style.display = 'block';
+            } catch (error) {
+                msgEl.innerText = 'Unable to send email right now. Please try again shortly.';
+                msgEl.style.color = '#dc3545';
+                msgEl.style.display = 'block';
             }
         });
 
