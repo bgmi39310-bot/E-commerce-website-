@@ -1,8 +1,22 @@
 import { collection, addDoc, getDocs, query, where, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
+// Very lightweight spam heuristics — catches obvious junk without blocking genuine reviews.
+function looksLikeSpam(text) {
+    if (!text) return false;
+    const lower = text.toLowerCase();
+    if (/https?:\/\/|www\./.test(lower)) return true;              // links
+    if (/(.)\1{6,}/.test(text)) return true;                        // "aaaaaaaa" style flooding
+    if (/\b(buy now|click here|whatsapp me|call \d{6,})\b/.test(lower)) return true; // spam phrases
+    return false;
+}
+
 export async function submitReview(db, { orderId, productId, sellerUid, buyerUid, buyerName, rating, comment }, refreshCallback) {
     if (!rating || rating < 1 || rating > 5) {
         alert("Please select a star rating.");
+        return;
+    }
+    if (looksLikeSpam(comment)) {
+        alert("Your review looks like it may contain spam (links or promotional text). Please rewrite it without links.");
         return;
     }
     try {
@@ -72,4 +86,3 @@ export async function loadProductReviews(db, productId) {
         container.innerHTML = `<p style="color:#888; font-size:13px;">Unable to load reviews right now.</p>`;
     }
 }
-
