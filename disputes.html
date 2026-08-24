@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Disputes - DesiMarket</title>
+<style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8f9fa; margin: 0; color: #0f1111; }
+    header { background: #232f3e; color: white; padding: 15px 20px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 998; }
+    .back-arrow { font-size: 20px; cursor: pointer; }
+    .header-title { font-size: 18px; font-weight: bold; flex-grow: 1; }
+    .new-btn { background: #ffd814; border: 1px solid #fcd200; padding: 7px 14px; border-radius: 5px; font-weight: bold; font-size: 12.5px; cursor: pointer; }
+
+    .container { max-width: 650px; margin: 20px auto; padding: 15px; }
+
+    .dispute-card { background: white; border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .dispute-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .dispute-preview { font-size: 13px; color: #666; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dispute-status { font-size: 10.5px; font-weight: bold; padding: 3px 9px; border-radius: 10px; }
+    .status-Open { background: #fff3cd; color: #8a6800; }
+    .status-Resolved { background: #d4edda; color: #1a7f4b; }
+    .status-Closed { background: #e2e3e5; color: #383d41; }
+
+    .no-disputes { text-align: center; padding: 50px 20px; background: white; border-radius: 8px; color: #666; }
+
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 500; align-items: flex-end; justify-content: center; }
+    .modal-overlay.active { display: flex; }
+    .modal-box { background: white; width: 100%; max-width: 480px; border-radius: 14px 14px 0 0; padding: 20px; max-height: 88vh; overflow-y: auto; }
+    @media(min-width: 600px) { .modal-overlay { align-items: center; } .modal-box { border-radius: 12px; } }
+    .modal-close { float: right; font-size: 22px; cursor: pointer; color: #767676; }
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 4px; }
+    .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; }
+    .submit-dispute-btn { width: 100%; background: #dc3545; color: white; border: none; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<header>
+    <div class="back-arrow" onclick="history.back()">⬅️</div>
+    <div class="header-title">My Disputes</div>
+    <button class="new-btn" onclick="openDisputeModal()">➕ Raise Dispute</button>
+</header>
+
+<div class="container" id="disputesContainer">
+    <p style="text-align:center; color:#888;">Loading disputes...</p>
+</div>
+
+<div class="modal-overlay" id="disputeModal">
+    <div class="modal-box">
+        <span class="modal-close" onclick="closeDisputeModal()">&times;</span>
+        <h3>Raise a Dispute</h3>
+        <p style="font-size:12.5px; color:#767676; margin-top:0;">Use this if a Report or Return request didn't resolve your issue. Our team will step in.</p>
+
+        <div class="form-group">
+            <label>Related Order ID</label>
+            <input type="text" id="disputeOrderId" placeholder="Paste the Order ID from My Orders">
+        </div>
+        <div class="form-group">
+            <label>Subject</label>
+            <input type="text" id="disputeSubject" placeholder="Brief summary of the issue">
+        </div>
+        <div class="form-group">
+            <label>Description</label>
+            <textarea id="disputeDescription" rows="4" placeholder="Explain what happened in detail"></textarea>
+        </div>
+
+        <button class="submit-dispute-btn" id="submitDisputeBtn">Submit Dispute</button>
+    </div>
+</div>
+
+<script type="module">
+    import { db, auth } from './firebase-config.js';
+    import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { createDispute, loadMyDisputes } from './dispute-logic.js';
+
+    let currentUid = null;
+    let currentName = 'DesiMarket User';
+
+    window.openDisputeModal = function() {
+        document.getElementById('disputeModal').classList.add('active');
+    };
+    window.closeDisputeModal = function() {
+        document.getElementById('disputeModal').classList.remove('active');
+    };
+
+    document.getElementById('submitDisputeBtn').addEventListener('click', async () => {
+        const orderId = document.getElementById('disputeOrderId').value.trim();
+        const subject = document.getElementById('disputeSubject').value.trim();
+        const description = document.getElementById('disputeDescription').value.trim();
+
+        if (!orderId) { alert('Please enter the related Order ID.'); return; }
+
+        try {
+            const orderSnap = await getDoc(doc(db, "orders", orderId));
+            if (!orderSnap.exists()) { alert('Order not found. Please check the Order ID.'); return; }
+            const order = orderSnap.data();
+
+            const isBuyer = order.buyerUid === currentUid;
+            const isSeller = order.sellerUid === currentUid;
+            if (!isBuyer && !isSeller) { alert('This order is not linked to your account.'); return; }
+
+            const raisedByRole = isBuyer ? 'buyer' : 'seller';
+            const againstUid = isBuyer ? order.sellerUid : order.buyerUid;
+
+            await createDispute(db, {
+                orderId, raisedByUid: currentUid, raisedByName: currentName, raisedByRole, againstUid,
+                subject, description
+            }, () => {
+                closeDisputeModal();
+                loadMyDisputes(db, currentUid);
+            });
+        } catch (error) {
+            console.error(error);
+            alert('Unable to submit dispute right now.');
+        }
+    });
+
+    onAuthStateChanged(auth, async (user) => {
+        if (!user) {
+            document.getElementById('disputesContainer').innerHTML = `<div class="no-disputes">Please login to view disputes.<br><a href="login.html">Login</a></div>`;
+            return;
+        }
+        currentUid = user.uid;
+        const userSnap = await getDoc(doc(db, "users", user.uid));
+        currentName = userSnap.exists() ? userSnap.data().name : 'DesiMarket User';
+        loadMyDisputes(db, user.uid);
+    });
+</script>
+</body>
+</html>
+
