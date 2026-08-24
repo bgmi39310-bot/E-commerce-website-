@@ -175,6 +175,8 @@
             <button class="sidebar-nav-item" id="nav-reports" onclick="switchTab('reports')"><span class="icon">⚠️</span> Reports</button>
             <button class="sidebar-nav-item" id="nav-kyc" onclick="switchTab('kyc')"><span class="icon">🪪</span> Seller KYC</button>
             <button class="sidebar-nav-item" id="nav-banners" onclick="switchTab('banners')"><span class="icon">🖼️</span> Banners</button>
+            <button class="sidebar-nav-item" id="nav-disputes" onclick="switchTab('disputes')"><span class="icon">⚖️</span> Disputes</button>
+            <button class="sidebar-nav-item" id="nav-reviews" onclick="switchTab('reviews')"><span class="icon">⭐</span> Reviews</button>
         </div>
         <div class="sidebar-logout">
             <button id="logoutBtn">Logout</button>
@@ -279,6 +281,16 @@
                 <div id="bannersContainer"><p>Loading banners...</p></div>
             </div>
 
+            <!-- DISPUTES -->
+            <div class="admin-section" id="section-disputes">
+                <div id="disputesAdminContainer"><p>Loading disputes...</p></div>
+            </div>
+
+            <!-- REVIEWS -->
+            <div class="admin-section" id="section-reviews">
+                <div id="reviewsAdminContainer"><p>Loading reviews...</p></div>
+            </div>
+
         </div>
     </div>
 
@@ -291,9 +303,10 @@
     import {
         loadDashboardCharts, loadSellers, loadBuyers, toggleBlockUser,
         loadAllProducts, deleteProductAdmin, loadAllOrders, loadReports, resolveReport,
-        loadPendingKyc, updateKycStatus
+        loadPendingKyc, updateKycStatus, loadAllReviews, deleteReviewAdmin
     } from './admin-logic.js';
     import { loadAllBanners, createBanner, toggleBannerActive, deleteBanner } from './banner-logic.js';
+    import { loadAllDisputes } from './dispute-logic.js';
 
     document.getElementById('topbarDate').innerText = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -454,7 +467,7 @@
         document.getElementById('menuOverlay').style.display = document.getElementById('sidebar').classList.contains('open') ? 'block' : 'none';
     };
 
-    const PAGE_TITLES = { dashboard: 'Dashboard', sellers: 'Sellers', buyers: 'Buyers', products: 'Products', orders: 'Orders', reports: 'Reports', kyc: 'Seller KYC', banners: 'Banners' };
+    const PAGE_TITLES = { dashboard: 'Dashboard', sellers: 'Sellers', buyers: 'Buyers', products: 'Products', orders: 'Orders', reports: 'Reports', kyc: 'Seller KYC', banners: 'Banners', disputes: 'Disputes', reviews: 'Reviews' };
 
     window.switchTab = function(tabName) {
         document.querySelectorAll('.sidebar-nav-item').forEach(b => b.classList.remove('active'));
@@ -474,6 +487,13 @@
         if (tabName === 'reports') loadReports(db);
         if (tabName === 'kyc') loadPendingKyc(db);
         if (tabName === 'banners') loadAllBanners(db);
+        if (tabName === 'disputes') loadAllDisputes(db);
+        if (tabName === 'reviews') loadAllReviews(db);
+    };
+
+    window.deleteReviewMain = function(reviewId) {
+        if (!confirm('Remove this review? This cannot be undone.')) return;
+        deleteReviewAdmin(db, reviewId, () => loadAllReviews(db));
     };
 
     window.createBannerMain = function() {
