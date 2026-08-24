@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dispute - DesiMarket</title>
+<style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #eaeded; margin: 0; height: 100vh; display: flex; flex-direction: column; }
+
+    header { background: #232f3e; padding: 14px 18px; flex-shrink: 0; }
+    .back-arrow { color: white; font-size: 20px; cursor: pointer; text-decoration: none; margin-right: 10px; }
+    .header-row { display: flex; align-items: center; gap: 10px; }
+    .dispute-title { color: white; font-size: 15px; font-weight: bold; flex-grow: 1; }
+    .status-select { padding: 5px 8px; border-radius: 5px; border: none; font-size: 12px; font-weight: bold; }
+
+    .info-box { background: white; padding: 14px 18px; border-bottom: 1px solid #ddd; flex-shrink: 0; }
+    .info-box p { margin: 3px 0; font-size: 13px; color: #444; }
+
+    .messages-wrap { flex-grow: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+    .msg-bubble { max-width: 78%; padding: 9px 13px; border-radius: 14px; font-size: 14px; line-height: 1.4; }
+    .msg-mine { align-self: flex-end; background: #ffd814; color: #111; border-bottom-right-radius: 3px; }
+    .msg-theirs { align-self: flex-start; background: white; color: #111; border-bottom-left-radius: 3px; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+    .msg-sender { font-size: 10.5px; color: #666; margin-bottom: 2px; font-weight: bold; }
+    .msg-time { font-size: 10px; color: #888; margin-top: 3px; }
+
+    .input-bar { display: flex; gap: 8px; padding: 12px; background: white; border-top: 1px solid #eee; flex-shrink: 0; }
+    .input-bar input { flex-grow: 1; padding: 11px 14px; border: 1px solid #ddd; border-radius: 20px; font-size: 14px; outline: none; }
+    .send-btn { background: #dc3545; color: white; border: none; width: 42px; height: 42px; border-radius: 50%; font-size: 16px; cursor: pointer; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<header>
+    <div class="header-row">
+        <a href="javascript:history.back()" class="back-arrow">⬅️</a>
+        <div class="dispute-title" id="disputeTitle">Loading...</div>
+        <select class="status-select" id="statusSelect" style="display:none;">
+            <option value="Open">Open</option>
+            <option value="Resolved">Resolved</option>
+            <option value="Closed">Closed</option>
+        </select>
+    </div>
+</header>
+
+<div class="info-box" id="infoBox"></div>
+
+<div class="messages-wrap" id="messagesWrap">
+    <p style="text-align:center; color:#888;">Loading conversation...</p>
+</div>
+
+<div class="input-bar">
+    <input type="text" id="msgInput" placeholder="Type a message...">
+    <button class="send-btn" id="sendBtn">➤</button>
+</div>
+
+<script type="module">
+    import { db, auth } from './firebase-config.js';
+    import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { sendDisputeMessage, listenToDisputeMessages, updateDisputeStatus } from './dispute-logic.js';
+
+    const params = new URLSearchParams(window.location.search);
+    const disputeId = params.get('id');
+    let currentUid = null;
+    let currentName = 'User';
+    let isAdmin = false;
+
+    async function init(user) {
+        currentUid = user.uid;
+
+        const userSnap = await getDoc(doc(db, "users", user.uid));
+        const userData = userSnap.exists() ? userSnap.data() : {};
+        currentName = userData.name || 'User';
+        isAdmin = userData.isAdmin === true;
+
+        const disputeSnap = await getDoc(doc(db, "disputes", disputeId));
+        if (!disputeSnap.exists()) {
+            document.getElementById('disputeTitle').innerText = 'Dispute not found';
+            return;
+        }
+        const dispute = disputeSnap.data();
+
+        document.getElementById('disputeTitle').innerText = dispute.subject;
+        document.getElementById('infoBox').innerHTML = `
+            <p><strong>Order:</strong> ${dispute.orderId}</p>
+            <p><strong>Description:</strong> ${dispute.description}</p>
+        `;
+
+        if (isAdmin) {
+            const select = document.getElementById('statusSelect');
+            select.style.display = 'block';
+            select.value = dispute.status;
+            select.addEventListener('change', () => {
+                updateDisputeStatus(db, disputeId, select.value);
+            });
+        }
+
+        listenToDisputeMessages(db, disputeId, renderMessages);
+    }
+
+    function renderMessages(messages) {
+        const wrap = document.getElementById('messagesWrap');
+        if (messages.length === 0) {
+            wrap.innerHTML = `<p style="text-align:center; color:#888;">No messages yet. Describe your concern to get started.</p>`;
+            return;
+        }
+        wrap.innerHTML = messages.map(m => {
+            const mine = m.senderUid === currentUid;
+            const time = m.createdAt && m.createdAt.toDate ? m.createdAt.toDate().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '';
+            return `
+                <div class="msg-bubble ${mine ? 'msg-mine' : 'msg-theirs'}">
+                    ${!mine ? `<div class="msg-sender">${m.senderName}</div>` : ''}
+                    ${m.text}
+                    <div class="msg-time">${time}</div>
+                </div>
+            `;
+        }).join('');
+        wrap.scrollTop = wrap.scrollHeight;
+    }
+
+    function sendCurrentMessage() {
+        const input = document.getElementById('msgInput');
+        const text = input.value.trim();
+        if (!text || !disputeId) return;
+        sendDisputeMessage(db, disputeId, currentUid, currentName, text);
+        input.value = '';
+    }
+
+    document.getElementById('sendBtn').addEventListener('click', sendCurrentMessage);
+    document.getElementById('msgInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendCurrentMessage(); });
+
+    onAuthStateChanged(auth, (user) => {
+        if (!user) {
+            document.getElementById('messagesWrap').innerHTML = `<p style="text-align:center; color:#888;">Please login to view this dispute.</p>`;
+            return;
+        }
+        init(user);
+    });
+</script>
+</body>
+</html>
