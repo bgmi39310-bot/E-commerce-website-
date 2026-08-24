@@ -123,6 +123,54 @@ export async function loadOverviewStats(db) {
     }
 }
 
+// ---------- REVIEW MODERATION ----------
+export async function loadAllReviews(db) {
+    const container = document.getElementById('reviewsAdminContainer');
+    container.innerHTML = "<p>Loading reviews...</p>";
+
+    try {
+        const snap = await getDocs(collection(db, "reviews"));
+        if (snap.empty) {
+            container.innerHTML = `<div class="admin-no-data">No reviews submitted yet.</div>`;
+            return;
+        }
+
+        let reviews = [];
+        snap.forEach(d => reviews.push({ id: d.id, ...d.data() }));
+        reviews.sort((a, b) => {
+            const ta = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate() : 0;
+            const tb = b.createdAt && b.createdAt.toDate ? b.createdAt.toDate() : 0;
+            return tb - ta;
+        });
+
+        container.innerHTML = reviews.map(r => `
+            <div class="admin-row-card">
+                <div class="arc-info">
+                    <h4>${'★'.repeat(r.rating || 0)}${'☆'.repeat(5 - (r.rating || 0))} — ${r.buyerName || 'Anonymous'}</h4>
+                    <p>${r.comment || '(no comment)'}</p>
+                    <p class="uid-tag">Product ID: ${r.productId || 'N/A'}</p>
+                </div>
+                <div class="arc-actions">
+                    <button class="admin-btn admin-btn-delete" onclick="deleteReviewMain('${r.id}')">🗑️ Remove</button>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error(error);
+        container.innerHTML = `<p style="color:red;">Unable to load reviews.</p>`;
+    }
+}
+
+export async function deleteReviewAdmin(db, reviewId, refreshCallback) {
+    try {
+        await deleteDoc(doc(db, "reviews", reviewId));
+        if (refreshCallback) refreshCallback();
+    } catch (error) {
+        console.error(error);
+        alert("Error removing review.");
+    }
+}
+
 // ---------- REPORTS ----------
 export async function loadReports(db) {
     const container = document.getElementById('reportsContainer');
