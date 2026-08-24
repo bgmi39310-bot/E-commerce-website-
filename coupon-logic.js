@@ -1,10 +1,20 @@
 import { collection, addDoc, getDocs, query, where, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { isPremiumSeller, countSellerActiveCoupons, FREE_TIER_LIMITS } from './premium-logic.js';
 
 export async function addCoupon(db, sellerUid, code, discountType, value, refreshCallback) {
     const cleanCode = code.trim().toUpperCase();
     if (!cleanCode) { alert("Please enter a coupon code."); return; }
     if (!value || Number(value) <= 0) { alert("Please enter a valid discount value."); return; }
     if (discountType === 'percent' && Number(value) > 90) { alert("Percentage discount can't exceed 90%."); return; }
+
+    const premium = await isPremiumSeller(db, sellerUid);
+    if (!premium) {
+        const activeCount = await countSellerActiveCoupons(db, sellerUid);
+        if (activeCount >= FREE_TIER_LIMITS.maxActiveCoupons) {
+            alert(`Free sellers can have ${FREE_TIER_LIMITS.maxActiveCoupons} active coupon at a time. Upgrade to Premium for unlimited coupons!`);
+            return;
+        }
+    }
 
     try {
         await addDoc(collection(db, "coupons"), {
@@ -99,4 +109,3 @@ export async function validateCoupon(db, code) {
         return null;
     }
 }
-
