@@ -47,7 +47,7 @@ export async function bulkUploadProducts(db, currentLoggedInUser, shopName, file
             return;
         }
 
-        // Skip header row (line 0), expect: name,price,unit,stock,material,warranty,image,description
+        // Skip header row (line 0), expect: name,price,unit,stock,material,warranty,image,description,category
         const rows = lines.slice(1);
         let successCount = 0;
         let failCount = 0;
@@ -56,7 +56,7 @@ export async function bulkUploadProducts(db, currentLoggedInUser, shopName, file
 
         for (const line of rows) {
             const cols = parseCsvLine(line);
-            const [name, price, unit, stock, material, warranty, image, description] = cols;
+            const [name, price, unit, stock, material, warranty, image, description, category] = cols;
 
             if (!name || !price) { failCount++; continue; }
 
@@ -71,6 +71,7 @@ export async function bulkUploadProducts(db, currentLoggedInUser, shopName, file
                     image: (image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300').trim(),
                     images: [(image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300').trim()],
                     description: (description || `${name} available in best quality.`).trim(),
+                    category: (category || 'other').trim().toLowerCase(),
                     shopName: shopName,
                     sellerUid: currentLoggedInUser.uid,
                     createdAt: new Date()
