@@ -179,6 +179,7 @@
     <div class="category-strip" id="categoryStrip">
         <div class="category-chip active" data-cat="all" data-i18n="categoryAll">All</div>
         <div class="category-chip" data-cat="grocery" data-i18n="categoryGrocery">Grocery</div>
+        <div class="category-chip" data-cat="vegetables">Vegetables & Fruits</div>
         <div class="category-chip" data-cat="clothing" data-i18n="categoryClothing">Clothing</div>
         <div class="category-chip" data-cat="electronics" data-i18n="categoryElectronics">Electronics</div>
         <div class="category-chip" data-cat="home" data-i18n="categoryHome">Home & Kitchen</div>
@@ -413,10 +414,7 @@
             let filtered = allProducts;
 
             if (currentCategory !== 'all') {
-                filtered = filtered.filter(p => {
-                    const haystack = ((p.name || '') + ' ' + (p.description || '') + ' ' + (p.category || '')).toLowerCase();
-                    return haystack.includes(currentCategory);
-                });
+                filtered = filtered.filter(p => (p.category || '').toLowerCase() === currentCategory);
             }
 
             if (searchQuery) {
