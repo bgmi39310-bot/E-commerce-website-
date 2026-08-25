@@ -1,21 +1,38 @@
-import { collection, getDocs, doc, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, onSnapshot, doc, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 let allOrders = [];
 let currentStatusFilter = 'Pending';
+let unsubscribeOrders = null;
 
-export async function fetchDashboardOrders(db, uid) {
+// Live listener — once set up, order list AND status changes update automatically
+// on screen without ever needing to re-fetch. This is the #1 fix for excess reads.
+export function fetchDashboardOrders(db, uid, onOrdersUpdate) {
     const container = document.getElementById('dashboardOrdersContainer');
-    try {
-        const q = query(collection(db, "orders"), where("sellerUid", "==", uid));
-        const querySnapshot = await getDocs(q);
+
+    if (unsubscribeOrders) {
+        unsubscribeOrders();
+        unsubscribeOrders = null;
+    }
+
+    const q = query(collection(db, "orders"), where("sellerUid", "==", uid));
+
+    unsubscribeOrders = onSnapshot(q, (querySnapshot) => {
         allOrders = [];
         querySnapshot.forEach((docSnap) => {
             allOrders.push({ id: docSnap.id, ...docSnap.data() });
         });
         displayDashboardOrders();
-    } catch (error) {
+        if (onOrdersUpdate) onOrdersUpdate(allOrders); // lets analytics recompute from the same data, no extra reads
+    }, (error) => {
         console.error("Error fetching orders: ", error);
         container.innerHTML = "<p style='color:red;'>Error loading orders.</p>";
+    });
+}
+
+export function stopListeningToOrders() {
+    if (unsubscribeOrders) {
+        unsubscribeOrders();
+        unsubscribeOrders = null;
     }
 }
 
@@ -68,38 +85,34 @@ function displayDashboardOrders() {
     container.innerHTML = html;
 }
 
-export async function updateOrderStatus(db, orderId, newStatus, uid, fetchOrdersCallback) {
+// NOTE: these action functions no longer take/call a "refetch" callback.
+// The onSnapshot listener above already picks up the change automatically.
+export async function updateOrderStatus(db, orderId, newStatus) {
     try {
         const orderRef = doc(db, "orders", orderId);
         await updateDoc(orderRef, { status: newStatus, [newStatus.toLowerCase() + 'At']: new Date() });
-        alert(`Order marked as ${newStatus}!`);
-        fetchOrdersCallback(db, uid);
     } catch (error) {
         console.error("Error updating status: ", error);
         alert("Error updating order status.");
     }
 }
 
-// Generates a 4-digit delivery OTP when the seller ships the order.
-// The OTP is stored on the order and shown ONLY to the buyer (never to the seller ahead of time).
-export async function markAsShipped(db, orderId, uid, fetchOrdersCallback) {
+export async function markAsShipped(db, orderId) {
     try {
         const otp = Math.floor(1000 + Math.random() * 9000).toString();
         const orderRef = doc(db, "orders", orderId);
         await updateDoc(orderRef, { status: 'Shipped', shippedAt: new Date(), deliveryOTP: otp });
         alert("Order marked as Shipped! 🚚\n\nThe buyer will now see a Delivery OTP on their Orders page. Ask them for it when you hand over the package, to confirm delivery.");
-        fetchOrdersCallback(db, uid);
     } catch (error) {
         console.error("Error marking shipped:", error);
         alert("Error updating order status.");
     }
 }
 
-// Seller must enter the OTP the buyer received to confirm the order was actually delivered.
-export async function confirmDelivery(db, orderId, uid, fetchOrdersCallback) {
+export async function confirmDelivery(db, orderId) {
     const order = allOrders.find(o => o.id === orderId);
     if (!order) {
-        alert("Order not found. Please refresh and try again.");
+        alert("Order not found. Please try again.");
         return;
     }
 
@@ -115,7 +128,6 @@ export async function confirmDelivery(db, orderId, uid, fetchOrdersCallback) {
         const orderRef = doc(db, "orders", orderId);
         await updateDoc(orderRef, { status: 'Delivered', deliveredAt: new Date() });
         alert("✅ Delivery confirmed! Order marked as Delivered.");
-        fetchOrdersCallback(db, uid);
     } catch (error) {
         console.error("Error confirming delivery:", error);
         alert("Error updating order status.");
