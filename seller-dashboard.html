@@ -189,6 +189,16 @@
             <div class="form-grid">
                 <input type="text" id="pName" placeholder="Product Name">
                 <input type="number" id="pPrice" placeholder="Price per unit (₹)">
+                <select id="pCategory">
+                    <option value="">Select Category</option>
+                    <option value="grocery">🛒 Grocery</option>
+                    <option value="vegetables">🥦 Vegetables & Fruits</option>
+                    <option value="clothing">👕 Clothing</option>
+                    <option value="electronics">🔌 Electronics</option>
+                    <option value="home">🏠 Home & Kitchen</option>
+                    <option value="beauty">💄 Beauty & Personal Care</option>
+                    <option value="other">📦 Other</option>
+                </select>
                 <select id="pUnit">
                     <option value="Per Piece">Per Piece</option>
                     <option value="Per Kg">Per Kg</option>
@@ -235,7 +245,7 @@
             <h2>2b. 📑 Bulk Upload Products (CSV)</h2>
             <p style="font-size:13px; color:#666; margin-top:0;">
                 Upload many products at once using a CSV file. Columns required (in this exact order):<br>
-                <code style="background:#f0f2f2; padding:2px 6px; border-radius:4px;">name,price,unit,stock,material,warranty,image,description</code>
+                <code style="background:#f0f2f2; padding:2px 6px; border-radius:4px;">name,price,unit,stock,material,warranty,image,description,category</code>
             </p>
             <input type="file" id="csvFileInput" accept=".csv" style="margin-bottom:10px;">
             <button onclick="bulkUploadMain()" class="action-btn">⬆️ Upload CSV</button>
@@ -319,8 +329,8 @@
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { loadSellerProfileFromFirestore, saveSellerProfile } from './profile-logic.js';
         import { addProductToFirebase, fetchMyListedProducts, editProduct, deleteProduct, stopListeningToMyProducts } from './product-logic.js';
-        import { fetchDashboardOrders, filterOrders, updateOrderStatus, markAsShipped, confirmDelivery } from './order-logic.js';
-        import { loadAnalytics, downloadSalesReport } from './analytics-logic.js';
+        import { fetchDashboardOrders, filterOrders, updateOrderStatus, markAsShipped, confirmDelivery, stopListeningToOrders } from './order-logic.js';
+        import { renderAnalyticsFromOrders, downloadSalesReport } from './analytics-logic.js';
         import { bulkUploadProducts } from './bulk-upload-logic.js';
         import { listenForNewOrders, clearUnreadNotifications } from './notification-logic.js';
         import { wireImageUpload } from './image-upload.js';
@@ -398,21 +408,18 @@
                 });
 
                 await loadSellerProfileFromFirestore(db, user.uid);
-                fetchDashboardOrders(db, user.uid);
+                fetchDashboardOrders(db, user.uid, renderAnalyticsFromOrders);
                 fetchMyListedProducts(db, user.uid, renderLowStockAlerts);
-                loadAnalytics(db, user.uid);
                 loadMyCoupons(db, user.uid);
                 loadReturnRequests(db, user.uid);
                 loadPayoutSummary(db, user.uid);
                 loadKycStatus(db, user.uid);
                 loadSellerQuestions(db, user.uid);
 
-                // Real-time new-order notifications (bell badge + browser notification + chime)
-                listenForNewOrders(db, user.uid, (newOrders) => {
-                    // Refresh the orders list and analytics whenever a new order comes in
-                    fetchDashboardOrders(db, user.uid);
-                    loadAnalytics(db, user.uid);
-                });
+                // Real-time new-order notifications (bell badge + browser notification + chime).
+                // No manual refresh needed here — the live orders listener above
+                // already updates the screen automatically when a new order arrives.
+                listenForNewOrders(db, user.uid, () => {});
             } else {
                 window.location.href = "login.html";
             }
@@ -459,28 +466,19 @@
 
         window.updateOrderStatus = function(orderId, newStatus) {
             if(currentLoggedInUser) {
-                updateOrderStatus(db, orderId, newStatus, currentLoggedInUser.uid, (uid) => {
-                    fetchDashboardOrders(db, uid);
-                    loadAnalytics(db, uid);
-                });
+                updateOrderStatus(db, orderId, newStatus);
             }
         }
 
         window.markShippedMain = function(orderId) {
             if(currentLoggedInUser) {
-                markAsShipped(db, orderId, currentLoggedInUser.uid, (uid) => {
-                    fetchDashboardOrders(db, uid);
-                    loadAnalytics(db, uid);
-                });
+                markAsShipped(db, orderId);
             }
         }
 
         window.confirmDeliveryMain = function(orderId) {
             if(currentLoggedInUser) {
-                confirmDelivery(db, orderId, currentLoggedInUser.uid, (uid) => {
-                    fetchDashboardOrders(db, uid);
-                    loadAnalytics(db, uid);
-                });
+                confirmDelivery(db, orderId);
             }
         }
 
@@ -535,10 +533,11 @@
             bulkUploadProducts(db, currentLoggedInUser, shopName, file, (uid) => fetchMyListedProducts(db, uid));
         }
 
-        // Close the live products listener when leaving the page, so it doesn't
+        // Close the live listeners when leaving the page, so they don't
         // keep consuming Firestore reads in the background.
         window.addEventListener('pagehide', () => {
             stopListeningToMyProducts();
+            stopListeningToOrders();
         });
     </script>
 </body>
