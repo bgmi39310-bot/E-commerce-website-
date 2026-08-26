@@ -499,7 +499,7 @@
 
     window.deleteReviewMain = function(reviewId) {
         if (!confirm('Remove this review? This cannot be undone.')) return;
-        deleteReviewAdmin(db, reviewId, () => loadAllReviews(db));
+        deleteReviewAdmin(db, reviewId);
     };
 
     window.createBannerMain = function() {
@@ -513,7 +513,7 @@
             document.getElementById('bannerTitle').value = '';
             document.getElementById('bannerSubtitle').value = '';
             document.getElementById('bannerLinkUrl').value = '';
-            loadAllBanners(db);
+            loadAllBanners(db); // banners list is small; a fresh load here is cheap and simplest
         });
     };
 
@@ -526,35 +526,34 @@
     };
 
     window.approveKycMain = function(sellerUid) {
-        updateKycStatus(db, sellerUid, 'Verified', () => loadPendingKyc(db));
+        updateKycStatus(db, sellerUid, 'Verified');
     };
 
     window.rejectKycMain = function(sellerUid) {
-        updateKycStatus(db, sellerUid, 'Rejected', () => loadPendingKyc(db));
+        updateKycStatus(db, sellerUid, 'Rejected');
     };
 
     window.dismissReportMain = function(reportId) {
-        resolveReport(db, reportId, () => loadReports(db));
+        resolveReport(db, reportId);
     };
 
     window.deleteReportedProductMain = function(reportId, productId) {
         if (!confirm('Remove this reported product from the marketplace?')) return;
-        deleteProductAdmin(db, productId, () => {
-            resolveReport(db, reportId, () => loadReports(db));
-        });
+        deleteProductAdmin(db, productId);
+        resolveReport(db, reportId);
     };
 
     window.togglePremiumMain = function(sellerUid, isPremium) {
-        setSellerPremium(db, sellerUid, isPremium, () => loadSellers(db));
+        setSellerPremium(db, sellerUid, isPremium, () => setSellerPremiumLocal(sellerUid, isPremium));
     };
 
     window.toggleBlockMain = function(uid, shouldBlock) {
-        toggleBlockUser(db, uid, shouldBlock, () => { loadSellers(db); loadBuyers(db); });
+        toggleBlockUser(db, uid, shouldBlock);
     };
 
     window.deleteProductMain = function(productId) {
         if (!confirm('Remove this product from the marketplace? This cannot be undone.')) return;
-        deleteProductAdmin(db, productId, () => loadAllProducts(db));
+        deleteProductAdmin(db, productId);
     };
 
     window.filterOrdersMain = function() {
