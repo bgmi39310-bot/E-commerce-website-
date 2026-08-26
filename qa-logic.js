@@ -1,5 +1,6 @@
 import { collection, addDoc, getDocs, query, where, doc, updateDoc, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
+// ---------- BUYER SIDE (product.html) ----------
 export async function submitQuestion(db, { productId, sellerUid, askerUid, askerName, question }, refreshCallback) {
     if (!question || !question.trim()) {
         alert("Please type your question first.");
@@ -15,7 +16,7 @@ export async function submitQuestion(db, { productId, sellerUid, askerUid, asker
             createdAt: new Date()
         });
         alert("Your question has been sent to the seller!");
-        if (refreshCallback) refreshCallback();
+        if (refreshCallback) refreshCallback(); // fine here — a buyer asks at most occasionally
     } catch (error) {
         console.error("Error submitting question:", error);
         alert("Unable to submit question right now.");
@@ -58,46 +59,56 @@ export async function loadProductQA(db, productId) {
     }
 }
 
-// ---------- SELLER SIDE ----------
+// ---------- SELLER SIDE (seller-dashboard.html) — local caching, no re-fetch on answer ----------
+let cachedQuestions = [];
+
+function renderSellerQuestions() {
+    const container = document.getElementById('qaSellerContainer');
+    if (!container) return;
+
+    if (cachedQuestions.length === 0) {
+        container.innerHTML = `<div class="no-data">No customer questions yet.</div>`;
+        return;
+    }
+
+    container.innerHTML = cachedQuestions.map(qa => `
+        <div class="order-card">
+            <div class="order-info">
+                <p><strong>${qa.askerName}</strong> asked:</p>
+                <p style="font-style:italic;">"${qa.question}"</p>
+                ${qa.answered
+                    ? `<p style="color:#28a745;"><strong>Your answer:</strong> ${qa.answer}</p>`
+                    : `
+                        <textarea id="answerInput-${qa.id}" rows="2" placeholder="Type your answer..." style="width:100%; padding:8px; border:1px solid #ddd; border-radius:5px; margin-top:6px;"></textarea>
+                        <button class="dash-action-btn btn-accept" style="margin-top:6px;" onclick="submitAnswerMain('${qa.id}')">Send Answer</button>
+                    `
+                }
+            </div>
+        </div>
+    `).join('');
+}
+
 export async function loadSellerQuestions(db, sellerUid) {
     const container = document.getElementById('qaSellerContainer');
     if (!container) return;
+    container.innerHTML = "<p>Loading questions...</p>";
 
     try {
         const q = query(collection(db, "productQuestions"), where("sellerUid", "==", sellerUid));
         const snap = await getDocs(q);
 
-        if (snap.empty) {
-            container.innerHTML = `<div class="no-data">No customer questions yet.</div>`;
-            return;
-        }
+        cachedQuestions = [];
+        snap.forEach(d => cachedQuestions.push({ id: d.id, ...d.data() }));
+        cachedQuestions.sort((a, b) => (a.answered === b.answered) ? 0 : (a.answered ? 1 : -1));
 
-        let items = [];
-        snap.forEach(d => items.push({ id: d.id, ...d.data() }));
-        items.sort((a, b) => (a.answered === b.answered) ? 0 : (a.answered ? 1 : -1));
-
-        container.innerHTML = items.map(qa => `
-            <div class="order-card">
-                <div class="order-info">
-                    <p><strong>${qa.askerName}</strong> asked:</p>
-                    <p style="font-style:italic;">"${qa.question}"</p>
-                    ${qa.answered
-                        ? `<p style="color:#28a745;"><strong>Your answer:</strong> ${qa.answer}</p>`
-                        : `
-                            <textarea id="answerInput-${qa.id}" rows="2" placeholder="Type your answer..." style="width:100%; padding:8px; border:1px solid #ddd; border-radius:5px; margin-top:6px;"></textarea>
-                            <button class="dash-action-btn btn-accept" style="margin-top:6px;" onclick="submitAnswerMain('${qa.id}')">Send Answer</button>
-                        `
-                    }
-                </div>
-            </div>
-        `).join('');
+        renderSellerQuestions();
     } catch (error) {
         console.error("Error loading seller questions:", error);
         container.innerHTML = `<p style="color:red;">Unable to load questions.</p>`;
     }
 }
 
-export async function submitAnswer(db, questionId, answerText, refreshCallback) {
+export async function submitAnswer(db, questionId, answerText) {
     if (!answerText || !answerText.trim()) {
         alert("Please type an answer first.");
         return;
@@ -108,10 +119,12 @@ export async function submitAnswer(db, questionId, answerText, refreshCallback) 
             answered: true,
             answeredAt: new Date()
         });
-        if (refreshCallback) refreshCallback();
+
+        const qa = cachedQuestions.find(x => x.id === questionId);
+        if (qa) { qa.answered = true; qa.answer = answerText.trim(); }
+        renderSellerQuestions();
     } catch (error) {
         console.error("Error submitting answer:", error);
         alert("Unable to submit answer right now.");
     }
 }
-
