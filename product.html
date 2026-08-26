@@ -160,6 +160,25 @@
     <div class="loading-state">Loading product details...</div>
 </div>
 
+<!-- Seller card lives OUTSIDE pageContent on purpose: pageContent gets fully
+     re-rendered on every live stock/price update, which would otherwise wipe
+     out the seller info and reset the Follow button's state on every update. -->
+<div class="container" style="padding-top:0; padding-bottom:0;">
+    <div class="seller-card" id="sellerCard" style="display:none;">
+        <img class="seller-logo" src="https://via.placeholder.com/60" id="sellerLogo" alt="Seller">
+        <div class="seller-info">
+            <h4 id="sellerName">Loading seller info...<span class="verified-tick">✔️</span></h4>
+            <p id="sellerAddress"></p>
+            <p id="sellerPhone"></p>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px; flex-shrink:0;">
+            <button id="askSellerBtn" onclick="askSeller()" style="background:#232f3e; color:white; border:none; padding:9px 16px; border-radius:6px; font-size:12.5px; font-weight:bold; cursor:pointer; white-space:nowrap;">💬 Ask Seller</button>
+            <button id="followSellerBtn" onclick="toggleFollowFromProduct()" style="background:white; color:#232f3e; border:1.5px solid #232f3e; padding:8px 16px; border-radius:6px; font-size:12.5px; font-weight:bold; cursor:pointer; white-space:nowrap;">➕ Follow Shop</button>
+        </div>
+    </div>
+    <div style="text-align:right; margin-top:6px;" id="visitShopWrap"></div>
+</div>
+
 <div class="container" style="padding-top:0;">
     <div class="reviews-card">
         <h3>⭐ Customer Reviews</h3>
@@ -271,8 +290,11 @@
     import { submitQuestion, loadProductQA } from './qa-logic.js';
     import { getOrCreateChat } from './chat-logic.js';
     import { decrementStock } from './stock-logic.js';
+    import { isFollowingSeller, toggleFollowSeller } from './follow-logic.js';
 
     let currentBuyerUid = null;
+    let authReadyResolve;
+    const authReady = new Promise(resolve => { authReadyResolve = resolve; });
 
     // Guest checkout: if the visitor isn't logged in, silently create an
     // anonymous session (no email/password needed) so they can still buy.
@@ -282,7 +304,10 @@
         currentBuyerUid = cred.user.uid;
         return currentBuyerUid;
     }
-    onAuthStateChanged(auth, (user) => { currentBuyerUid = user ? user.uid : null; });
+    onAuthStateChanged(auth, (user) => {
+        currentBuyerUid = user ? user.uid : null;
+        authReadyResolve();
+    });
 
     const params = new URLSearchParams(window.location.search);
     const productId = params.get('id');
@@ -417,38 +442,74 @@
                     `}
                 </div>
             </div>
-            <div class="seller-card" id="sellerCard">
-                <img class="seller-logo" src="https://via.placeholder.com/60" id="sellerLogo" alt="Seller">
-                <div class="seller-info">
-                    <h4 id="sellerName">Loading seller info...<span class="verified-tick">✔️</span></h4>
-                    <p id="sellerAddress"></p>
-                    <p id="sellerPhone"></p>
-                </div>
-                <button id="askSellerBtn" onclick="askSeller()" style="background:#232f3e; color:white; border:none; padding:9px 16px; border-radius:6px; font-size:12.5px; font-weight:bold; cursor:pointer; white-space:nowrap;">💬 Ask Seller</button>
-            </div>
         `;
     }
 
     async function loadSellerInfo(sellerUid) {
+        const sellerCard = document.getElementById('sellerCard');
+        const visitShopWrap = document.getElementById('visitShopWrap');
+
         if (!sellerUid) {
+            sellerCard.style.display = 'flex';
             document.getElementById('sellerName').innerText = 'Local Seller';
+            document.getElementById('followSellerBtn').style.display = 'none';
+            visitShopWrap.innerHTML = '';
             return;
         }
         try {
+            await authReady; // wait for existing session (if any) — don't force-create one just to view a product
             const snap = await getDoc(doc(db, "sellers_profiles", sellerUid));
+            sellerCard.style.display = 'flex';
+            visitShopWrap.innerHTML = `<a href="shop.html?id=${sellerUid}" style="font-size:12.5px; color:#007185; font-weight:600; text-decoration:none;">🏪 Visit Shop Page →</a>`;
+
             if (snap.exists()) {
                 const seller = snap.data();
+                currentSellerData = seller;
                 document.getElementById('sellerLogo').src = seller.logo || 'https://via.placeholder.com/60';
                 document.getElementById('sellerName').innerHTML = `${seller.shopName || 'Local Seller'} <span class="verified-tick">✔️ Verified</span> ${seller.isPremium ? '<span style="background:linear-gradient(135deg,#ffd700,#ff9900); color:#111; font-size:10px; font-weight:bold; padding:2px 8px; border-radius:10px; margin-left:4px;">🌟 PREMIUM</span>' : ''}`;
-                document.getElementById('sellerAddress').innerText = '📍 ' + (seller.address || 'Address not provided');
+                document.getElementById('sellerAddress').innerText = '📍 ' + (seller.city ? seller.city + ' — ' : '') + (seller.address || 'Address not provided');
                 document.getElementById('sellerPhone').innerText = '📞 Contact after order confirmation';
+
+                if (sellerUid !== currentBuyerUid) {
+                    document.getElementById('followSellerBtn').style.display = 'block';
+                    const nowFollowing = await isFollowingSeller(db, currentBuyerUid, sellerUid);
+                    updateFollowBtnUI(nowFollowing);
+                } else {
+                    document.getElementById('followSellerBtn').style.display = 'none';
+                }
             } else {
                 document.getElementById('sellerName').innerText = 'Local Seller';
+                document.getElementById('followSellerBtn').style.display = 'none';
             }
         } catch (e) {
             console.error(e);
         }
     }
+
+    let currentSellerData = null;
+
+    function updateFollowBtnUI(isFollowing) {
+        const btn = document.getElementById('followSellerBtn');
+        if (!btn) return;
+        btn.innerText = isFollowing ? '✓ Following' : '➕ Follow Shop';
+        btn.style.background = isFollowing ? '#eaf6ff' : 'white';
+    }
+
+    window.toggleFollowFromProduct = async function() {
+        if (!currentProduct || !currentProduct.sellerUid) return;
+        await ensureAuthenticated();
+        if (currentProduct.sellerUid === currentBuyerUid) {
+            alert("You can't follow your own shop!");
+            return;
+        }
+        try {
+            const nowFollowing = await toggleFollowSeller(db, currentBuyerUid, currentProduct.sellerUid, currentSellerData);
+            updateFollowBtnUI(nowFollowing);
+        } catch (e) {
+            console.error(e);
+            alert('Something went wrong, please try again.');
+        }
+    };
 
     async function loadRelatedProducts(product) {
         const card = document.getElementById('relatedCard');
