@@ -107,6 +107,23 @@
         .loading-text, .no-product { grid-column: 1 / -1; text-align: center; padding: 40px 20px; font-size: 15px; color: #666; background: white; border-radius: 8px; }
         .no-product a { color: #007185; }
 
+        /* Sellers Near You */
+        .sellers-section-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
+        .sellers-section-head .section-title { margin-bottom: 0; }
+        .sellers-desc { font-size: 12px; color: #666; margin: -2px 0 12px; }
+        .city-select-wrap select { padding: 7px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 12.5px; background: white; }
+        .sellers-scroll { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; }
+        .seller-card-mini { flex-shrink: 0; width: 150px; background: white; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); padding: 14px 10px; text-align: center; }
+        .seller-card-mini img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; border: 1.5px solid #eee; margin-bottom: 8px; }
+        .seller-card-mini .s-name { font-size: 12.5px; font-weight: 700; color: #232f3e; line-height: 1.3; min-height: 32px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .seller-card-mini .s-city { font-size: 11px; color: #777; margin: 3px 0 8px; }
+        .seller-card-mini .s-view-link { display: block; font-size: 11px; color: #007185; font-weight: 600; text-decoration: none; margin-bottom: 6px; }
+        .seller-card-mini .s-follow-btn { width: 100%; background: #232f3e; color: white; border: none; padding: 6px 0; border-radius: 14px; font-size: 11px; font-weight: bold; cursor: pointer; }
+        .seller-card-mini .s-follow-btn.following { background: white; color: #232f3e; border: 1.5px solid #232f3e; }
+        .no-sellers-box { text-align: center; padding: 20px; font-size: 13px; color: #888; background: white; border-radius: 10px; width: 100%; }
+
+        .follow-hint-box { background: #fff8ee; border: 1px dashed #ffb300; border-radius: 8px; padding: 12px 16px; font-size: 12.5px; color: #8a6800; margin-bottom: 24px; }
+
         .mobile-search { display: none; padding: 10px 15px; background: #232f3e; }
         .mobile-search input { width: 100%; padding: 9px; border-radius: 4px; border: none; font-size: 14px; }
 
@@ -175,6 +192,22 @@
         <span><i class="fas fa-headset"></i> <span data-i18n="directContact">Direct Seller Contact</span></span>
     </div>
 
+    <!-- Sellers Near You -->
+    <div class="container" style="padding-bottom:0;">
+        <div class="sellers-section-head">
+            <div class="section-title" data-i18n="sellersNearYou">Sellers Near You</div>
+            <div class="city-select-wrap">
+                <select id="citySelect">
+                    <option value="all" data-i18n="allAreas">All Areas</option>
+                </select>
+            </div>
+        </div>
+        <p class="sellers-desc" data-i18n="sellersNearYouDesc">Discover verified local shops around you</p>
+        <div class="sellers-scroll" id="sellersScroll">
+            <div class="no-sellers-box">Loading local shops...</div>
+        </div>
+    </div>
+
     <!-- Category chips (cosmetic filter based on product name/description match) -->
     <div class="category-strip" id="categoryStrip">
         <div class="category-chip active" data-cat="all" data-i18n="categoryAll">All</div>
@@ -208,6 +241,11 @@
             <div id="recentlyViewedScroll" style="display:flex; gap:12px; overflow-x:auto; padding-bottom:6px;"></div>
         </div>
 
+        <div id="followedFeedWrap" style="display:none; margin-bottom:24px;">
+            <div class="section-title" data-i18n="fromFollowedSellers">🆕 New From Shops You Follow</div>
+            <div id="followedFeedScroll" style="display:flex; gap:12px; overflow-x:auto; padding-bottom:6px;"></div>
+        </div>
+
         <div class="section-title" data-i18n="trendingProducts">Trending Products Near You</div>
         <div id="productGrid" class="product-grid">
             <div class="loading-text">Loading live products...</div>
@@ -221,14 +259,35 @@
 
     <!-- Firebase Live Fetch Logic -->
     <script type="module">
-        import { db } from './firebase-config.js';
+        import { db, auth } from './firebase-config.js';
         import { applyTranslations, toggleLanguage, t } from './i18n.js';
         import { loadActiveBanners } from './banner-logic.js';
-        import { collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { collection, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFollowedSellers, toggleFollowSeller } from './follow-logic.js';
 
         let allProducts = [];
         let currentCategory = 'all';
         let unsubscribeProducts = null;
+
+        // ---------- Anonymous auth (buyers don't need to sign up to follow shops) ----------
+        // IMPORTANT: we do NOT sign visitors in anonymously just for browsing/loading the
+        // page — only when they actually take an action (clicking Follow). This mirrors
+        // product.html's pattern and avoids creating a Firebase Auth account for every
+        // random visitor who never interacts.
+        let currentBuyerUid = null;
+        let authReadyResolve;
+        const authReady = new Promise(resolve => { authReadyResolve = resolve; });
+        async function ensureAuthenticated() {
+            if (currentBuyerUid) return currentBuyerUid;
+            const cred = await signInAnonymously(auth);
+            currentBuyerUid = cred.user.uid;
+            return currentBuyerUid;
+        }
+        onAuthStateChanged(auth, (user) => {
+            currentBuyerUid = user ? user.uid : null;
+            authReadyResolve();
+        });
 
         // Toggle Hamburger Menu
         window.toggleMenu = function() {
@@ -264,6 +323,7 @@
                 });
                 applyFilters();
                 renderRecentlyViewed();
+                renderFollowedFeed();
             }, (error) => {
                 console.error("Error fetching products: ", error);
                 grid.innerHTML = `<div class="no-product">Unable to load products right now. Please check your connection and try again.</div>`;
@@ -447,7 +507,11 @@
 
         // Load products when page opens
         window.switchLanguage = function() {
-            toggleLanguage(() => renderVisibleProducts());
+            toggleLanguage(() => {
+                renderVisibleProducts();
+                applySellerCityFilter();
+                renderFollowedFeed();
+            });
         };
 
         // PWA "Install App" button — shows only when the browser signals the
@@ -506,11 +570,140 @@
             }
         }
 
+        // ---------- Sellers Near You ----------
+        let allSellers = [];
+        let followedSellerIds = new Set();
+
+        async function loadSellersNearYou() {
+            const scrollEl = document.getElementById('sellersScroll');
+            try {
+                const snap = await getDocs(collection(db, "sellers_profiles"));
+                allSellers = [];
+                snap.forEach(d => allSellers.push({ id: d.id, ...d.data() }));
+
+                await authReady; // wait for Firebase to report existing session (if any) — never force-create one here
+                const followed = await getFollowedSellers(db, currentBuyerUid);
+                followedSellerIds = new Set(followed.map(f => f.id));
+
+                populateCityDropdown();
+                renderSellers(allSellers);
+                renderFollowedFeed();
+            } catch (error) {
+                console.error("Error loading sellers:", error);
+                scrollEl.innerHTML = `<div class="no-sellers-box">Unable to load local shops right now.</div>`;
+            }
+        }
+
+        function populateCityDropdown() {
+            const select = document.getElementById('citySelect');
+            const cities = [...new Set(allSellers.map(s => (s.city || '').trim()).filter(c => c))].sort();
+            cities.forEach(city => {
+                const opt = document.createElement('option');
+                opt.value = city;
+                opt.textContent = city;
+                select.appendChild(opt);
+            });
+        }
+
+        document.getElementById('citySelect').addEventListener('change', (e) => {
+            selectedCity = e.target.value;
+            applySellerCityFilter();
+        });
+
+        let selectedCity = 'all';
+        function applySellerCityFilter() {
+            const filtered = selectedCity === 'all' ? allSellers : allSellers.filter(s => (s.city || '').trim() === selectedCity);
+            renderSellers(filtered);
+        }
+
+        function renderSellers(sellers) {
+            const scrollEl = document.getElementById('sellersScroll');
+            if (sellers.length === 0) {
+                scrollEl.innerHTML = `<div class="no-sellers-box">${t('noSellersYet')}</div>`;
+                return;
+            }
+            scrollEl.innerHTML = sellers.map(s => {
+                const isFollowing = followedSellerIds.has(s.id);
+                return `
+                    <div class="seller-card-mini">
+                        <img src="${s.logo || 'https://via.placeholder.com/56'}" alt="${s.shopName || 'Shop'}" loading="lazy" onerror="this.src='https://via.placeholder.com/56'">
+                        <div class="s-name">${s.shopName || 'Local Shop'}</div>
+                        <div class="s-city">📍 ${s.city || 'Nearby'}</div>
+                        <a class="s-view-link" href="shop.html?id=${s.id}">${t('viewShop')}</a>
+                        <button class="s-follow-btn ${isFollowing ? 'following' : ''}" onclick="toggleSellerFollow('${s.id}', this)">${isFollowing ? '✓ ' + t('following') : '➕ ' + t('follow')}</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        window.toggleSellerFollow = async function(sellerId, btnEl) {
+            await ensureAuthenticated();
+            if (sellerId === currentBuyerUid) {
+                alert("You can't follow your own shop!");
+                return;
+            }
+            btnEl.disabled = true;
+            try {
+                const sellerData = allSellers.find(s => s.id === sellerId);
+                const nowFollowing = await toggleFollowSeller(db, currentBuyerUid, sellerId, sellerData);
+                if (nowFollowing) {
+                    followedSellerIds.add(sellerId);
+                    btnEl.innerText = '✓ ' + t('following');
+                    btnEl.classList.add('following');
+                } else {
+                    followedSellerIds.delete(sellerId);
+                    btnEl.innerText = '➕ ' + t('follow');
+                    btnEl.classList.remove('following');
+                }
+                renderFollowedFeed();
+            } catch (e) {
+                console.error(e);
+                alert('Something went wrong, please try again.');
+            } finally {
+                btnEl.disabled = false;
+            }
+        };
+
+        // ---------- Followed Sellers Feed ----------
+        function renderFollowedFeed() {
+            const wrap = document.getElementById('followedFeedWrap');
+            const scrollEl = document.getElementById('followedFeedScroll');
+
+            if (followedSellerIds.size === 0) {
+                wrap.style.display = 'none';
+                return;
+            }
+
+            const followedProducts = allProducts
+                .filter(p => followedSellerIds.has(p.sellerUid))
+                .sort((a, b) => {
+                    const ta = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate() : 0;
+                    const tb = b.createdAt && b.createdAt.toDate ? b.createdAt.toDate() : 0;
+                    return tb - ta;
+                });
+
+            if (followedProducts.length === 0) {
+                wrap.style.display = 'none';
+                return;
+            }
+
+            wrap.style.display = 'block';
+            scrollEl.innerHTML = followedProducts.slice(0, 12).map(p => `
+                <div style="flex-shrink:0; width:130px; cursor:pointer;" onclick="window.location.href='product.html?id=${p.id}'">
+                    <img src="${p.image || 'https://via.placeholder.com/130'}" loading="lazy" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:8px; background:#f5f5f5;" onerror="this.src='https://via.placeholder.com/130?text=No+Image'">
+                    <div style="font-size:11.5px; margin-top:4px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${p.name || 'Product'}</div>
+                    <div style="font-size:10.5px; color:#777;">🏪 ${p.shopName || 'Local Shop'}</div>
+                    <div style="font-size:12.5px; font-weight:bold; color:#B12704;">₹${(parseFloat(p.price) || 0).toFixed(0)}</div>
+                </div>
+            `).join('');
+        }
+
         window.onload = function() {
             applyTranslations();
             fetchLiveProducts();
             updateCartBadge();
             setupHeroBanners();
+            loadSellersNearYou();
         };
     </script>
 </body>
