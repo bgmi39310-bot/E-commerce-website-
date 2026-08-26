@@ -487,32 +487,31 @@
             const code = document.getElementById('couponCode').value;
             const type = document.getElementById('couponType').value;
             const value = document.getElementById('couponValue').value;
-            addCoupon(db, currentLoggedInUser.uid, code, type, value, () => {
+            addCoupon(db, currentLoggedInUser.uid, code, type, value).then(() => {
                 document.getElementById('couponCode').value = '';
                 document.getElementById('couponValue').value = '';
-                loadMyCoupons(db, currentLoggedInUser.uid);
             });
         }
 
         window.toggleCouponMain = function(couponId, active) {
             if (!currentLoggedInUser) return;
-            toggleCouponActive(db, couponId, active, () => loadMyCoupons(db, currentLoggedInUser.uid));
+            toggleCouponActive(db, couponId, active);
         }
 
         window.deleteCouponMain = function(couponId) {
             if (!currentLoggedInUser) return;
-            deleteCoupon(db, couponId, () => loadMyCoupons(db, currentLoggedInUser.uid));
+            deleteCoupon(db, couponId);
         }
 
         window.approveReturnMain = function(orderId) {
             if (!currentLoggedInUser) return;
             if (!confirm('Approve this return? The order will be marked as Returned.')) return;
-            updateReturnStatus(db, orderId, 'Approved', () => loadReturnRequests(db, currentLoggedInUser.uid));
+            updateReturnStatus(db, orderId, 'Approved');
         }
 
         window.rejectReturnMain = function(orderId) {
             if (!currentLoggedInUser) return;
-            updateReturnStatus(db, orderId, 'Rejected', () => loadReturnRequests(db, currentLoggedInUser.uid));
+            updateReturnStatus(db, orderId, 'Rejected');
         }
 
         window.downloadReportMain = function() {
@@ -523,7 +522,7 @@
         window.submitAnswerMain = function(questionId) {
             if (!currentLoggedInUser) return;
             const answerText = document.getElementById('answerInput-' + questionId).value;
-            submitAnswer(db, questionId, answerText, () => loadSellerQuestions(db, currentLoggedInUser.uid));
+            submitAnswer(db, questionId, answerText);
         }
 
         window.bulkUploadMain = function() {
