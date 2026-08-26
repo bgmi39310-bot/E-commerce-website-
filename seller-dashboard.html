@@ -157,6 +157,8 @@
                         <p><strong>Owner:</strong> <span id="dispOwnerName"></span></p>
                         <p><strong>Phone:</strong> <span id="dispPhone"></span></p>
                         <p><strong>Address:</strong> <span id="dispAddress"></span></p>
+                        <p><strong>City / Area:</strong> <span id="dispCity"></span></p>
+                        <p id="dispFollowerCount" style="color:#c7511f; font-weight:bold;"></p>
                         <div class="btn-group-profile">
                             <button class="btn-edit" onclick="enableEditMode()">✏️ Edit Profile</button>
                             <button class="btn-view" onclick="viewMyProfile()">👁️ View Profile ID</button>
@@ -169,6 +171,7 @@
                 <input type="text" id="shopName" placeholder="Shop Name">
                 <input type="text" id="ownerName" placeholder="Owner Name">
                 <input type="text" id="shopPhone" placeholder="Contact Number">
+                <input type="text" id="shopCity" placeholder="City / Area (e.g. Indore, MG Road) — shown under 'Sellers Near You'">
                 <input type="text" id="shopUpiId" placeholder="UPI ID (e.g. yourname@okhdfcbank)">
                 <div class="file-upload-box">
                     <label>Shop Logo:</label>
@@ -340,6 +343,7 @@
         import { loadKycStatus } from './kyc-logic.js';
         import { isPremiumSeller } from './premium-logic.js';
         import { loadSellerQuestions, submitAnswer } from './qa-logic.js';
+        import { getFollowerCount } from './follow-logic.js';
 
         wireImageUpload('shopLogoFileUpload', 'shopLogoFile', 'shopLogoStatus');
         wireImageUpload('pImageFileUpload', 'pImageFile', 'pImageStatus');
@@ -408,6 +412,10 @@
                 });
 
                 await loadSellerProfileFromFirestore(db, user.uid);
+                getFollowerCount(db, user.uid).then(count => {
+                    const el = document.getElementById('dispFollowerCount');
+                    if (el) el.innerText = `👥 ${count} Follower${count === 1 ? '' : 's'}`;
+                });
                 fetchDashboardOrders(db, user.uid, renderAnalyticsFromOrders);
                 fetchMyListedProducts(db, user.uid, renderLowStockAlerts);
                 loadMyCoupons(db, user.uid);
