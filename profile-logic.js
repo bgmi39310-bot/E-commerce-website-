@@ -15,12 +15,16 @@ export async function loadSellerProfileFromFirestore(db, uid) {
             document.getElementById('dispPhone').innerText = profile.phone || 'N/A';
             document.getElementById('dispAddress').innerText = profile.address || 'N/A';
             document.getElementById('dispLogo').src = profile.logo || 'https://via.placeholder.com/80';
+            const dispCityEl = document.getElementById('dispCity');
+            if (dispCityEl) dispCityEl.innerText = profile.city || 'N/A';
 
             document.getElementById('shopName').value = profile.shopName || '';
             document.getElementById('ownerName').value = profile.ownerName || '';
             document.getElementById('shopPhone').value = profile.phone || '';
             document.getElementById('shopLogoFile').value = profile.logo || '';
             document.getElementById('shopAddress').value = profile.address || '';
+            const cityField = document.getElementById('shopCity');
+            if (cityField) cityField.value = profile.city || '';
             const upiField = document.getElementById('shopUpiId');
             if (upiField) upiField.value = profile.upiId || '';
         } else {
@@ -47,6 +51,7 @@ export async function saveSellerProfile(db, currentLoggedInUser, loadProfileCall
         ownerName,
         phone: document.getElementById('shopPhone').value.trim(),
         address: document.getElementById('shopAddress').value.trim(),
+        city: document.getElementById('shopCity') ? document.getElementById('shopCity').value.trim() : '',
         upiId: upiField ? upiField.value.trim() : '',
         logo: logoUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
     };
