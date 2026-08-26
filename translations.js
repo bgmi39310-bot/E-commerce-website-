@@ -33,7 +33,17 @@ export const translations = {
         categoryHome: "Home & Kitchen",
         categoryBeauty: "Beauty",
         noProductsFound: "No products found. Want to sell here?",
-        becomeSellerLink: "Become a Seller"
+        becomeSellerLink: "Become a Seller",
+        sellersNearYou: "Sellers Near You",
+        sellersNearYouDesc: "Discover verified local shops around you",
+        allAreas: "All Areas",
+        viewShop: "View Shop",
+        follow: "Follow",
+        following: "Following",
+        noSellersYet: "No local shops listed in this area yet.",
+        fromFollowedSellers: "🆕 New From Shops You Follow",
+        followHint: "Follow your favourite local shops to see their new products here first!",
+        followersCount: "Followers"
     },
     hi: {
         home: "होम",
@@ -69,7 +79,17 @@ export const translations = {
         categoryHome: "घर व रसोई",
         categoryBeauty: "सौंदर्य",
         noProductsFound: "कोई उत्पाद नहीं मिला। यहाँ बेचना चाहते हैं?",
-        becomeSellerLink: "विक्रेता बनें"
+        becomeSellerLink: "विक्रेता बनें",
+        sellersNearYou: "आपके आस-पास के विक्रेता",
+        sellersNearYouDesc: "अपने आस-पास की सत्यापित स्थानीय दुकानें खोजें",
+        allAreas: "सभी क्षेत्र",
+        viewShop: "दुकान देखें",
+        follow: "फॉलो करें",
+        following: "फॉलो हो रहा है",
+        noSellersYet: "इस क्षेत्र में अभी कोई स्थानीय दुकान सूचीबद्ध नहीं है।",
+        fromFollowedSellers: "🆕 आपकी फॉलो की गई दुकानों से नया",
+        followHint: "अपनी पसंदीदा स्थानीय दुकानों को फॉलो करें ताकि उनके नए उत्पाद सबसे पहले यहाँ दिखें!",
+        followersCount: "फॉलोअर्स"
     }
 };
 
