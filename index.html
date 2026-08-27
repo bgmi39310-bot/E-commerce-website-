@@ -175,8 +175,8 @@
         <a href="cart.html"><i class="fas fa-shopping-cart"></i> Cart</a>
         <hr style="border: 0.5px solid #444;">
         <a href="account.html"><i class="fas fa-user-circle"></i> My Account</a>
-        <a href="seller-dashboard.html"><i class="fas fa-store"></i> <span data-i18n="sellerHub">Seller Hub (डैशबोर्ड)</span></a>
-        <a href="signup.html?role=seller"><i class="fas fa-rocket"></i> <span data-i18n="becomeSeller">Become a Seller</span></a>
+        <a href="seller-dashboard.html" id="menuSellerHub"><i class="fas fa-store"></i> <span data-i18n="sellerHub">Seller Hub (डैशबोर्ड)</span></a>
+        <a href="signup.html?role=seller" id="menuBecomeSeller"><i class="fas fa-rocket"></i> <span data-i18n="becomeSeller">Become a Seller</span></a>
         <hr style="border: 0.5px solid #444;">
         <a href="terms.html"><i class="fas fa-file-contract"></i> <span data-i18n="termsPrivacy">Terms & Privacy</span></a>
     </div>
@@ -264,7 +264,7 @@
         import { db, auth } from './firebase-config.js';
         import { applyTranslations, toggleLanguage, t } from './i18n.js';
         import { loadActiveBanners } from './banner-logic.js';
-        import { collection, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { collection, onSnapshot, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFollowedSellers, toggleFollowSeller } from './follow-logic.js';
         import { mountNotificationBell } from './notif-logic.js';
@@ -300,7 +300,26 @@
             } else {
                 document.getElementById('notifBellMount').innerHTML = '';
             }
+            updateSellerMenuLinks(currentBuyerUid);
         });
+
+        // Show "Become a Seller" only when this account doesn't already have a
+        // shop; "Seller Hub" stays visible either way (it's harmless to click
+        // even before login — it just sends them to login.html).
+        async function updateSellerMenuLinks(uid) {
+            const becomeSellerLink = document.getElementById('menuBecomeSeller');
+            if (!becomeSellerLink) return;
+            if (!uid) {
+                becomeSellerLink.style.display = ''; // logged out — default to showing it
+                return;
+            }
+            try {
+                const snap = await getDoc(doc(db, "sellers_profiles", uid));
+                becomeSellerLink.style.display = snap.exists() ? 'none' : '';
+            } catch (e) {
+                console.error('Error checking seller profile:', e);
+            }
+        }
 
         // Toggle Hamburger Menu
         window.toggleMenu = function() {
