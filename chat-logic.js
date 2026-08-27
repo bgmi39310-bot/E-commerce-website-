@@ -1,4 +1,5 @@
 import { doc, setDoc, getDoc, collection, addDoc, query, orderBy, onSnapshot, where, getDocs, serverTimestamp, updateDoc, increment } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { showToast } from './toast.js';
 
 // Deterministic chat ID so the same buyer+seller pair always reuses the same thread
 function getChatId(uidA, uidB) {
@@ -43,7 +44,7 @@ export async function sendMessage(db, chatId, senderUid, senderRole, text) {
         });
     } catch (error) {
         console.error("Error sending message:", error);
-        alert("Unable to send message right now.");
+        showToast('Unable to send message right now.', 'error');
     }
 }
 
