@@ -9,6 +9,7 @@
     <link rel="icon" href="icon-192.png">
     <link rel="apple-touch-icon" href="icon-192.png">
     <script src="pwa-init.js" defer></script>
+    <script src="click-guard.js"></script>
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
 <script>
     window.dataLayer = window.dataLayer || [];
@@ -201,7 +202,7 @@
         <div id="qaContainer"><p style="color:#888; font-size:13px;">Loading questions...</p></div>
         <div class="ask-question-box">
             <input type="text" id="questionInput" placeholder="Ask a question about this product...">
-            <button onclick="askQuestion()">Ask</button>
+            <button id="askQuestionBtn" onclick="askQuestion()">Ask</button>
         </div>
     </div>
 
@@ -291,6 +292,7 @@
     import { getOrCreateChat } from './chat-logic.js';
     import { decrementStock } from './stock-logic.js';
     import { isFollowingSeller, toggleFollowSeller } from './follow-logic.js';
+    import { showToast } from './toast.js';
 
     let currentBuyerUid = null;
     let authReadyResolve;
@@ -499,15 +501,20 @@
         if (!currentProduct || !currentProduct.sellerUid) return;
         await ensureAuthenticated();
         if (currentProduct.sellerUid === currentBuyerUid) {
-            alert("You can't follow your own shop!");
+            showToast("You can't follow your own shop!", 'error');
             return;
         }
+        const btn = document.getElementById('followSellerBtn');
+        if (btn) btn.disabled = true;
         try {
             const nowFollowing = await toggleFollowSeller(db, currentBuyerUid, currentProduct.sellerUid, currentSellerData);
             updateFollowBtnUI(nowFollowing);
+            showToast(nowFollowing ? 'Following this shop!' : 'Unfollowed.');
         } catch (e) {
             console.error(e);
-            alert('Something went wrong, please try again.');
+            showToast('Something went wrong, please try again.', 'error');
+        } finally {
+            if (btn) btn.disabled = false;
         }
     };
 
@@ -611,7 +618,7 @@
 
         localStorage.setItem('cart', JSON.stringify(cart));
         updateCartBadge();
-        alert('Bundle added to cart! 🛍️');
+        showToast('Bundle added to cart! 🛍️');
     };
 
     window.switchMainImage = function(src, thumbEl) {
@@ -622,16 +629,16 @@
 
     window.askSeller = async function() {
         if (!currentBuyerUid) {
-            alert("Please login to message the seller.");
-            window.location.href = 'login.html';
+            showToast('Please login to message the seller.', 'error');
+            setTimeout(() => { window.location.href = 'login.html'; }, 900);
             return;
         }
         if (!currentProduct || !currentProduct.sellerUid) {
-            alert("Seller info not available right now.");
+            showToast('Seller info not available right now.', 'error');
             return;
         }
         if (currentProduct.sellerUid === currentBuyerUid) {
-            alert("This is your own product listing.");
+            showToast('This is your own product listing.', 'error');
             return;
         }
         try {
@@ -641,36 +648,42 @@
             window.location.href = `chat.html?chatId=${chatId}`;
         } catch (error) {
             console.error(error);
-            alert("Unable to start chat right now.");
+            showToast('Unable to start chat right now.', 'error');
         }
     };
 
     window.askQuestion = async function() {
         if (!currentProduct) return;
         const input = document.getElementById('questionInput');
+        const askBtn = document.getElementById('askQuestionBtn');
         const question = input.value.trim();
-        if (!question) { alert('Please type your question first.'); return; }
+        if (!question) { showToast('Please type your question first.', 'error'); return; }
 
-        await ensureAuthenticated();
-        const userSnap = await getDoc(doc(db, "users", currentBuyerUid));
-        const askerName = userSnap.exists() ? userSnap.data().name : 'DesiMarket Buyer';
+        if (askBtn) askBtn.disabled = true;
+        try {
+            await ensureAuthenticated();
+            const userSnap = await getDoc(doc(db, "users", currentBuyerUid));
+            const askerName = userSnap.exists() ? userSnap.data().name : 'DesiMarket Buyer';
 
-        submitQuestion(db, {
-            productId: currentProduct.id,
-            productName: currentProduct.name,
-            sellerUid: currentProduct.sellerUid,
-            askerUid: currentBuyerUid,
-            askerName, question
-        }, () => {
-            input.value = '';
-            loadProductQA(db, currentProduct.id);
-        });
+            await submitQuestion(db, {
+                productId: currentProduct.id,
+                productName: currentProduct.name,
+                sellerUid: currentProduct.sellerUid,
+                askerUid: currentBuyerUid,
+                askerName, question
+            }, () => {
+                input.value = '';
+                loadProductQA(db, currentProduct.id);
+            });
+        } finally {
+            if (askBtn) askBtn.disabled = false;
+        }
     };
 
     window.openReportModal = function() {
         if (!currentBuyerUid) {
-            alert("Please login to report a listing.");
-            window.location.href = 'login.html';
+            showToast('Please login to report a listing.', 'error');
+            setTimeout(() => { window.location.href = 'login.html'; }, 900);
             return;
         }
         document.getElementById('reportModal').classList.add('active');
@@ -709,8 +722,8 @@
     function variantsSelected() {
         const sizeChips = document.getElementById('sizeChips');
         const colorChips = document.getElementById('colorChips');
-        if (sizeChips && !selectedVariants.size) { alert('Please select a size.'); return false; }
-        if (colorChips && !selectedVariants.color) { alert('Please select a color.'); return false; }
+        if (sizeChips && !selectedVariants.size) { showToast('Please select a size.', 'error'); return false; }
+        if (colorChips && !selectedVariants.color) { showToast('Please select a color.', 'error'); return false; }
         return true;
     }
 
@@ -749,7 +762,7 @@
         }
         localStorage.setItem('cart', JSON.stringify(cart));
         updateCartBadge();
-        alert(`${currentQty} x ${currentProduct.name} added to cart! 🛍️`);
+        showToast(`${currentQty} x ${currentProduct.name} added to cart! 🛍️`);
     };
 
     window.openBuyModal = async function() {
@@ -789,11 +802,11 @@
         const payment = document.getElementById('buyPayment').value;
 
         if (!name || !phone || !address || !city) {
-            alert('Please fill in all required delivery details.');
+            showToast('Please fill in all required delivery details.', 'error');
             return;
         }
         if (!/^\d{10}$/.test(phone)) {
-            alert('Please enter a valid 10-digit mobile number.');
+            showToast('Please enter a valid 10-digit mobile number.', 'error');
             return;
         }
 
@@ -842,11 +855,11 @@
             });
             localStorage.setItem('myOrders', JSON.stringify(myOrders));
 
-            alert('Order placed successfully! 🎉 The seller has been notified.');
-            window.location.href = 'orders.html';
+            showToast('Order placed successfully! 🎉 The seller has been notified.');
+            setTimeout(() => { window.location.href = 'orders.html'; }, 900);
         } catch (error) {
             console.error(error);
-            alert('Error placing order: ' + error.message);
+            showToast('Error placing order: ' + error.message, 'error');
             btn.disabled = false;
             btn.innerText = 'Place Order';
         }
