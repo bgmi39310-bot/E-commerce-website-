@@ -5,13 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DesiMarket - India's Desi Online Marketplace</title>
 
-    <!-- PWA: makes the site installable as an app on phones -->
+    <!-- PWA & Analytics -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#232f3e">
     <link rel="icon" href="icon-192.png">
     <link rel="apple-touch-icon" href="icon-192.png">
     <script src="pwa-init.js" defer></script>
-    <!-- Google Analytics: create a free GA4 property at analytics.google.com and replace G-XXXXXXXXXX below -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
     <script>
         window.dataLayer = window.dataLayer || [];
@@ -20,11 +19,6 @@
         gtag('config', 'G-XXXXXXXXXX');
     </script>
     <meta name="description" content="Shop directly from verified local vendors near you. Buy groceries, clothing, electronics and more on DesiMarket — India's local online marketplace. Vocal for Local.">
-    <meta name="keywords" content="local marketplace, buy online India, local vendors, desi shopping, online shopping India">
-    <meta property="og:title" content="DesiMarket - India's Desi Online Marketplace">
-    <meta property="og:description" content="Shop directly from verified local vendors near you. Vocal for Local.">
-    <meta property="og:type" content="website">
-    <meta name="robots" content="index, follow">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         :root {
@@ -141,7 +135,7 @@
         <a href="index.html" class="logo-area">Desi<span>Market</span></a>
 
         <div class="search-container">
-            <input type="text" id="searchInput" data-i18n-placeholder="searchPlaceholder" placeholder="Search products, local shops, items...">
+            <input type="text" id="searchInput" placeholder="Search products, local shops, items...">
             <button class="search-btn"><i class="fas fa-search"></i></button>
         </div>
 
@@ -158,7 +152,7 @@
 
     <!-- Mobile Search Bar -->
     <div class="mobile-search">
-        <input type="text" id="mobileSearchInput" data-i18n-placeholder="searchPlaceholder" placeholder="Search products...">
+        <input type="text" id="mobileSearchInput" placeholder="Search products...">
     </div>
 
     <!-- Side Menu Drawer -->
@@ -166,42 +160,42 @@
     <div id="sideMenu" class="side-menu">
         <a href="javascript:void(0)" class="close-btn" onclick="toggleMenu()">&times;</a>
         <a href="index.html"><i class="fas fa-home"></i> Home</a>
-        <a href="orders.html"><i class="fas fa-box"></i> <span data-i18n="myOrders">My Orders</span></a>
-        <a href="wishlist.html"><i class="fas fa-heart"></i> <span data-i18n="myWishlist">My Wishlist</span></a>
-        <a href="messages.html"><i class="fas fa-comment-dots"></i> <span data-i18n="myMessages">My Messages</span></a>
+        <a href="orders.html"><i class="fas fa-box"></i> My Orders</a>
+        <a href="wishlist.html"><i class="fas fa-heart"></i> My Wishlist</a>
+        <a href="messages.html"><i class="fas fa-comment-dots"></i> My Messages</a>
         <a href="cart.html"><i class="fas fa-shopping-cart"></i> Cart</a>
         <hr style="border: 0.5px solid #444;">
         <a href="account.html"><i class="fas fa-user-circle"></i> My Account</a>
-        <a href="seller-dashboard.html"><i class="fas fa-store"></i> <span data-i18n="sellerHub">Seller Hub (डैशबोर्ड)</span></a>
-        <a href="signup.html?role=seller"><i class="fas fa-rocket"></i> <span data-i18n="becomeSeller">Become a Seller</span></a>
+        <a href="seller-dashboard.html"><i class="fas fa-store"></i> Seller Hub (डैशबोर्ड)</a>
+        <a href="signup.html?role=seller"><i class="fas fa-rocket"></i> Become a Seller</a>
         <hr style="border: 0.5px solid #444;">
-        <a href="terms.html"><i class="fas fa-file-contract"></i> <span data-i18n="termsPrivacy">Terms & Privacy</span></a>
+        <a href="terms.html"><i class="fas fa-file-contract"></i> Terms & Privacy</a>
     </div>
 
     <!-- Hero Banner -->
     <div class="hero-banner" id="heroBanner">
-        <h1 id="heroTitle" data-i18n="heroTitle">Vocal for Local</h1>
-        <p id="heroSubtitle" data-i18n="heroSubtitle">Shop directly from verified local vendors near you</p>
+        <h1 id="heroTitle">Vocal for Local</h1>
+        <p id="heroSubtitle">Shop directly from verified local vendors near you</p>
     </div>
     <div id="heroDots" style="display:none; justify-content:center; gap:6px; padding:8px 0; background:white;"></div>
 
     <div class="trust-strip">
-        <span><i class="fas fa-shield-alt"></i> <span data-i18n="verifiedSellers">Verified Sellers</span></span>
-        <span><i class="fas fa-truck"></i> <span data-i18n="fastDelivery">Local Fast Delivery</span></span>
-        <span><i class="fas fa-headset"></i> <span data-i18n="directContact">Direct Seller Contact</span></span>
+        <span><i class="fas fa-shield-alt"></i> Verified Sellers</span>
+        <span><i class="fas fa-truck"></i> Local Fast Delivery</span>
+        <span><i class="fas fa-headset"></i> Direct Seller Contact</span>
     </div>
 
     <!-- Sellers Near You -->
     <div class="container" style="padding-bottom:0;">
         <div class="sellers-section-head">
-            <div class="section-title" data-i18n="sellersNearYou">Sellers Near You</div>
+            <div class="section-title">Sellers Near You</div>
             <div class="city-select-wrap">
                 <select id="citySelect">
-                    <option value="all" data-i18n="allAreas">All Areas</option>
+                    <option value="all">All Areas</option>
                 </select>
             </div>
         </div>
-        <p class="sellers-desc" data-i18n="sellersNearYouDesc">Discover verified local shops around you</p>
+        <p class="sellers-desc">Discover verified local shops around you</p>
         <div class="sellers-scroll" id="sellersScroll">
             <div class="no-sellers-box">Loading local shops...</div>
         </div>
@@ -209,8 +203,8 @@
 
     <!-- Category chips -->
     <div class="category-strip" id="categoryStrip">
-        <div class="category-chip active" data-cat="all" data-i18n="categoryAll">All</div>
-        <div class="category-chip" data-cat="grocery" data-i18n="categoryGrocery">Grocery</div>
+        <div class="category-chip active" data-cat="all">All</div>
+        <div class="category-chip" data-cat="grocery">Grocery</div>
         <div class="category-chip" data-cat="vegetables">Vegetables & Fruits</div>
         <div class="category-chip" data-cat="clothing">Clothing</div>
         <div class="category-chip" data-cat="electronics">Electronics</div>
@@ -221,10 +215,10 @@
     <!-- Sort & Price Filter Bar -->
     <div class="filter-bar">
         <select id="sortSelect">
-            <option value="default" data-i18n="sortRecommended">Sort: Recommended</option>
-            <option value="priceLow" data-i18n="priceLowHigh">Price: Low to High</option>
-            <option value="priceHigh" data-i18n="priceHighLow">Price: High to Low</option>
-            <option value="newest" data-i18n="newestFirst">Newest First</option>
+            <option value="default">Sort: Recommended</option>
+            <option value="priceLow">Price: Low to High</option>
+            <option value="priceHigh">Price: High to Low</option>
+            <option value="newest">Newest First</option>
         </select>
         <div class="price-range-wrap">
             <span>₹</span><input type="number" id="minPrice" placeholder="Min">
@@ -241,18 +235,41 @@
         </div>
 
         <div id="followedFeedWrap" style="display:none; margin-bottom:24px;">
-            <div class="section-title" data-i18n="fromFollowedSellers">🆕 New From Shops You Follow</div>
+            <div class="section-title">🆕 New From Shops You Follow</div>
             <div id="followedFeedScroll" style="display:flex; gap:12px; overflow-x:auto; padding-bottom:6px;"></div>
         </div>
 
-        <div class="section-title" data-i18n="trendingProducts">Trending Products Near You</div>
+        <div class="section-title">Trending Products Near You</div>
         <div id="productGrid" class="product-grid">
             <div class="loading-text">Loading live products...</div>
         </div>
         <div id="loadMoreWrap" style="display:none; text-align:center; margin-top:20px;">
             <button onclick="loadMoreProducts()" style="background:white; border:1.5px solid var(--primary-color); color:var(--primary-color); padding:11px 28px; border-radius:6px; font-weight:bold; font-size:14px; cursor:pointer;">
-                <span data-i18n="loadMore">Load More Products</span> (<span id="loadMoreCount">0</span> more)
+                <span>Load More Products</span> (<span id="loadMoreCount">0</span> more)
             </button>
+        </div>
+    </div>
+
+    <!-- Floating Inspect Tool Button -->
+    <div id="devInspectTool" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;">
+        <button onclick="toggleInspector()" style="background: #232f3e; color: #ffd814; border: 2px solid #ffd814; padding: 10px 14px; border-radius: 50px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3); font-size: 13px;">
+            🛠️ Inspect Site
+        </button>
+    </div>
+
+    <!-- Inspect Drawer / Modal -->
+    <div id="inspectModal" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 10000; align-items: center; justify-content: center;">
+        <div style="background: white; width: 90%; max-width: 600px; max-height: 80vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.3);">
+            <div style="background: #232f3e; color: white; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; font-size: 16px;">🛠️ Live Site Inspector</h3>
+                <button onclick="toggleInspector()" style="background: none; border: none; color: white; font-size: 20px; cursor: pointer;">&times;</button>
+            </div>
+            <div style="padding: 15px; overflow-y: auto; font-family: monospace; font-size: 12px; background: #f8f9fa;" id="inspectContent">
+                Loading site diagnostics...
+            </div>
+            <div style="padding: 10px 15px; background: #eee; text-align: right;">
+                <button onclick="refreshInspectorData()" style="background: #232f3e; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 12px;">Refresh Data</button>
+            </div>
         </div>
     </div>
 
@@ -347,7 +364,7 @@
             grid.innerHTML = '';
 
             if (currentFilteredProducts.length === 0) {
-                grid.innerHTML = `<div class="no-product">${t('noProductsFound')} <a href="signup.html?role=seller">${t('becomeSellerLink')}</a>!</div>`;
+                grid.innerHTML = `<div class="no-product">No products found. <a href="signup.html?role=seller">Become a Seller</a>!</div>`;
                 document.getElementById('loadMoreWrap').style.display = 'none';
                 return;
             }
@@ -379,7 +396,7 @@
                         <div class="product-title">${pName}</div>
                         <div class="shop-badge"><i class="fas fa-store"></i> ${pShop}</div>
                         <div class="product-price">₹${price.toFixed(0)} <small>${unit}</small></div>
-                        <div class="view-hint">${outOfStock ? t('currentlyUnavailable') : t('tapToView')}</div>
+                        <div class="view-hint">${outOfStock ? 'Currently Unavailable' : 'Tap to View'}</div>
                     </div>
                 `;
                 grid.appendChild(card);
@@ -610,7 +627,7 @@
         function renderSellers(sellers) {
             const scrollEl = document.getElementById('sellersScroll');
             if (sellers.length === 0) {
-                scrollEl.innerHTML = `<div class="no-sellers-box">${t('noSellersYet')}</div>`;
+                scrollEl.innerHTML = `<div class="no-sellers-box">No local shops found.</div>`;
                 return;
             }
             scrollEl.innerHTML = sellers.map(s => {
@@ -620,8 +637,8 @@
                         <img src="${s.logo || 'https://via.placeholder.com/56'}" alt="${s.shopName || 'Shop'}" loading="lazy" onerror="this.src='https://via.placeholder.com/56'">
                         <div class="s-name">${s.shopName || 'Local Shop'}</div>
                         <div class="s-city">📍 ${s.city || 'Nearby'}</div>
-                        <a class="s-view-link" href="shop.html?id=${s.id}">${t('viewShop')}</a>
-                        <button class="s-follow-btn ${isFollowing ? 'following' : ''}" onclick="toggleSellerFollow('${s.id}', this)">${isFollowing ? '✓ ' + t('following') : '➕ ' + t('follow')}</button>
+                        <a class="s-view-link" href="shop.html?id=${s.id}">View Shop</a>
+                        <button class="s-follow-btn ${isFollowing ? 'following' : ''}" onclick="toggleSellerFollow('${s.id}', this)">${isFollowing ? '✓ Following' : '➕ Follow'}</button>
                     </div>
                 `;
             }).join('');
@@ -639,11 +656,11 @@
                 const nowFollowing = await toggleFollowSeller(db, currentBuyerUid, sellerId, sellerData);
                 if (nowFollowing) {
                     followedSellerIds.add(sellerId);
-                    btnEl.innerText = '✓ ' + t('following');
+                    btnEl.innerText = '✓ Following';
                     btnEl.classList.add('following');
                 } else {
                     followedSellerIds.delete(sellerId);
-                    btnEl.innerText = '➕ ' + t('follow');
+                    btnEl.innerText = '➕ Follow';
                     btnEl.classList.remove('following');
                 }
                 renderFollowedFeed();
@@ -686,6 +703,35 @@
                     <div style="font-size:12.5px; font-weight:bold; color:#B12704;">₹${(parseFloat(p.price) || 0).toFixed(0)}</div>
                 </div>
             `).join('');
+        }
+
+        // Inspector Code Logic
+        window.toggleInspector = function() {
+            const modal = document.getElementById('inspectModal');
+            const isVisible = modal.style.display === 'flex';
+            modal.style.display = isVisible ? 'none' : 'flex';
+            if (!isVisible) {
+                refreshInspectorData();
+            }
+        }
+
+        window.refreshInspectorData = function() {
+            const contentEl = document.getElementById('inspectContent');
+            const cart = JSON.parse(localStorage.getItem('cart')) || [];
+            const wishlist = JSON.parse(localStorage.getItem('wishlist')) || [];
+            const recent = JSON.parse(localStorage.getItem('recentlyViewed')) || [];
+            
+            contentEl.innerHTML = `
+                <p><b>🛒 Cart Items Count:</b> ${cart.length}</p>
+                <p><b>❤️ Wishlist Count:</b> ${wishlist.length}</p>
+                <p><b>🕒 Recently Viewed IDs:</b> ${JSON.stringify(recent)}</p>
+                <hr style="border:0; border-top:1px solid #ddd; margin:10px 0;">
+                <p><b>📦 Loaded Products in Memory:</b> ${allProducts.length}</p>
+                <p><b>🏪 Loaded Sellers in Memory:</b> ${allSellers.length}</p>
+                <hr style="border:0; border-top:1px solid #ddd; margin:10px 0;">
+                <p><b>📋 Full Products JSON Snapshot:</b></p>
+                <pre style="background:#232f3e; color:#00ffcc; padding:10px; border-radius:6px; overflow-x:auto;">${JSON.stringify(allProducts, null, 2)}</pre>
+            `;
         }
 
         window.onload = function() {
