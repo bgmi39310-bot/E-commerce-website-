@@ -1,10 +1,11 @@
 import { collection, addDoc, getDocs, query, where, doc, updateDoc, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { sendNotification } from './notif-logic.js';
+import { showToast } from './toast.js';
 
 // ---------- BUYER SIDE (product.html) ----------
 export async function submitQuestion(db, { productId, productName, sellerUid, askerUid, askerName, question }, refreshCallback) {
     if (!question || !question.trim()) {
-        alert("Please type your question first.");
+        showToast('Please type your question first.', 'error');
         return;
     }
     try {
@@ -16,7 +17,7 @@ export async function submitQuestion(db, { productId, productName, sellerUid, as
             answered: false,
             createdAt: new Date()
         });
-        alert("Your question has been sent to the seller!");
+        showToast('Your question has been sent to the seller!');
         if (refreshCallback) refreshCallback(); // fine here — a buyer asks at most occasionally
 
         if (sellerUid) {
@@ -29,7 +30,7 @@ export async function submitQuestion(db, { productId, productName, sellerUid, as
         }
     } catch (error) {
         console.error("Error submitting question:", error);
-        alert("Unable to submit question right now.");
+        showToast('Unable to submit question right now.', 'error');
     }
 }
 
@@ -120,7 +121,7 @@ export async function loadSellerQuestions(db, sellerUid) {
 
 export async function submitAnswer(db, questionId, answerText) {
     if (!answerText || !answerText.trim()) {
-        alert("Please type an answer first.");
+        showToast('Please type an answer first.', 'error');
         return;
     }
     try {
@@ -133,8 +134,9 @@ export async function submitAnswer(db, questionId, answerText) {
         const qa = cachedQuestions.find(x => x.id === questionId);
         if (qa) { qa.answered = true; qa.answer = answerText.trim(); }
         renderSellerQuestions();
+        showToast('Answer sent to the buyer!');
     } catch (error) {
         console.error("Error submitting answer:", error);
-        alert("Unable to submit answer right now.");
+        showToast('Unable to submit answer right now.', 'error');
     }
 }
