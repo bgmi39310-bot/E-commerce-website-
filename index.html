@@ -148,6 +148,7 @@
         </div>
 
         <div class="nav-actions">
+            <div id="notifBellMount" style="display:flex; align-items:center;"></div>
             <a href="orders.html" class="nav-link"><i class="fas fa-box"></i><span>Orders</span></a>
             <a href="cart.html" class="nav-link"><i class="fas fa-shopping-cart"></i><span>Cart</span><span class="cart-badge" id="cartBadge" style="display:none;">0</span></a>
             <a href="account.html" class="nav-link"><i class="fas fa-user"></i><span>Account</span></a>
@@ -265,6 +266,7 @@
         import { collection, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFollowedSellers, toggleFollowSeller } from './follow-logic.js';
+        import { mountNotificationBell } from './notif-logic.js';
 
         let allProducts = [];
         let currentCategory = 'all';
@@ -284,9 +286,18 @@
             currentBuyerUid = cred.user.uid;
             return currentBuyerUid;
         }
+        let unsubscribeNotifBell = null;
         onAuthStateChanged(auth, (user) => {
             currentBuyerUid = user ? user.uid : null;
             authReadyResolve();
+            // Only show the bell for a signed-in / already-anonymous session — we
+            // never force sign-in just to display it (see comment above).
+            if (unsubscribeNotifBell) { unsubscribeNotifBell(); unsubscribeNotifBell = null; }
+            if (currentBuyerUid) {
+                unsubscribeNotifBell = mountNotificationBell(db, currentBuyerUid, 'notifBellMount');
+            } else {
+                document.getElementById('notifBellMount').innerHTML = '';
+            }
         });
 
         // Toggle Hamburger Menu
@@ -332,6 +343,7 @@
 
         window.addEventListener('pagehide', () => {
             if (unsubscribeProducts) unsubscribeProducts();
+            if (unsubscribeNotifBell) unsubscribeNotifBell();
         });
 
         // Render Products on Grid — image, name, price, shop name ONLY (no buy/cart buttons here)
