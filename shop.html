@@ -9,6 +9,7 @@
     <link rel="icon" href="icon-192.png">
     <link rel="apple-touch-icon" href="icon-192.png">
     <script src="pwa-init.js" defer></script>
+    <script src="click-guard.js"></script>
 <style>
     * { box-sizing: border-box; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #eaeded; margin: 0; color: #0f1111; }
@@ -66,6 +67,7 @@
     import { doc, getDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     import { onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { getFollowerCount, isFollowingSeller, toggleFollowSeller } from './follow-logic.js';
+    import { showToast } from './toast.js';
 
     const params = new URLSearchParams(window.location.search);
     const sellerUid = params.get('id');
@@ -132,7 +134,7 @@
 
     async function handleFollowClick() {
         if (sellerUid === currentBuyerUid) {
-            alert("You can't follow your own shop!");
+            showToast("You can't follow your own shop!", 'error');
             return;
         }
         await ensureAuthenticated();
@@ -144,9 +146,10 @@
             btn.classList.toggle('following', nowFollowing);
             const count = await getFollowerCount(db, sellerUid);
             document.getElementById('followerCountText').innerText = `👥 ${count} Follower${count === 1 ? '' : 's'}`;
+            showToast(nowFollowing ? 'Following this shop!' : 'Unfollowed.');
         } catch (e) {
             console.error(e);
-            alert('Something went wrong, please try again.');
+            showToast('Something went wrong, please try again.', 'error');
         } finally {
             btn.disabled = false;
         }
