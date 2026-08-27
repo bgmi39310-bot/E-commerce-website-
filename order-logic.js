@@ -1,4 +1,5 @@
 import { collection, onSnapshot, doc, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { sendNotification } from './notif-logic.js';
 
 let allOrders = [];
 let currentStatusFilter = 'Pending';
@@ -85,12 +86,35 @@ function displayDashboardOrders() {
     container.innerHTML = html;
 }
 
+// Looks up the order from the already-loaded live list so we know who the
+// buyer is and what they ordered, without an extra Firestore read.
+function findOrderById(orderId) {
+    return allOrders.find(o => o.id === orderId) || null;
+}
+
+const STATUS_MESSAGES = {
+    Accepted: 'Your order has been accepted by the seller and will be shipped soon.',
+    Shipped: 'Your order is on the way! 🚚',
+    Delivered: 'Your order has been delivered. Enjoy! 🎉',
+    Cancelled: 'Your order was cancelled by the seller.'
+};
+
 // NOTE: these action functions no longer take/call a "refetch" callback.
 // The onSnapshot listener above already picks up the change automatically.
 export async function updateOrderStatus(db, orderId, newStatus) {
     try {
+        const order = findOrderById(orderId);
         const orderRef = doc(db, "orders", orderId);
         await updateDoc(orderRef, { status: newStatus, [newStatus.toLowerCase() + 'At']: new Date() });
+
+        if (order && order.buyerUid) {
+            sendNotification(db, order.buyerUid, {
+                title: `Order ${newStatus}: ${order.productName || 'Your item'}`,
+                body: STATUS_MESSAGES[newStatus] || `Your order status is now ${newStatus}.`,
+                type: 'order_status',
+                link: 'orders.html'
+            });
+        }
     } catch (error) {
         console.error("Error updating status: ", error);
         alert("Error updating order status.");
@@ -99,10 +123,20 @@ export async function updateOrderStatus(db, orderId, newStatus) {
 
 export async function markAsShipped(db, orderId) {
     try {
+        const order = findOrderById(orderId);
         const otp = Math.floor(1000 + Math.random() * 9000).toString();
         const orderRef = doc(db, "orders", orderId);
         await updateDoc(orderRef, { status: 'Shipped', shippedAt: new Date(), deliveryOTP: otp });
         alert("Order marked as Shipped! 🚚\n\nThe buyer will now see a Delivery OTP on their Orders page. Ask them for it when you hand over the package, to confirm delivery.");
+
+        if (order && order.buyerUid) {
+            sendNotification(db, order.buyerUid, {
+                title: `Order Shipped: ${order.productName || 'Your item'}`,
+                body: STATUS_MESSAGES.Shipped,
+                type: 'order_status',
+                link: 'orders.html'
+            });
+        }
     } catch (error) {
         console.error("Error marking shipped:", error);
         alert("Error updating order status.");
@@ -128,6 +162,15 @@ export async function confirmDelivery(db, orderId) {
         const orderRef = doc(db, "orders", orderId);
         await updateDoc(orderRef, { status: 'Delivered', deliveredAt: new Date() });
         alert("✅ Delivery confirmed! Order marked as Delivered.");
+
+        if (order.buyerUid) {
+            sendNotification(db, order.buyerUid, {
+                title: `Order Delivered: ${order.productName || 'Your item'}`,
+                body: STATUS_MESSAGES.Delivered,
+                type: 'order_status',
+                link: 'orders.html'
+            });
+        }
     } catch (error) {
         console.error("Error confirming delivery:", error);
         alert("Error updating order status.");
