@@ -97,6 +97,7 @@
     <header>
         <div class="back-arrow" onclick="history.back()">⬅️</div>
         <div class="header-title">My Orders</div>
+        <div id="notifBellMount" style="margin-left:auto; margin-right:6px;"></div>
         <a href="disputes.html" style="color:white; text-decoration:none; font-size:12px; border:1px solid rgba(255,255,255,0.4); padding:6px 10px; border-radius:5px;">⚖️ Disputes</a>
     </header>
 
@@ -111,6 +112,7 @@
         import { submitReview } from './review-logic.js';
         import { submitReturnRequest } from './return-logic.js';
         import { generateInvoice } from './invoice-logic.js';
+        import { mountNotificationBell } from './notif-logic.js';
 
         let currentBuyerUid = null;
         let currentBuyerName = 'DesiMarket Buyer';
@@ -342,11 +344,14 @@
             }
         };
 
+        let unsubscribeNotifBell = null;
         onAuthStateChanged(auth, (user) => {
+            if (unsubscribeNotifBell) { unsubscribeNotifBell(); unsubscribeNotifBell = null; }
             if (user) {
                 currentBuyerUid = user.uid;
                 currentBuyerName = user.displayName || 'DesiMarket Buyer';
                 fetchMyOrders(user.uid);
+                unsubscribeNotifBell = mountNotificationBell(db, user.uid, 'notifBellMount');
             } else {
                 document.getElementById('pageContent').innerHTML = `
                     <div class="login-prompt">
@@ -358,6 +363,7 @@
 
         window.addEventListener('pagehide', () => {
             if (unsubscribeMyOrders) unsubscribeMyOrders();
+            if (unsubscribeNotifBell) unsubscribeNotifBell();
         });
     </script>
 </body>
