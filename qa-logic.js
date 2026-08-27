@@ -1,7 +1,8 @@
 import { collection, addDoc, getDocs, query, where, doc, updateDoc, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { sendNotification } from './notif-logic.js';
 
 // ---------- BUYER SIDE (product.html) ----------
-export async function submitQuestion(db, { productId, sellerUid, askerUid, askerName, question }, refreshCallback) {
+export async function submitQuestion(db, { productId, productName, sellerUid, askerUid, askerName, question }, refreshCallback) {
     if (!question || !question.trim()) {
         alert("Please type your question first.");
         return;
@@ -17,6 +18,15 @@ export async function submitQuestion(db, { productId, sellerUid, askerUid, asker
         });
         alert("Your question has been sent to the seller!");
         if (refreshCallback) refreshCallback(); // fine here — a buyer asks at most occasionally
+
+        if (sellerUid) {
+            sendNotification(db, sellerUid, {
+                title: `New question about ${productName || 'your product'}`,
+                body: `"${question.trim().slice(0, 100)}${question.trim().length > 100 ? '…' : ''}" — ${askerName || 'A buyer'}`,
+                type: 'new_question',
+                link: 'seller-dashboard.html'
+            });
+        }
     } catch (error) {
         console.error("Error submitting question:", error);
         alert("Unable to submit question right now.");
