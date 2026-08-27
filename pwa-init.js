@@ -3,7 +3,12 @@
 // <script src="pwa-init.js" defer></script>
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch((err) => {
+        navigator.serviceWorker.register('./sw.js').then((reg) => {
+            // Proactively check for a newer service worker every time the app
+            // opens, instead of waiting for the browser's own (slower) check.
+            // This is what makes updates show up quickly in the installed app.
+            reg.update();
+        }).catch((err) => {
             console.log('Service worker registration failed:', err);
         });
     });
