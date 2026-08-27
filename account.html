@@ -56,10 +56,13 @@
 
     <header>
         <h2 style="color: white; margin:0; font-size: 18px;">DesiMarket</h2>
-        <div class="menu-icon" onclick="toggleMenu()">
-            <span></span>
-            <span></span>
-            <span></span>
+        <div style="display:flex; align-items:center; gap:16px;">
+            <div id="notifBellMount"></div>
+            <div class="menu-icon" onclick="toggleMenu()">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
         </div>
     </header>
 
@@ -152,6 +155,7 @@
         import { auth, db } from './firebase-config.js';
         import { onAuthStateChanged, signOut, EmailAuthProvider, linkWithCredential, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { mountNotificationBell } from './notif-logic.js';
 
         function toggleMenu() {
             const menu = document.getElementById('sideMenu');
@@ -164,13 +168,27 @@
             window.location.href = 'login.html';
         }
 
+        let unsubscribeNotifBell = null;
+        let notifBellMountedForUid = null;
+
         onAuthStateChanged(auth, async (user) => {
             document.getElementById('loadingSection').style.display = 'none';
 
             if (!user) {
                 document.getElementById('userProfileSection').style.display = 'none';
                 document.getElementById('guestSection').style.display = 'block';
+                if (unsubscribeNotifBell) { unsubscribeNotifBell(); unsubscribeNotifBell = null; }
+                notifBellMountedForUid = null;
+                document.getElementById('notifBellMount').innerHTML = '';
                 return;
+            }
+
+            // Guard against re-mounting a duplicate listener if onAuthStateChanged
+            // fires again for the same uid (e.g. after linking a guest account).
+            if (notifBellMountedForUid !== user.uid) {
+                if (unsubscribeNotifBell) unsubscribeNotifBell();
+                unsubscribeNotifBell = mountNotificationBell(db, user.uid, 'notifBellMount');
+                notifBellMountedForUid = user.uid;
             }
 
             document.getElementById('userProfileSection').style.display = 'block';
