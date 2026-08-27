@@ -1,4 +1,5 @@
 import { doc, updateDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { sendNotification } from './notif-logic.js';
 
 // ---------- BUYER SIDE ----------
 // (Buyer's orders.html now uses a live onSnapshot listener, so a plain
@@ -78,6 +79,7 @@ export async function loadReturnRequests(db, sellerUid) {
 
 export async function updateReturnStatus(db, orderId, newReturnStatus) {
     try {
+        const order = cachedReturns.find(o => o.id === orderId);
         const updateData = { returnStatus: newReturnStatus };
         if (newReturnStatus === 'Approved') updateData.status = 'Returned';
         await updateDoc(doc(db, "orders", orderId), updateData);
@@ -87,6 +89,17 @@ export async function updateReturnStatus(db, orderId, newReturnStatus) {
         renderReturns();
 
         alert(`Return request ${newReturnStatus.toLowerCase()}.`);
+
+        if (order && order.buyerUid) {
+            sendNotification(db, order.buyerUid, {
+                title: `Return ${newReturnStatus}: ${order.productName || 'Your item'}`,
+                body: newReturnStatus === 'Approved'
+                    ? 'Your return request was approved. Refund will be processed as per the seller\'s policy.'
+                    : 'Your return request was rejected by the seller.',
+                type: 'return_status',
+                link: 'orders.html'
+            });
+        }
     } catch (error) {
         console.error(error);
         alert("Error updating return request.");
