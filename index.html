@@ -122,8 +122,6 @@
         .seller-card-mini .s-follow-btn.following { background: white; color: #232f3e; border: 1.5px solid #232f3e; }
         .no-sellers-box { text-align: center; padding: 20px; font-size: 13px; color: #888; background: white; border-radius: 10px; width: 100%; }
 
-        .follow-hint-box { background: #fff8ee; border: 1px dashed #ffb300; border-radius: 8px; padding: 12px 16px; font-size: 12.5px; color: #8a6800; margin-bottom: 24px; }
-
         .mobile-search { display: none; padding: 10px 15px; background: #232f3e; }
         .mobile-search input { width: 100%; padding: 9px; border-radius: 4px; border: none; font-size: 14px; }
 
@@ -209,15 +207,15 @@
         </div>
     </div>
 
-    <!-- Category chips (cosmetic filter based on product name/description match) -->
+    <!-- Category chips -->
     <div class="category-strip" id="categoryStrip">
         <div class="category-chip active" data-cat="all" data-i18n="categoryAll">All</div>
         <div class="category-chip" data-cat="grocery" data-i18n="categoryGrocery">Grocery</div>
         <div class="category-chip" data-cat="vegetables">Vegetables & Fruits</div>
-        <div class="category-chip" data-cat="clothing" data-i18n="categoryClothing">Clothing</div>
-        <div class="category-chip" data-cat="electronics" data-i18n="categoryElectronics">Electronics</div>
-        <div class="category-chip" data-cat="home" data-i18n="categoryHome">Home & Kitchen</div>
-        <div class="category-chip" data-cat="beauty" data-i18n="categoryBeauty">Beauty</div>
+        <div class="category-chip" data-cat="clothing">Clothing</div>
+        <div class="category-chip" data-cat="electronics">Electronics</div>
+        <div class="category-chip" data-cat="home">Home & Kitchen</div>
+        <div class="category-chip" data-cat="beauty">Beauty</div>
     </div>
 
     <!-- Sort & Price Filter Bar -->
@@ -272,11 +270,6 @@
         let currentCategory = 'all';
         let unsubscribeProducts = null;
 
-        // ---------- Anonymous auth (buyers don't need to sign up to follow shops) ----------
-        // IMPORTANT: we do NOT sign visitors in anonymously just for browsing/loading the
-        // page — only when they actually take an action (clicking Follow). This mirrors
-        // product.html's pattern and avoids creating a Firebase Auth account for every
-        // random visitor who never interacts.
         let currentBuyerUid = null;
         let authReadyResolve;
         const authReady = new Promise(resolve => { authReadyResolve = resolve; });
@@ -290,8 +283,6 @@
         onAuthStateChanged(auth, (user) => {
             currentBuyerUid = user ? user.uid : null;
             authReadyResolve();
-            // Only show the bell for a signed-in / already-anonymous session — we
-            // never force sign-in just to display it (see comment above).
             if (unsubscribeNotifBell) { unsubscribeNotifBell(); unsubscribeNotifBell = null; }
             if (currentBuyerUid) {
                 unsubscribeNotifBell = mountNotificationBell(db, currentBuyerUid, 'notifBellMount');
@@ -300,7 +291,6 @@
             }
         });
 
-        // Toggle Hamburger Menu
         window.toggleMenu = function() {
             const menu = document.getElementById('sideMenu');
             const overlay = document.getElementById('menuOverlay');
@@ -321,10 +311,6 @@
             }
         }
 
-        // Live-listens to all products so stock/price/new-listing changes show up
-        // instantly for everyone browsing, with no manual refresh needed.
-        // The listener is closed automatically once the person leaves this page
-        // (see the 'pagehide' handler below) so it doesn't keep consuming reads.
         function fetchLiveProducts() {
             const grid = document.getElementById('productGrid');
             unsubscribeProducts = onSnapshot(collection(db, "vendors"), (querySnapshot) => {
@@ -346,7 +332,6 @@
             if (unsubscribeNotifBell) unsubscribeNotifBell();
         });
 
-        // Render Products on Grid — image, name, price, shop name ONLY (no buy/cart buttons here)
         const PAGE_SIZE = 12;
         let currentFilteredProducts = [];
         let visibleCount = PAGE_SIZE;
@@ -414,7 +399,6 @@
             renderVisibleProducts();
         };
 
-        // ---------- Wishlist ----------
         function renderRecentlyViewed() {
             const recentIds = JSON.parse(localStorage.getItem('recentlyViewed')) || [];
             const wrap = document.getElementById('recentlyViewedWrap');
@@ -422,7 +406,7 @@
 
             const recentProducts = recentIds
                 .map(id => allProducts.find(p => p.id === id))
-                .filter(p => p); // drop any that no longer exist
+                .filter(p => p);
 
             if (recentProducts.length === 0) {
                 wrap.style.display = 'none';
@@ -456,7 +440,6 @@
             localStorage.setItem('wishlist', JSON.stringify(wishlist));
         };
 
-        // ---------- Sort & Price Filter ----------
         function applySortAndPriceFilter(products) {
             const minPrice = parseFloat(document.getElementById('minPrice').value);
             const maxPrice = parseFloat(document.getElementById('maxPrice').value);
@@ -517,7 +500,6 @@
             });
         });
 
-        // Load products when page opens
         window.switchLanguage = function() {
             toggleLanguage(() => {
                 renderVisibleProducts();
@@ -526,8 +508,6 @@
             });
         };
 
-        // PWA "Install App" button — shows only when the browser signals the
-        // site is actually installable (Chrome/Edge/Android support this).
         let deferredInstallPrompt = null;
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
@@ -549,7 +529,7 @@
 
         async function setupHeroBanners() {
             const banners = await loadActiveBanners(db);
-            if (banners.length === 0) return; // keep default static hero
+            if (banners.length === 0) return;
 
             let current = 0;
             const heroEl = document.getElementById('heroBanner');
@@ -582,7 +562,6 @@
             }
         }
 
-        // ---------- Sellers Near You ----------
         let allSellers = [];
         let followedSellerIds = new Set();
 
@@ -593,7 +572,7 @@
                 allSellers = [];
                 snap.forEach(d => allSellers.push({ id: d.id, ...d.data() }));
 
-                await authReady; // wait for Firebase to report existing session (if any) — never force-create one here
+                await authReady;
                 const followed = await getFollowedSellers(db, currentBuyerUid);
                 followedSellerIds = new Set(followed.map(f => f.id));
 
@@ -676,7 +655,6 @@
             }
         };
 
-        // ---------- Followed Sellers Feed ----------
         function renderFollowedFeed() {
             const wrap = document.getElementById('followedFeedWrap');
             const scrollEl = document.getElementById('followedFeedScroll');
