@@ -9,6 +9,7 @@
     <link rel="icon" href="icon-192.png">
     <link rel="apple-touch-icon" href="icon-192.png">
     <script src="pwa-init.js" defer></script>
+    <script src="click-guard.js"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
         header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 998; }
@@ -119,7 +120,8 @@
     <header>
         <div class="header-title">Seller Hub & Dashboard</div>
         <div style="display: flex; align-items: center; gap: 18px;">
-            <div class="bell-wrap" id="bellIcon" title="Notifications">
+            <div id="notifBellMount" title="Questions & Updates"></div>
+            <div class="bell-wrap" id="bellIcon" title="New Orders">
                 🔔
                 <span class="notif-badge" id="notifBadge">0</span>
             </div>
@@ -336,6 +338,7 @@
         import { renderAnalyticsFromOrders, downloadSalesReport } from './analytics-logic.js';
         import { bulkUploadProducts } from './bulk-upload-logic.js';
         import { listenForNewOrders, clearUnreadNotifications } from './notification-logic.js';
+        import { mountNotificationBell } from './notif-logic.js';
         import { wireImageUpload } from './image-upload.js';
         import { addCoupon, loadMyCoupons, toggleCouponActive, deleteCoupon } from './coupon-logic.js';
         import { loadReturnRequests, updateReturnStatus } from './return-logic.js';
@@ -381,6 +384,8 @@
             await signOut(auth);
             window.location.href = "login.html";
         }
+
+        let unsubscribeNotifBell = null;
 
         onAuthStateChanged(auth, async (user) => {
             if (user) {
@@ -428,6 +433,9 @@
                 // No manual refresh needed here — the live orders listener above
                 // already updates the screen automatically when a new order arrives.
                 listenForNewOrders(db, user.uid, () => {});
+
+                // Separate bell for persisted notifications (new customer questions, etc.)
+                unsubscribeNotifBell = mountNotificationBell(db, user.uid, 'notifBellMount');
             } else {
                 window.location.href = "login.html";
             }
@@ -545,6 +553,7 @@
         window.addEventListener('pagehide', () => {
             stopListeningToMyProducts();
             stopListeningToOrders();
+            if (unsubscribeNotifBell) unsubscribeNotifBell();
         });
     </script>
 </body>
