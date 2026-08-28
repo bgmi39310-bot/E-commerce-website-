@@ -68,6 +68,7 @@
     import { onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { getFollowerCount, isFollowingSeller, toggleFollowSeller } from './follow-logic.js';
     import { showToast } from './toast.js';
+    import { escapeHtml } from './sanitize.js';
 
     const params = new URLSearchParams(window.location.search);
     const sellerUid = params.get('id');
@@ -113,11 +114,15 @@
 
             document.title = `${sellerData.shopName || 'Shop'} - DesiMarket`;
 
+            const shopNameSafe = escapeHtml(sellerData.shopName || 'Local Seller');
+            const citySafe = escapeHtml(sellerData.city || '');
+            const addressSafe = escapeHtml(sellerData.address || 'Address not provided');
+
             banner.innerHTML = `
-                <img class="shop-logo" src="${sellerData.logo || 'https://via.placeholder.com/76'}" alt="${sellerData.shopName || 'Shop'}" onerror="this.src='https://via.placeholder.com/76'">
+                <img class="shop-logo" src="${sellerData.logo || 'https://via.placeholder.com/76'}" alt="${shopNameSafe}" onerror="this.src='https://via.placeholder.com/76'">
                 <div class="shop-info">
-                    <h2 class="shop-name">${sellerData.shopName || 'Local Seller'} <span class="verified-tick">✔️ Verified</span> ${sellerData.isPremium ? '<span class="premium-tag">🌟 PREMIUM</span>' : ''}</h2>
-                    <div class="shop-meta">📍 ${sellerData.city ? sellerData.city + ' — ' : ''}${sellerData.address || 'Address not provided'}</div>
+                    <h2 class="shop-name">${shopNameSafe} <span class="verified-tick">✔️ Verified</span> ${sellerData.isPremium ? '<span class="premium-tag">🌟 PREMIUM</span>' : ''}</h2>
+                    <div class="shop-meta">📍 ${citySafe ? citySafe + ' — ' : ''}${addressSafe}</div>
                     <div class="shop-stats" id="followerCountText">👥 ${followerCount} Follower${followerCount === 1 ? '' : 's'}</div>
                 </div>
                 <button class="follow-btn ${nowFollowing ? 'following' : ''}" id="followBtn">${nowFollowing ? '✓ Following' : '➕ Follow'}</button>
@@ -171,10 +176,10 @@
             grid.innerHTML = products.map(p => `
                 <div class="product-card" onclick="window.location.href='product.html?id=${p.id}'">
                     <div class="product-img-wrap">
-                        <img src="${p.image || 'https://via.placeholder.com/300'}" alt="${p.name || 'Product'}" loading="lazy" onerror="this.src='https://via.placeholder.com/300?text=No+Image'">
+                        <img src="${p.image || 'https://via.placeholder.com/300'}" alt="${escapeHtml(p.name || 'Product')}" loading="lazy" onerror="this.src='https://via.placeholder.com/300?text=No+Image'">
                     </div>
                     <div class="product-body">
-                        <div class="product-title">${p.name || 'Product'}</div>
+                        <div class="product-title">${escapeHtml(p.name || 'Product')}</div>
                         <div class="product-price">₹${(parseFloat(p.price) || 0).toFixed(0)}</div>
                     </div>
                 </div>
