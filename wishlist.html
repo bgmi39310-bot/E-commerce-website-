@@ -37,6 +37,7 @@
 <header>
     <div class="back-arrow" onclick="history.back()">⬅️</div>
     <div class="header-title">My Wishlist</div>
+    <div id="notifBellMount" style="margin-left:auto;"></div>
 </header>
 
 <div class="container">
@@ -46,8 +47,15 @@
 </div>
 
 <script type="module">
-    import { db } from './firebase-config.js';
+    import { db, auth } from './firebase-config.js';
     import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { escapeHtml } from './sanitize.js';
+    import { mountNotificationBell } from './notif-logic.js';
+
+    onAuthStateChanged(auth, (user) => {
+        if (user) mountNotificationBell(db, user.uid, 'notifBellMount');
+    });
 
     function getWishlist() {
         return JSON.parse(localStorage.getItem('wishlist')) || [];
@@ -83,10 +91,10 @@
                 <div class="wish-card" onclick="window.location.href='product.html?id=${p.id}'">
                     <button class="remove-wish-btn" onclick="event.stopPropagation(); removeFromWishlist('${p.id}')">🗑️</button>
                     <div class="wish-img-wrap">
-                        <img src="${p.image || 'https://via.placeholder.com/300'}" alt="${p.name}" loading="lazy" onerror="this.src='https://via.placeholder.com/300?text=No+Image'">
+                        <img src="${p.image || 'https://via.placeholder.com/300'}" alt="${escapeHtml(p.name || 'Product')}" loading="lazy" onerror="this.src='https://via.placeholder.com/300?text=No+Image'">
                     </div>
                     <div class="wish-body">
-                        <div class="wish-title">${p.name || 'Product'}</div>
+                        <div class="wish-title">${escapeHtml(p.name || 'Product')}</div>
                         <div class="wish-price">₹${(parseFloat(p.price) || 0).toFixed(0)}</div>
                     </div>
                 </div>
