@@ -16,7 +16,7 @@
 
     header { background: #232f3e; padding: 14px 18px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
     .back-arrow { color: white; font-size: 20px; cursor: pointer; text-decoration: none; }
-    .chat-title { color: white; }
+    .chat-title { color: white; flex-grow: 1; }
     .chat-title h3 { margin: 0; font-size: 15.5px; }
     .chat-title small { color: #cbd3dc; font-size: 11.5px; }
 
@@ -44,6 +44,7 @@
         <h3 id="chatWithName">Loading...</h3>
         <small id="chatSubtitle"></small>
     </div>
+    <div id="notifBellMount"></div>
 </header>
 
 <div class="messages-wrap" id="messagesWrap">
@@ -60,6 +61,8 @@
     import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { getOrCreateChat, sendMessage, listenToMessages, markChatRead } from './chat-logic.js';
+    import { escapeHtml } from './sanitize.js';
+    import { mountNotificationBell } from './notif-logic.js';
 
     const params = new URLSearchParams(window.location.search);
     let chatId = params.get('chatId');
@@ -117,7 +120,7 @@
             const time = m.createdAt && m.createdAt.toDate ? m.createdAt.toDate().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '';
             return `
                 <div class="msg-bubble ${mine ? 'msg-mine' : 'msg-theirs'}">
-                    ${m.text}
+                    ${escapeHtml(m.text)}
                     <div class="msg-time">${time}</div>
                 </div>
             `;
@@ -147,6 +150,7 @@
             return;
         }
         initChat(user);
+        mountNotificationBell(db, user.uid, 'notifBellMount');
     });
 </script>
 </body>
