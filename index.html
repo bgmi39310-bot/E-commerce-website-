@@ -607,9 +607,49 @@
         let allSellers = [];
         let followedSellerIds = new Set();
 
+        // Read-cost optimization: the "all sellers" list rarely changes minute
+        // to minute, but this is a static multi-page site — every navigation
+        // back to index.html is a full page reload, which would otherwise
+        // re-run this query from scratch every single time. Caching it in
+        // sessionStorage for a few minutes means clicking around the site and
+        // coming back to Home doesn't re-charge these reads each time.
+        const SELLERS_CACHE_KEY = 'dm_sellers_cache_v1';
+        const SELLERS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 min — short enough that new shops show up soon
+
+        function readSellersCache() {
+            try {
+                const raw = sessionStorage.getItem(SELLERS_CACHE_KEY);
+                if (!raw) return null;
+                const parsed = JSON.parse(raw);
+                if (Date.now() - parsed.savedAt > SELLERS_CACHE_TTL_MS) return null;
+                return parsed;
+            } catch (e) { return null; }
+        }
+
+        function writeSellersCache() {
+            try {
+                sessionStorage.setItem(SELLERS_CACHE_KEY, JSON.stringify({
+                    savedAt: Date.now(),
+                    sellers: allSellers,
+                    followedIds: [...followedSellerIds]
+                }));
+            } catch (e) { /* storage full/unavailable — not critical, just skip caching */ }
+        }
+
         async function loadSellersNearYou() {
             const scrollEl = document.getElementById('sellersScroll');
             try {
+                const cached = readSellersCache();
+                if (cached) {
+                    // Cache hit — zero Firestore reads for this visit.
+                    allSellers = cached.sellers;
+                    followedSellerIds = new Set(cached.followedIds);
+                    populateCityDropdown();
+                    renderSellers(allSellers);
+                    renderFollowedFeed();
+                    return;
+                }
+
                 const snap = await getDocs(collection(db, "sellers_profiles"));
                 allSellers = [];
                 snap.forEach(d => allSellers.push({ id: d.id, ...d.data() }));
@@ -621,6 +661,7 @@
                 populateCityDropdown();
                 renderSellers(allSellers);
                 renderFollowedFeed();
+                writeSellersCache();
             } catch (error) {
                 console.error("Error loading sellers:", error);
                 scrollEl.innerHTML = `<div class="no-sellers-box">Unable to load local shops right now.</div>`;
@@ -691,6 +732,7 @@
                     showToast('Unfollowed.');
                 }
                 renderFollowedFeed();
+                writeSellersCache();
             } catch (e) {
                 console.error(e);
                 showToast('Something went wrong, please try again.', 'error');
