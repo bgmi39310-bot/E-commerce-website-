@@ -1,4 +1,5 @@
 import { collection, addDoc, doc, updateDoc, onSnapshot, query, orderBy, limit, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { escapeHtml } from './sanitize.js';
 
 // ============================================================================
 // DesiMarket unified notification system.
@@ -158,8 +159,8 @@ export function mountNotificationBell(db, uid, containerId) {
                      style="display:flex; gap:10px; padding:10px 10px; border-radius:8px; cursor:pointer; margin-bottom:2px; background:${n.read ? 'transparent' : '#f5faff'};">
                     <div style="flex-shrink:0; width:34px; height:34px; border-radius:50%; background:${color}1a; display:flex; align-items:center; justify-content:center; font-size:16px;">${icon}</div>
                     <div style="flex:1; min-width:0;">
-                        <div style="font-size:12.8px; font-weight:${n.read ? '600' : '700'}; color:#232f3e; line-height:1.35;">${n.title}</div>
-                        ${n.body ? `<div style="font-size:11.8px; color:#666; margin-top:2px; line-height:1.35;">${n.body}</div>` : ''}
+                        <div style="font-size:12.8px; font-weight:${n.read ? '600' : '700'}; color:#232f3e; line-height:1.35;">${escapeHtml(n.title)}</div>
+                        ${n.body ? `<div style="font-size:11.8px; color:#666; margin-top:2px; line-height:1.35;">${escapeHtml(n.body)}</div>` : ''}
                         <div style="font-size:10.5px; color:#999; margin-top:4px;">${when}</div>
                     </div>
                     ${!n.read ? `<span style="flex-shrink:0; width:8px; height:8px; border-radius:50%; background:${color}; margin-top:5px;"></span>` : ''}
