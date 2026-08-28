@@ -314,6 +314,7 @@
     import { loadAllBanners, createBanner, toggleBannerActive, deleteBanner } from './banner-logic.js';
     import { loadAllDisputes } from './dispute-logic.js';
     import { setSellerPremium } from './premium-logic.js';
+    import { escapeHtml } from './sanitize.js';
 
     document.getElementById('topbarDate').innerText = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -418,7 +419,7 @@
                 ? `<p style="color:#8a94a6; font-size:13px;">No sales yet.</p>`
                 : data.topSellers.map(([shop, rev]) => `
                     <div class="mini-list-row">
-                        <span class="name">${shop}</span>
+                        <span class="name">${escapeHtml(shop)}</span>
                         <div class="bar-mini-track"><div class="bar-mini-fill" style="width:${(rev / maxRev * 100).toFixed(0)}%"></div></div>
                         <span class="amount">₹${rev.toFixed(0)}</span>
                     </div>
@@ -429,7 +430,7 @@
                 ? `<p style="color:#8a94a6; font-size:13px;">No orders yet.</p>`
                 : data.recentOrders.map(o => `
                     <div class="mini-list-row">
-                        <span class="name">${o.productName || 'Item'} — ₹${o.price || 0}</span>
+                        <span class="name">${escapeHtml(o.productName || 'Item')} — ₹${o.price || 0}</span>
                         <span class="status-pill-mini sp-${o.status || 'Pending'}">${o.status || 'Pending'}</span>
                     </div>
                 `).join('');
