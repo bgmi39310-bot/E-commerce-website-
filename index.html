@@ -269,6 +269,7 @@
         import { getFollowedSellers, toggleFollowSeller } from './follow-logic.js';
         import { mountNotificationBell } from './notif-logic.js';
         import { showToast } from './toast.js';
+        import { escapeHtml } from './sanitize.js';
 
         let allProducts = [];
         let currentCategory = 'all';
@@ -394,8 +395,8 @@
                 const rawPrice = product.price || 0;
                 const price = parseFloat(rawPrice) || 0;
                 const pImage = product.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300';
-                const pName = product.name || 'Unnamed product';
-                const pShop = product.shopName || 'Local Seller';
+                const pName = escapeHtml(product.name || 'Unnamed product');
+                const pShop = escapeHtml(product.shopName || 'Local Seller');
                 const unit = product.unit || '';
                 const stock = product.stock !== undefined ? product.stock : 10;
                 const outOfStock = stock <= 0;
@@ -454,7 +455,7 @@
             scrollEl.innerHTML = recentProducts.slice(0, 10).map(p => `
                 <div style="flex-shrink:0; width:110px; cursor:pointer;" onclick="window.location.href='product.html?id=${p.id}'">
                     <img src="${p.image || 'https://via.placeholder.com/110'}" loading="lazy" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:8px; background:#f5f5f5;" onerror="this.src='https://via.placeholder.com/110?text=No+Image'">
-                    <div style="font-size:11.5px; margin-top:4px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${p.name || 'Product'}</div>
+                    <div style="font-size:11.5px; margin-top:4px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${escapeHtml(p.name || 'Product')}</div>
                     <div style="font-size:12.5px; font-weight:bold; color:#B12704;">₹${(parseFloat(p.price) || 0).toFixed(0)}</div>
                 </div>
             `).join('');
@@ -698,11 +699,13 @@
             }
             scrollEl.innerHTML = sellers.map(s => {
                 const isFollowing = followedSellerIds.has(s.id);
+                const shopName = escapeHtml(s.shopName || 'Local Shop');
+                const city = escapeHtml(s.city || 'Nearby');
                 return `
                     <div class="seller-card-mini">
-                        <img src="${s.logo || 'https://via.placeholder.com/56'}" alt="${s.shopName || 'Shop'}" loading="lazy" onerror="this.src='https://via.placeholder.com/56'">
-                        <div class="s-name">${s.shopName || 'Local Shop'}</div>
-                        <div class="s-city">📍 ${s.city || 'Nearby'}</div>
+                        <img src="${s.logo || 'https://via.placeholder.com/56'}" alt="${shopName}" loading="lazy" onerror="this.src='https://via.placeholder.com/56'">
+                        <div class="s-name">${shopName}</div>
+                        <div class="s-city">📍 ${city}</div>
                         <a class="s-view-link" href="shop.html?id=${s.id}">${t('viewShop')}</a>
                         <button class="s-follow-btn ${isFollowing ? 'following' : ''}" onclick="toggleSellerFollow('${s.id}', this)">${isFollowing ? '✓ ' + t('following') : '➕ ' + t('follow')}</button>
                     </div>
@@ -768,8 +771,8 @@
             scrollEl.innerHTML = followedProducts.slice(0, 12).map(p => `
                 <div style="flex-shrink:0; width:130px; cursor:pointer;" onclick="window.location.href='product.html?id=${p.id}'">
                     <img src="${p.image || 'https://via.placeholder.com/130'}" loading="lazy" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:8px; background:#f5f5f5;" onerror="this.src='https://via.placeholder.com/130?text=No+Image'">
-                    <div style="font-size:11.5px; margin-top:4px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${p.name || 'Product'}</div>
-                    <div style="font-size:10.5px; color:#777;">🏪 ${p.shopName || 'Local Shop'}</div>
+                    <div style="font-size:11.5px; margin-top:4px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${escapeHtml(p.name || 'Product')}</div>
+                    <div style="font-size:10.5px; color:#777;">🏪 ${escapeHtml(p.shopName || 'Local Shop')}</div>
                     <div style="font-size:12.5px; font-weight:bold; color:#B12704;">₹${(parseFloat(p.price) || 0).toFixed(0)}</div>
                 </div>
             `).join('');
