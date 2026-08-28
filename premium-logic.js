@@ -1,4 +1,5 @@
 import { doc, getDoc, updateDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { showToast } from './toast.js';
 
 export const FREE_TIER_LIMITS = {
     maxProducts: 30,
@@ -33,11 +34,11 @@ export async function countSellerActiveCoupons(db, uid) {
 export async function setSellerPremium(db, sellerUid, isPremium, refreshCallback) {
     try {
         await updateDoc(doc(db, "sellers_profiles", sellerUid), { isPremium });
-        alert(isPremium ? "Seller upgraded to Premium! 🌟" : "Premium status removed for this seller.");
+        showToast(isPremium ? "Seller upgraded to Premium! 🌟" : "Premium status removed for this seller.");
         if (refreshCallback) refreshCallback();
     } catch (error) {
         console.error("Error updating premium status:", error);
-        alert("Error updating premium status. If this is a new shop with no profile yet, ask the seller to save their Shop Profile first.");
+        showToast("Error updating premium status. If this is a new shop with no profile yet, ask the seller to save their Shop Profile first.", 'error');
     }
 }
 
