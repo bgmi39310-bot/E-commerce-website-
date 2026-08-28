@@ -1,7 +1,8 @@
+import { showToast } from './toast.js';
 // Generates a simple, clean PDF invoice for a single order using jsPDF (loaded via CDN in orders.html)
 export function generateInvoice(order, orderId) {
     if (!window.jspdf) {
-        alert("Invoice generator is still loading — please try again in a moment.");
+        showToast("Invoice generator is still loading — please try again in a moment.", 'error');
         return;
     }
     const { jsPDF } = window.jspdf;
