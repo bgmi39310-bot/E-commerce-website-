@@ -1,5 +1,6 @@
 import { collection, onSnapshot, doc, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { sendNotification } from './notif-logic.js';
+import { showToast } from './toast.js';
 
 let allOrders = [];
 let currentStatusFilter = 'Pending';
@@ -117,7 +118,7 @@ export async function updateOrderStatus(db, orderId, newStatus) {
         }
     } catch (error) {
         console.error("Error updating status: ", error);
-        alert("Error updating order status.");
+        showToast("Error updating order status.", 'error');
     }
 }
 
@@ -127,7 +128,7 @@ export async function markAsShipped(db, orderId) {
         const otp = Math.floor(1000 + Math.random() * 9000).toString();
         const orderRef = doc(db, "orders", orderId);
         await updateDoc(orderRef, { status: 'Shipped', shippedAt: new Date(), deliveryOTP: otp });
-        alert("Order marked as Shipped! 🚚\n\nThe buyer will now see a Delivery OTP on their Orders page. Ask them for it when you hand over the package, to confirm delivery.");
+        showToast("Order marked as Shipped! 🚚\n\nThe buyer will now see a Delivery OTP on their Orders page. Ask them for it when you hand over the package, to confirm delivery.");
 
         if (order && order.buyerUid) {
             sendNotification(db, order.buyerUid, {
@@ -139,14 +140,14 @@ export async function markAsShipped(db, orderId) {
         }
     } catch (error) {
         console.error("Error marking shipped:", error);
-        alert("Error updating order status.");
+        showToast("Error updating order status.", 'error');
     }
 }
 
 export async function confirmDelivery(db, orderId) {
     const order = allOrders.find(o => o.id === orderId);
     if (!order) {
-        alert("Order not found. Please try again.");
+        showToast("Order not found. Please try again.", 'error');
         return;
     }
 
@@ -154,14 +155,14 @@ export async function confirmDelivery(db, orderId) {
     if (enteredOtp === null) return; // seller cancelled the prompt
 
     if (enteredOtp.trim() !== (order.deliveryOTP || '')) {
-        alert("❌ Incorrect OTP. Please ask the buyer again — the order will not be marked delivered until the correct OTP is entered.");
+        showToast("❌ Incorrect OTP. Please ask the buyer again — the order will not be marked delivered until the correct OTP is entered.", 'error');
         return;
     }
 
     try {
         const orderRef = doc(db, "orders", orderId);
         await updateDoc(orderRef, { status: 'Delivered', deliveredAt: new Date() });
-        alert("✅ Delivery confirmed! Order marked as Delivered.");
+        showToast("✅ Delivery confirmed! Order marked as Delivered.");
 
         if (order.buyerUid) {
             sendNotification(db, order.buyerUid, {
@@ -173,6 +174,6 @@ export async function confirmDelivery(db, orderId) {
         }
     } catch (error) {
         console.error("Error confirming delivery:", error);
-        alert("Error updating order status.");
+        showToast("Error updating order status.", 'error');
     }
 }
