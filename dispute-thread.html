@@ -65,6 +65,7 @@
     import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { sendDisputeMessage, listenToDisputeMessages, updateDisputeStatus } from './dispute-logic.js';
+    import { escapeHtml } from './sanitize.js';
 
     const params = new URLSearchParams(window.location.search);
     const disputeId = params.get('id');
@@ -89,8 +90,8 @@
 
         document.getElementById('disputeTitle').innerText = dispute.subject;
         document.getElementById('infoBox').innerHTML = `
-            <p><strong>Order:</strong> ${dispute.orderId}</p>
-            <p><strong>Description:</strong> ${dispute.description}</p>
+            <p><strong>Order:</strong> ${escapeHtml(dispute.orderId)}</p>
+            <p><strong>Description:</strong> ${escapeHtml(dispute.description)}</p>
         `;
 
         if (isAdmin) {
@@ -116,8 +117,8 @@
             const time = m.createdAt && m.createdAt.toDate ? m.createdAt.toDate().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '';
             return `
                 <div class="msg-bubble ${mine ? 'msg-mine' : 'msg-theirs'}">
-                    ${!mine ? `<div class="msg-sender">${m.senderName}</div>` : ''}
-                    ${m.text}
+                    ${!mine ? `<div class="msg-sender">${escapeHtml(m.senderName)}</div>` : ''}
+                    ${escapeHtml(m.text)}
                     <div class="msg-time">${time}</div>
                 </div>
             `;
