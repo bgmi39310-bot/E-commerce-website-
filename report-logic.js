@@ -1,8 +1,9 @@
 import { collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { showToast } from './toast.js';
 
 export async function submitReport(db, { productId, productName, sellerUid, shopName, reporterUid, reason, details }, refreshCallback) {
-    if (!reason) { alert("Please select a reason for reporting."); return; }
-    if (!reporterUid) { alert("Please login to report a listing."); return; }
+    if (!reason) { showToast("Please select a reason for reporting.", 'error'); return; }
+    if (!reporterUid) { showToast("Please login to report a listing.", 'error'); return; }
 
     try {
         await addDoc(collection(db, "reports"), {
@@ -16,11 +17,11 @@ export async function submitReport(db, { productId, productName, sellerUid, shop
             status: 'Pending',
             createdAt: new Date()
         });
-        alert("Thank you. Your report has been submitted for review. 🙏");
+        showToast("Thank you. Your report has been submitted for review. 🙏");
         if (refreshCallback) refreshCallback();
     } catch (error) {
         console.error("Error submitting report:", error);
-        alert("Unable to submit report right now. Please try again.");
+        showToast("Unable to submit report right now. Please try again.", 'error');
     }
 }
 
