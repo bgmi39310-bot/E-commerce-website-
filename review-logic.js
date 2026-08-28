@@ -1,4 +1,5 @@
 import { collection, addDoc, getDocs, query, where, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { showToast } from './toast.js';
 
 // Very lightweight spam heuristics — catches obvious junk without blocking genuine reviews.
 function looksLikeSpam(text) {
@@ -12,11 +13,11 @@ function looksLikeSpam(text) {
 
 export async function submitReview(db, { orderId, productId, sellerUid, buyerUid, buyerName, rating, comment }, refreshCallback) {
     if (!rating || rating < 1 || rating > 5) {
-        alert("Please select a star rating.");
+        showToast("Please select a star rating.", 'error');
         return;
     }
     if (looksLikeSpam(comment)) {
-        alert("Your review looks like it may contain spam (links or promotional text). Please rewrite it without links.");
+        showToast("Your review looks like it may contain spam (links or promotional text). Please rewrite it without links.", 'error');
         return;
     }
     try {
@@ -31,11 +32,11 @@ export async function submitReview(db, { orderId, productId, sellerUid, buyerUid
         // Mark the order as reviewed so the "Write a Review" prompt doesn't show again
         await updateDoc(doc(db, "orders", orderId), { reviewed: true });
 
-        alert("Thank you for your review! ⭐");
+        showToast("Thank you for your review! ⭐");
         if (refreshCallback) refreshCallback();
     } catch (error) {
         console.error("Error submitting review:", error);
-        alert("Unable to submit review right now. Please try again.");
+        showToast("Unable to submit review right now. Please try again.", 'error');
     }
 }
 
