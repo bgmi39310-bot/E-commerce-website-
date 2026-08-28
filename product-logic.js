@@ -1,5 +1,6 @@
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { isPremiumSeller, countSellerProducts, FREE_TIER_LIMITS } from './premium-logic.js';
+import { showToast } from './toast.js';
 
 // Keeps track of the active listener so we never stack up duplicate onSnapshot
 // subscriptions (which would waste Firestore reads) if this gets called more than once.
@@ -24,20 +25,20 @@ export async function addProductToFirebase(db, currentLoggedInUser, fetchProduct
     const categoryVal = document.getElementById('pCategory').value;
     const colorsVal = document.getElementById('pColors').value.trim();
 
-    if (!name || !priceVal) { alert("Please enter Product Name and Price!"); return; }
+    if (!name || !priceVal) { showToast("Please enter Product Name and Price!", 'error'); return; }
 
     // ---------- Free vs Premium limits ----------
     const premium = await isPremiumSeller(db, currentLoggedInUser.uid);
     if (!premium) {
         const currentCount = await countSellerProducts(db, currentLoggedInUser.uid);
         if (currentCount >= FREE_TIER_LIMITS.maxProducts) {
-            alert(`Free sellers can list up to ${FREE_TIER_LIMITS.maxProducts} products. Upgrade to Premium for unlimited listings!`);
+            showToast(`Free sellers can list up to ${FREE_TIER_LIMITS.maxProducts} products. Upgrade to Premium for unlimited listings!`, 'error');
             return;
         }
     }
 
     const shopNameVal = document.getElementById('shopName').value.trim();
-    if (!shopNameVal) { alert("Please save Shop Profile first!"); return; }
+    if (!shopNameVal) { showToast("Please save Shop Profile first!", 'error'); return; }
 
     const defaultImg = "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80";
     let imagesArray = [imageUrl, imageUrl2, imageUrl3, imageUrl4].filter(url => url !== '');
@@ -65,7 +66,7 @@ export async function addProductToFirebase(db, currentLoggedInUser, fetchProduct
             createdAt: new Date()
         });
 
-        alert("Product Added Successfully to Database! 🎉");
+        showToast("Product Added Successfully to Database! 🎉");
         document.getElementById('pName').value = '';
         document.getElementById('pPrice').value = '';
         document.getElementById('pMaterial').value = '';
@@ -83,7 +84,7 @@ export async function addProductToFirebase(db, currentLoggedInUser, fetchProduct
         fetchProductsCallback(currentLoggedInUser.uid);
     } catch (error) {
         console.error("Error adding product: ", error);
-        alert("Error: " + error.message);
+        showToast("Error: " + error.message, 'error');
     }
 }
 
@@ -173,7 +174,7 @@ export function editProduct(db, productId, currentPrice, currentStock, uid, fetc
     if (newPrice === null || newPrice.trim() === "") return;
     const updatedPrice = Number(newPrice);
     if (isNaN(updatedPrice)) {
-        alert("Please enter a valid number for the price!");
+        showToast("Please enter a valid number for the price!", 'error');
         return;
     }
 
@@ -181,7 +182,7 @@ export function editProduct(db, productId, currentPrice, currentStock, uid, fetc
     if (newStock === null || newStock.trim() === "") return;
     const updatedStock = Number(newStock);
     if (isNaN(updatedStock) || updatedStock < 0) {
-        alert("Please enter a valid stock quantity (0 or more)!");
+        showToast("Please enter a valid stock quantity (0 or more)!", 'error');
         return;
     }
 
@@ -189,10 +190,10 @@ export function editProduct(db, productId, currentPrice, currentStock, uid, fetc
         price: updatedPrice,
         stock: updatedStock
     }).then(() => {
-        alert("Product updated successfully! 🎉");
+        showToast("Product updated successfully! 🎉");
         fetchProductsCallback(uid);
     }).catch((error) => {
-        alert("Error updating product: " + error.message);
+        showToast("Error updating product: " + error.message, 'error');
     });
 }
 
@@ -200,11 +201,11 @@ export async function deleteProduct(db, productId, uid, fetchProductsCallback) {
     if (confirm("Are you sure you want to delete this product?")) {
         try {
             await deleteDoc(doc(db, "vendors", productId));
-            alert("Product deleted successfully!");
+            showToast("Product deleted successfully!");
             fetchProductsCallback(uid);
         } catch (error) {
             console.error("Error deleting product: ", error);
-            alert("Error deleting product.");
+            showToast("Error deleting product.", 'error');
         }
     }
 }
