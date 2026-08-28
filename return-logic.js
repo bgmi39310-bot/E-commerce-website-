@@ -1,6 +1,7 @@
 import { doc, updateDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { sendNotification } from './notif-logic.js';
 import { showToast } from './toast.js';
+import { escapeHtml } from './sanitize.js';
 
 // ---------- BUYER SIDE ----------
 // (Buyer's orders.html now uses a live onSnapshot listener, so a plain
@@ -35,12 +36,16 @@ function renderReturns() {
 
     container.innerHTML = cachedReturns.map(o => {
         const rStatus = o.returnStatus || 'Pending';
+        const productNameSafe = escapeHtml(o.productName || 'Item');
+        const buyerNameSafe = escapeHtml(o.buyerName || 'Customer');
+        const buyerPhoneSafe = escapeHtml(o.buyerPhone || 'N/A');
+        const reasonSafe = escapeHtml(o.returnReason || 'Not specified');
         return `
             <div class="order-card">
                 <div class="order-info">
-                    <h4>📦 ${o.productName || 'Item'} — ₹${o.price || 0}</h4>
-                    <p><strong>Buyer:</strong> ${o.buyerName || 'Customer'} &nbsp; <strong>Phone:</strong> ${o.buyerPhone || 'N/A'}</p>
-                    <p><strong>Reason:</strong> ${o.returnReason || 'Not specified'}</p>
+                    <h4>📦 ${productNameSafe} — ₹${o.price || 0}</h4>
+                    <p><strong>Buyer:</strong> ${buyerNameSafe} &nbsp; <strong>Phone:</strong> ${buyerPhoneSafe}</p>
+                    <p><strong>Reason:</strong> ${reasonSafe}</p>
                     <p><strong>Status:</strong> <span style="font-weight:bold;">${rStatus}</span></p>
                     ${rStatus === 'Pending' ? `
                         <div class="btn-group">
