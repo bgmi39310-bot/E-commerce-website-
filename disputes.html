@@ -9,6 +9,7 @@
     <link rel="icon" href="icon-192.png">
     <link rel="apple-touch-icon" href="icon-192.png">
     <script src="pwa-init.js" defer></script>
+    <script src="click-guard.js"></script>
 <style>
     * { box-sizing: border-box; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8f9fa; margin: 0; color: #0f1111; }
@@ -80,6 +81,7 @@
     import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { createDispute, loadMyDisputes } from './dispute-logic.js';
+        import { showToast } from './toast.js';
 
     let currentUid = null;
     let currentName = 'DesiMarket User';
@@ -96,16 +98,16 @@
         const subject = document.getElementById('disputeSubject').value.trim();
         const description = document.getElementById('disputeDescription').value.trim();
 
-        if (!orderId) { alert('Please enter the related Order ID.'); return; }
+        if (!orderId) { showToast('Please enter the related Order ID.', 'error'); return; }
 
         try {
             const orderSnap = await getDoc(doc(db, "orders", orderId));
-            if (!orderSnap.exists()) { alert('Order not found. Please check the Order ID.'); return; }
+            if (!orderSnap.exists()) { showToast('Order not found. Please check the Order ID.', 'error'); return; }
             const order = orderSnap.data();
 
             const isBuyer = order.buyerUid === currentUid;
             const isSeller = order.sellerUid === currentUid;
-            if (!isBuyer && !isSeller) { alert('This order is not linked to your account.'); return; }
+            if (!isBuyer && !isSeller) { showToast('This order is not linked to your account.', 'error'); return; }
 
             const raisedByRole = isBuyer ? 'buyer' : 'seller';
             const againstUid = isBuyer ? order.sellerUid : order.buyerUid;
@@ -119,7 +121,7 @@
             });
         } catch (error) {
             console.error(error);
-            alert('Unable to submit dispute right now.');
+            showToast('Unable to submit dispute right now.', 'error');
         }
     });
 
