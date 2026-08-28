@@ -1,8 +1,9 @@
 import { doc, setDoc, getDoc, addDoc, collection, query, where, getDocs, onSnapshot, orderBy, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { showToast } from './toast.js';
 
 export async function createDispute(db, { orderId, raisedByUid, raisedByName, raisedByRole, againstUid, subject, description }, refreshCallback) {
     if (!subject || !description) {
-        alert("Please fill in both subject and description.");
+        showToast("Please fill in both subject and description.", 'error');
         return;
     }
     try {
@@ -14,12 +15,12 @@ export async function createDispute(db, { orderId, raisedByUid, raisedByName, ra
             createdAt: new Date(),
             lastUpdateAt: new Date()
         });
-        alert("Dispute submitted. Our team will review it and help resolve this.");
+        showToast("Dispute submitted. Our team will review it and help resolve this.");
         if (refreshCallback) refreshCallback();
         return docRef.id;
     } catch (error) {
         console.error("Error creating dispute:", error);
-        alert("Unable to submit dispute right now.");
+        showToast("Unable to submit dispute right now.", 'error');
     }
 }
 
@@ -75,7 +76,7 @@ export async function sendDisputeMessage(db, disputeId, senderUid, senderName, t
         await updateDoc(doc(db, "disputes", disputeId), { lastUpdateAt: serverTimestamp() });
     } catch (error) {
         console.error("Error sending dispute message:", error);
-        alert("Unable to send message right now.");
+        showToast("Unable to send message right now.", 'error');
     }
 }
 
@@ -128,7 +129,7 @@ export async function updateDisputeStatus(db, disputeId, newStatus, refreshCallb
         if (refreshCallback) refreshCallback();
     } catch (error) {
         console.error(error);
-        alert("Error updating dispute status.");
+        showToast("Error updating dispute status.", 'error');
     }
 }
 
