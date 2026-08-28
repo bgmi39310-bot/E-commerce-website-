@@ -1,6 +1,7 @@
 import { collection, addDoc, getDocs, query, where, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { isPremiumSeller, countSellerActiveCoupons, FREE_TIER_LIMITS } from './premium-logic.js';
 import { showToast } from './toast.js';
+import { escapeHtml } from './sanitize.js';
 
 // Local cache so toggling/deleting a coupon never needs to re-query Firestore.
 let cachedCoupons = [];
@@ -19,7 +20,7 @@ function renderCoupons() {
         return `
             <div class="coupon-card ${c.active ? '' : 'inactive'}">
                 <div>
-                    <span class="coupon-code">${c.code}</span>
+                    <span class="coupon-code">${escapeHtml(c.code)}</span>
                     <span class="coupon-discount">${discountLabel}</span>
                     ${!c.active ? '<span class="coupon-off-tag">Inactive</span>' : ''}
                 </div>
