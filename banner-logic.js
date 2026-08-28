@@ -1,4 +1,5 @@
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { showToast } from './toast.js';
 
 // ---------- HOMEPAGE (public) ----------
 export async function loadActiveBanners(db) {
@@ -54,7 +55,7 @@ export async function loadAllBanners(db) {
 
 export async function createBanner(db, bannerData, refreshCallback) {
     if (!bannerData.imageUrl || !bannerData.title) {
-        alert("Please provide at least an image URL and title.");
+        showToast("Please provide at least an image URL and title.", 'error');
         return;
     }
     try {
@@ -64,11 +65,11 @@ export async function createBanner(db, bannerData, refreshCallback) {
             order: Date.now(),
             createdAt: new Date()
         });
-        alert("Banner created!");
+        showToast("Banner created!");
         if (refreshCallback) refreshCallback();
     } catch (error) {
         console.error(error);
-        alert("Error creating banner: " + error.message);
+        showToast("Error creating banner: " + error.message, 'error');
     }
 }
 
@@ -78,7 +79,7 @@ export async function toggleBannerActive(db, bannerId, active, refreshCallback) 
         if (refreshCallback) refreshCallback();
     } catch (error) {
         console.error(error);
-        alert("Error updating banner.");
+        showToast("Error updating banner.", 'error');
     }
 }
 
@@ -89,7 +90,7 @@ export async function deleteBanner(db, bannerId, refreshCallback) {
         if (refreshCallback) refreshCallback();
     } catch (error) {
         console.error(error);
-        alert("Error deleting banner.");
+        showToast("Error deleting banner.", 'error');
     }
 }
 
