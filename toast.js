@@ -45,7 +45,20 @@ export function showToast(message, type = 'success', durationMs = 2600) {
         opacity: 0; transform: translateY(12px); transition: opacity 0.22s ease, transform 0.22s ease;
         pointer-events: auto;
     `;
-    toast.innerHTML = `<span>${style.icon}</span><span>${message}</span>`;
+    // NOTE: the message is set via textContent (not innerHTML) on purpose.
+    // Callers all over the app pass product names, shop names, etc. into
+    // showToast() — some of that text is ultimately typed by another user
+    // (a seller's product name, for example). Rendering it as plain text
+    // here means even a malicious "<img onerror=...>" product name just
+    // shows up as harmless visible text in the toast, instead of running as
+    // real HTML/JS. This one change protects every showToast() call in the
+    // app without needing to escape the message at each call site.
+    const iconSpan = document.createElement('span');
+    iconSpan.textContent = style.icon;
+    const msgSpan = document.createElement('span');
+    msgSpan.textContent = message;
+    toast.appendChild(iconSpan);
+    toast.appendChild(msgSpan);
     container.appendChild(toast);
 
     // Animate in
