@@ -1,4 +1,5 @@
 import {
+import { showToast } from './toast.js';
     collection, getDocs, query, where, doc, updateDoc, deleteDoc, getDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
@@ -127,7 +128,7 @@ export async function deleteReviewAdmin(db, reviewId) {
         renderReviews();
     } catch (error) {
         console.error(error);
-        alert("Error removing review.");
+        showToast("Error removing review.", 'error');
     }
 }
 
@@ -186,7 +187,7 @@ export async function resolveReport(db, reportId) {
         renderReports();
     } catch (error) {
         console.error(error);
-        alert("Error updating report.");
+        showToast("Error updating report.", 'error');
     }
 }
 
@@ -235,7 +236,7 @@ export async function updateKycStatus(db, sellerUid, newStatus) {
         renderKyc();
     } catch (error) {
         console.error(error);
-        alert("Error updating KYC status.");
+        showToast("Error updating KYC status.", 'error');
     }
 }
 
@@ -338,7 +339,7 @@ export async function loadBuyers(db) {
 export async function toggleBlockUser(db, uid, shouldBlock) {
     try {
         await updateDoc(doc(db, "users", uid), { blocked: shouldBlock });
-        alert(shouldBlock ? "User has been blocked." : "User has been unblocked.");
+        showToast(shouldBlock ? "User has been blocked." : "User has been unblocked.");
 
         const seller = cachedSellers.find(u => u.id === uid);
         if (seller) { seller.blocked = shouldBlock; renderSellers(); }
@@ -347,7 +348,7 @@ export async function toggleBlockUser(db, uid, shouldBlock) {
         if (buyer) { buyer.blocked = shouldBlock; renderBuyers(); }
     } catch (error) {
         console.error(error);
-        alert("Error updating user status.");
+        showToast("Error updating user status.", 'error');
     }
 }
 
@@ -396,12 +397,12 @@ export async function loadAllProducts(db) {
 export async function deleteProductAdmin(db, productId) {
     try {
         await deleteDoc(doc(db, "vendors", productId));
-        alert("Product removed from the marketplace.");
+        showToast("Product removed from the marketplace.");
         cachedProducts = cachedProducts.filter(p => p.id !== productId);
         renderProducts();
     } catch (error) {
         console.error(error);
-        alert("Error removing product.");
+        showToast("Error removing product.", 'error');
     }
 }
 
