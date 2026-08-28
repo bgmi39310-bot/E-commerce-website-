@@ -1,5 +1,6 @@
 import { collection, addDoc, getDocs, query, where, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { isPremiumSeller, countSellerActiveCoupons, FREE_TIER_LIMITS } from './premium-logic.js';
+import { showToast } from './toast.js';
 
 // Local cache so toggling/deleting a coupon never needs to re-query Firestore.
 let cachedCoupons = [];
@@ -50,15 +51,15 @@ export async function loadMyCoupons(db, sellerUid) {
 
 export async function addCoupon(db, sellerUid, code, discountType, value) {
     const cleanCode = code.trim().toUpperCase();
-    if (!cleanCode) { alert("Please enter a coupon code."); return; }
-    if (!value || Number(value) <= 0) { alert("Please enter a valid discount value."); return; }
-    if (discountType === 'percent' && Number(value) > 90) { alert("Percentage discount can't exceed 90%."); return; }
+    if (!cleanCode) { showToast("Please enter a coupon code.", 'error'); return; }
+    if (!value || Number(value) <= 0) { showToast("Please enter a valid discount value.", 'error'); return; }
+    if (discountType === 'percent' && Number(value) > 90) { showToast("Percentage discount can't exceed 90%.", 'error'); return; }
 
     const premium = await isPremiumSeller(db, sellerUid);
     if (!premium) {
         const activeCount = cachedCoupons.filter(c => c.active).length;
         if (activeCount >= FREE_TIER_LIMITS.maxActiveCoupons) {
-            alert(`Free sellers can have ${FREE_TIER_LIMITS.maxActiveCoupons} active coupon at a time. Upgrade to Premium for unlimited coupons!`);
+            showToast(`Free sellers can have ${FREE_TIER_LIMITS.maxActiveCoupons} active coupon at a time. Upgrade to Premium for unlimited coupons!`, 'error');
             return;
         }
     }
@@ -75,10 +76,10 @@ export async function addCoupon(db, sellerUid, code, discountType, value) {
         const docRef = await addDoc(collection(db, "coupons"), newCoupon);
         cachedCoupons.unshift({ id: docRef.id, ...newCoupon }); // patch locally, no re-fetch
         renderCoupons();
-        alert(`Coupon "${cleanCode}" created! 🎉`);
+        showToast(`Coupon "${cleanCode}" created! 🎉`);
     } catch (error) {
         console.error(error);
-        alert("Error creating coupon: " + error.message);
+        showToast("Error creating coupon: " + error.message, 'error');
     }
 }
 
@@ -90,7 +91,7 @@ export async function toggleCouponActive(db, couponId, active) {
         renderCoupons();
     } catch (error) {
         console.error(error);
-        alert("Error updating coupon.");
+        showToast("Error updating coupon.", 'error');
     }
 }
 
@@ -102,7 +103,7 @@ export async function deleteCoupon(db, couponId) {
         renderCoupons();
     } catch (error) {
         console.error(error);
-        alert("Error deleting coupon.");
+        showToast("Error deleting coupon.", 'error');
     }
 }
 
