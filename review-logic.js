@@ -1,5 +1,6 @@
 import { collection, addDoc, getDocs, query, where, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { showToast } from './toast.js';
+import { escapeHtml } from './sanitize.js';
 
 // Very lightweight spam heuristics — catches obvious junk without blocking genuine reviews.
 function looksLikeSpam(text) {
@@ -76,9 +77,9 @@ export async function loadProductReviews(db, productId) {
             <div class="review-item">
                 <div class="review-top">
                     <span class="review-stars">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</span>
-                    <span class="review-author">${r.buyerName}</span>
+                    <span class="review-author">${escapeHtml(r.buyerName)}</span>
                 </div>
-                ${r.comment ? `<p class="review-comment">${r.comment}</p>` : ''}
+                ${r.comment ? `<p class="review-comment">${escapeHtml(r.comment)}</p>` : ''}
             </div>
         `).join('');
     } catch (error) {
