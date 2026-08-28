@@ -1,11 +1,12 @@
 import { doc, updateDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { sendNotification } from './notif-logic.js';
+import { showToast } from './toast.js';
 
 // ---------- BUYER SIDE ----------
 // (Buyer's orders.html now uses a live onSnapshot listener, so a plain
 // updateDoc here is enough — the buyer's screen updates automatically.)
 export async function submitReturnRequest(db, orderId, reason) {
-    if (!reason) { alert("Please select a reason for the return."); return; }
+    if (!reason) { showToast("Please select a reason for the return.", 'error'); return; }
     try {
         await updateDoc(doc(db, "orders", orderId), {
             returnRequested: true,
@@ -13,10 +14,10 @@ export async function submitReturnRequest(db, orderId, reason) {
             returnStatus: 'Pending',
             returnRequestedAt: new Date()
         });
-        alert("Return request submitted. The seller will review it shortly.");
+        showToast("Return request submitted. The seller will review it shortly.");
     } catch (error) {
         console.error(error);
-        alert("Unable to submit return request right now.");
+        showToast("Unable to submit return request right now.", 'error');
     }
 }
 
@@ -88,7 +89,7 @@ export async function updateReturnStatus(db, orderId, newReturnStatus) {
         cachedReturns = cachedReturns.filter(o => o.id !== orderId);
         renderReturns();
 
-        alert(`Return request ${newReturnStatus.toLowerCase()}.`);
+        showToast(`Return request ${newReturnStatus.toLowerCase()}.`);
 
         if (order && order.buyerUid) {
             sendNotification(db, order.buyerUid, {
@@ -102,6 +103,6 @@ export async function updateReturnStatus(db, orderId, newReturnStatus) {
         }
     } catch (error) {
         console.error(error);
-        alert("Error updating return request.");
+        showToast("Error updating return request.", 'error');
     }
 }
