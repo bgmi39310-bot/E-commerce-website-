@@ -1,4 +1,5 @@
 import { doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { showToast } from './toast.js';
 
 const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
 const AADHAR_REGEX = /^\d{12}$/;
@@ -8,11 +9,11 @@ export async function submitKycDetails(db, uid, panNumber, aadharNumber, refresh
     const aadhar = aadharNumber.trim();
 
     if (!PAN_REGEX.test(pan)) {
-        alert("Please enter a valid PAN number (e.g. ABCDE1234F).");
+        showToast("Please enter a valid PAN number (e.g. ABCDE1234F).", 'error');
         return;
     }
     if (!AADHAR_REGEX.test(aadhar)) {
-        alert("Please enter a valid 12-digit Aadhar number.");
+        showToast("Please enter a valid 12-digit Aadhar number.", 'error');
         return;
     }
 
@@ -24,11 +25,11 @@ export async function submitKycDetails(db, uid, panNumber, aadharNumber, refresh
             kycSubmittedAt: new Date()
         }, { merge: true });
 
-        alert("KYC details submitted! Our team will review them shortly.");
+        showToast("KYC details submitted! Our team will review them shortly.");
         if (refreshCallback) refreshCallback();
     } catch (error) {
         console.error("Error submitting KYC:", error);
-        alert("Unable to submit KYC right now. Please try again.");
+        showToast("Unable to submit KYC right now. Please try again.", 'error');
     }
 }
 
