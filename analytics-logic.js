@@ -1,4 +1,5 @@
 import { collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { showToast } from './toast.js';
 
 // This is only called when the seller explicitly clicks "Download Report" —
 // a one-time on-demand read is fine here since it's a deliberate user action,
@@ -9,7 +10,7 @@ export async function downloadSalesReport(db, uid) {
         const snap = await getDocs(q);
 
         if (snap.empty) {
-            alert("No orders yet to generate a report.");
+            showToast("No orders yet to generate a report.", 'info');
             return;
         }
 
@@ -43,7 +44,7 @@ export async function downloadSalesReport(db, uid) {
         URL.revokeObjectURL(url);
     } catch (error) {
         console.error("Error generating sales report:", error);
-        alert("Unable to generate report right now.");
+        showToast("Unable to generate report right now.", 'error');
     }
 }
 
