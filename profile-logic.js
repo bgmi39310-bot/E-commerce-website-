@@ -1,4 +1,5 @@
 import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { showToast } from './toast.js';
 
 export async function loadSellerProfileFromFirestore(db, uid) {
     try {
@@ -40,7 +41,7 @@ export async function saveSellerProfile(db, currentLoggedInUser, loadProfileCall
     if (!currentLoggedInUser) return;
     const shopName = document.getElementById('shopName').value.trim();
     const ownerName = document.getElementById('ownerName').value.trim();
-    if (!shopName || !ownerName) { alert("Please enter Shop and Owner Name!"); return; }
+    if (!shopName || !ownerName) { showToast("Please enter Shop and Owner Name!", 'error'); return; }
 
     const logoUrl = document.getElementById('shopLogoFile').value.trim();
     const upiField = document.getElementById('shopUpiId');
@@ -63,8 +64,8 @@ export async function saveSellerProfile(db, currentLoggedInUser, loadProfileCall
         const msg = document.getElementById('profileMsg');
         msg.style.display = 'block';
         setTimeout(() => { msg.style.display = 'none'; }, 3000);
-        alert("Shop Profile Saved Successfully! 🎉");
+        showToast("Shop Profile Saved Successfully! 🎉");
     } catch (error) {
-        alert("Error saving profile: " + error.message);
+        showToast("Error saving profile: " + error.message, 'error');
     }
 }
