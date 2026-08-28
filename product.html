@@ -154,6 +154,7 @@
 <header>
     <a href="javascript:history.back()" class="back-arrow">⬅️</a>
     <a href="index.html" class="logo-area">Desi<span>Market</span></a>
+    <div id="notifBellMount" style="margin-left:auto; margin-right:8px;"></div>
     <a href="cart.html" class="header-cart"><i class="fas fa-shopping-cart">🛒</i><span class="cart-badge" id="cartBadge" style="display:none;">0</span></a>
 </header>
 
@@ -293,6 +294,8 @@
     import { decrementStock } from './stock-logic.js';
     import { isFollowingSeller, toggleFollowSeller } from './follow-logic.js';
     import { showToast } from './toast.js';
+    import { escapeHtml } from './sanitize.js';
+    import { mountNotificationBell } from './notif-logic.js';
 
     let currentBuyerUid = null;
     let authReadyResolve;
@@ -306,9 +309,16 @@
         currentBuyerUid = cred.user.uid;
         return currentBuyerUid;
     }
+    let unsubscribeNotifBell = null;
     onAuthStateChanged(auth, (user) => {
         currentBuyerUid = user ? user.uid : null;
         authReadyResolve();
+        if (unsubscribeNotifBell) { unsubscribeNotifBell(); unsubscribeNotifBell = null; }
+        if (currentBuyerUid) {
+            unsubscribeNotifBell = mountNotificationBell(db, currentBuyerUid, 'notifBellMount');
+        } else {
+            document.getElementById('notifBellMount').innerHTML = '';
+        }
     });
 
     const params = new URLSearchParams(window.location.search);
@@ -368,6 +378,7 @@
     // burning Firestore reads on a page nobody is looking at anymore.
     window.addEventListener('pagehide', () => {
         if (unsubscribeProduct) unsubscribeProduct();
+        if (unsubscribeNotifBell) unsubscribeNotifBell();
     });
 
     function renderProduct(p) {
@@ -381,7 +392,7 @@
         content.innerHTML = `
             <div class="product-layout">
                 <div class="gallery">
-                    <img class="main-img" id="mainProductImg" src="${imageList[0]}" alt="${p.name}" onerror="this.src='https://via.placeholder.com/400?text=No+Image'">
+                    <img class="main-img" id="mainProductImg" src="${imageList[0]}" alt="${escapeHtml(p.name || 'Product')}" onerror="this.src='https://via.placeholder.com/400?text=No+Image'">
                     ${imageList.length > 1 ? `
                         <div class="thumb-strip">
                             ${imageList.map((img, i) => `<img src="${img}" loading="lazy" class="${i === 0 ? 'active' : ''}" onclick="switchMainImage('${img.replace(/'/g, "\\'")}', this)" onerror="this.style.display='none'">`).join('')}
@@ -389,22 +400,22 @@
                     ` : ''}
                 </div>
                 <div class="info-panel">
-                    <h1 class="p-name">${p.name || 'Product'}</h1>
-                    <div class="p-shop"><i class="fas fa-store">🏪</i> Sold by <strong>${p.shopName || 'Local Seller'}</strong></div>
-                    <div class="p-price">₹${price.toFixed(0)} <small>${p.unit || ''}</small></div>
+                    <h1 class="p-name">${escapeHtml(p.name || 'Product')}</h1>
+                    <div class="p-shop"><i class="fas fa-store">🏪</i> Sold by <strong>${escapeHtml(p.shopName || 'Local Seller')}</strong></div>
+                    <div class="p-price">₹${price.toFixed(0)} <small>${escapeHtml(p.unit || '')}</small></div>
 
                     <div class="p-badges">
-                        <span class="badge">✅ ${p.material || 'Original Quality'}</span>
-                        <span class="badge warranty">🛡️ ${p.warranty || 'Verified Quality'}</span>
+                        <span class="badge">✅ ${escapeHtml(p.material || 'Original Quality')}</span>
+                        <span class="badge warranty">🛡️ ${escapeHtml(p.warranty || 'Verified Quality')}</span>
                         ${outOfStock ? '<span class="badge" style="background:#fdecea;color:#c0392b;">❌ Out of Stock</span>' : `<span class="badge" style="background:#eafaf1;color:#1a7f4b;">✔️ ${stock} in stock</span>`}
                     </div>
 
-                    <div class="desc-block">${p.description || 'No additional description provided by the seller.'}</div>
+                    <div class="desc-block">${escapeHtml(p.description || 'No additional description provided by the seller.')}</div>
 
                     <table class="spec-table">
-                        <tr><td>Unit</td><td>${p.unit || 'Per Piece'}</td></tr>
-                        <tr><td>Material / Type</td><td>${p.material || 'N/A'}</td></tr>
-                        <tr><td>Warranty / Validity</td><td>${p.warranty || 'N/A'}</td></tr>
+                        <tr><td>Unit</td><td>${escapeHtml(p.unit || 'Per Piece')}</td></tr>
+                        <tr><td>Material / Type</td><td>${escapeHtml(p.material || 'N/A')}</td></tr>
+                        <tr><td>Warranty / Validity</td><td>${escapeHtml(p.warranty || 'N/A')}</td></tr>
                     </table>
 
                     ${outOfStock ? `
@@ -416,7 +427,7 @@
                             <div class="variant-group">
                                 <label>Size:</label>
                                 <div class="variant-chips" id="sizeChips">
-                                    ${p.sizes.map(s => `<div class="variant-chip" data-value="${s}" onclick="selectVariant('size', '${s}', this)">${s}</div>`).join('')}
+                                    ${p.sizes.map(s => `<div class="variant-chip" data-value="${escapeHtml(s)}" onclick="selectVariant('size', '${String(s).replace(/'/g, "\\'")}', this)">${escapeHtml(s)}</div>`).join('')}
                                 </div>
                             </div>
                         ` : ''}
@@ -424,7 +435,7 @@
                             <div class="variant-group">
                                 <label>Color:</label>
                                 <div class="variant-chips" id="colorChips">
-                                    ${p.colors.map(c => `<div class="variant-chip" data-value="${c}" onclick="selectVariant('color', '${c}', this)">${c}</div>`).join('')}
+                                    ${p.colors.map(c => `<div class="variant-chip" data-value="${escapeHtml(c)}" onclick="selectVariant('color', '${String(c).replace(/'/g, "\\'")}', this)">${escapeHtml(c)}</div>`).join('')}
                                 </div>
                             </div>
                         ` : ''}
@@ -468,7 +479,7 @@
                 const seller = snap.data();
                 currentSellerData = seller;
                 document.getElementById('sellerLogo').src = seller.logo || 'https://via.placeholder.com/60';
-                document.getElementById('sellerName').innerHTML = `${seller.shopName || 'Local Seller'} <span class="verified-tick">✔️ Verified</span> ${seller.isPremium ? '<span style="background:linear-gradient(135deg,#ffd700,#ff9900); color:#111; font-size:10px; font-weight:bold; padding:2px 8px; border-radius:10px; margin-left:4px;">🌟 PREMIUM</span>' : ''}`;
+                document.getElementById('sellerName').innerHTML = `${escapeHtml(seller.shopName || 'Local Seller')} <span class="verified-tick">✔️ Verified</span> ${seller.isPremium ? '<span style="background:linear-gradient(135deg,#ffd700,#ff9900); color:#111; font-size:10px; font-weight:bold; padding:2px 8px; border-radius:10px; margin-left:4px;">🌟 PREMIUM</span>' : ''}`;
                 document.getElementById('sellerAddress').innerText = '📍 ' + (seller.city ? seller.city + ' — ' : '') + (seller.address || 'Address not provided');
                 document.getElementById('sellerPhone').innerText = '📞 Contact after order confirmation';
 
@@ -550,7 +561,7 @@
             scrollEl.innerHTML = related.map(p => `
                 <div class="related-item" onclick="window.location.href='product.html?id=${p.id}'">
                     <img src="${p.image || 'https://via.placeholder.com/150'}" loading="lazy" onerror="this.src='https://via.placeholder.com/150?text=No+Image'">
-                    <div class="r-name">${p.name || 'Product'}</div>
+                    <div class="r-name">${escapeHtml(p.name || 'Product')}</div>
                     <div class="r-price">₹${(parseFloat(p.price) || 0).toFixed(0)}</div>
                 </div>
             `).join('');
@@ -578,7 +589,7 @@
             <div class="fbt-item">
                 <input type="checkbox" checked ${p.isMain ? 'disabled' : ''} onchange="toggleFbtItem('${p.id}', this.checked)">
                 <img src="${p.image || 'https://via.placeholder.com/80'}" loading="lazy" onerror="this.src='https://via.placeholder.com/80?text=No+Image'">
-                <div class="fbt-name">${p.name || 'Product'}</div>
+                <div class="fbt-name">${escapeHtml(p.name || 'Product')}</div>
                 <div class="fbt-price">₹${(parseFloat(p.price) || 0).toFixed(0)}</div>
             </div>
         `).join('');
