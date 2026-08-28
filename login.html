@@ -120,6 +120,7 @@
     import { signInWithEmailAndPassword, sendPasswordResetEmail, signInAnonymously, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     import { db } from './firebase-config.js';
+        import { showToast } from './toast.js';
 
     const emailInput = document.getElementById('loginEmail');
     const passInput = document.getElementById('loginPassword');
@@ -211,7 +212,7 @@
         try {
             await sendPasswordResetEmail(auth, email);
             hideError();
-            alert('Password reset link sent to ' + email + '. Please check your inbox.');
+            showToast('Password reset link sent to ' + email + '. Please check your inbox.');
         } catch (error) {
             showError(friendlyError(error.code));
         }
