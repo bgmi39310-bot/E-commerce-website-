@@ -1,5 +1,6 @@
 import { collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { isPremiumSeller } from './premium-logic.js';
+import { showToast } from './toast.js';
 
 // Simple CSV line parser that respects quoted fields containing commas.
 function parseCsvLine(line) {
@@ -24,13 +25,13 @@ function parseCsvLine(line) {
 export async function bulkUploadProducts(db, currentLoggedInUser, shopName, file, refreshCallback) {
     const statusEl = document.getElementById('bulkUploadStatus');
 
-    if (!currentLoggedInUser) { alert("Please login first."); return; }
-    if (!shopName) { alert("Please save your Shop Profile first!"); return; }
-    if (!file) { alert("Please choose a CSV file first."); return; }
+    if (!currentLoggedInUser) { showToast("Please login first.", 'error'); return; }
+    if (!shopName) { showToast("Please save your Shop Profile first!", 'error'); return; }
+    if (!file) { showToast("Please choose a CSV file first.", 'error'); return; }
 
     const premium = await isPremiumSeller(db, currentLoggedInUser.uid);
     if (!premium) {
-        alert("Bulk CSV upload is a Premium feature. Upgrade to Premium to add many products at once!");
+        showToast("Bulk CSV upload is a Premium feature. Upgrade to Premium to add many products at once!", 'error');
         return;
     }
 
