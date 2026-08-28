@@ -1,5 +1,6 @@
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { showToast } from './toast.js';
+import { escapeHtml } from './sanitize.js';
 
 // ---------- HOMEPAGE (public) ----------
 export async function loadActiveBanners(db) {
@@ -37,9 +38,9 @@ export async function loadAllBanners(db) {
             <div class="admin-row-card ${!b.active ? 'is-blocked' : ''}">
                 <img class="arc-thumb" src="${b.imageUrl || 'https://via.placeholder.com/80x50'}" alt="" style="width:80px; height:50px; border-radius:6px; object-fit:cover;">
                 <div class="arc-info">
-                    <h4>${b.title || 'Untitled Banner'} ${!b.active ? '<span class="blocked-tag">INACTIVE</span>' : ''}</h4>
-                    <p>${b.subtitle || ''}</p>
-                    <p class="uid-tag">Link: ${b.linkUrl || 'N/A'}</p>
+                    <h4>${escapeHtml(b.title || 'Untitled Banner')} ${!b.active ? '<span class="blocked-tag">INACTIVE</span>' : ''}</h4>
+                    <p>${escapeHtml(b.subtitle || '')}</p>
+                    <p class="uid-tag">Link: ${escapeHtml(b.linkUrl || 'N/A')}</p>
                 </div>
                 <div class="arc-actions">
                     <button class="admin-btn ${b.active ? 'admin-btn-block' : 'admin-btn-unblock'}" onclick="toggleBannerMain('${b.id}', ${!b.active})">${b.active ? '🚫 Deactivate' : '✅ Activate'}</button>
