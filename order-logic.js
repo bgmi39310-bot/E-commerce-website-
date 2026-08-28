@@ -1,6 +1,7 @@
 import { collection, onSnapshot, doc, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { sendNotification } from './notif-logic.js';
 import { showToast } from './toast.js';
+import { escapeHtml } from './sanitize.js';
 
 let allOrders = [];
 let currentStatusFilter = 'Pending';
@@ -61,20 +62,26 @@ function displayDashboardOrders() {
 
     let html = "";
     filtered.forEach(order => {
+        const productNameSafe = escapeHtml(order.productName || 'Item');
+        const sizeSafe = escapeHtml(order.selectedSize || '');
+        const colorSafe = escapeHtml(order.selectedColor || '');
+        const buyerNameSafe = escapeHtml(order.buyerName || 'Customer');
+        const buyerPhoneSafe = escapeHtml(order.buyerPhone || 'N/A');
+        const buyerAddressSafe = escapeHtml(order.buyerAddress || 'N/A');
         html += `
             <div class="order-card">
                 <div class="order-info">
-                    <h4>📦 ${order.productName || 'Item'} (Qty: ${order.quantity || 1})</h4>
-                    ${(order.selectedSize || order.selectedColor) ? `<p style="color:#6f42c1; font-weight:600;">${order.selectedSize ? 'Size: ' + order.selectedSize + ' ' : ''}${order.selectedColor ? 'Color: ' + order.selectedColor : ''}</p>` : ''}
-                    <p><strong>Buyer:</strong> ${order.buyerName || 'Customer'}</p>
-                    <p><strong>Phone:</strong> ${order.buyerPhone || 'N/A'}</p>
-                    <p><strong>Address:</strong> ${order.buyerAddress || 'N/A'}</p>
+                    <h4>📦 ${productNameSafe} (Qty: ${order.quantity || 1})</h4>
+                    ${(order.selectedSize || order.selectedColor) ? `<p style="color:#6f42c1; font-weight:600;">${sizeSafe ? 'Size: ' + sizeSafe + ' ' : ''}${colorSafe ? 'Color: ' + colorSafe : ''}</p>` : ''}
+                    <p><strong>Buyer:</strong> ${buyerNameSafe}</p>
+                    <p><strong>Phone:</strong> ${buyerPhoneSafe}</p>
+                    <p><strong>Address:</strong> ${buyerAddressSafe}</p>
                     <p><strong>Amount:</strong> ₹${order.price || 0}</p>
                     <p><strong>Status:</strong> <span style="font-weight:bold; color:#007600;">${order.status || 'Pending'}</span></p>
                     ${currentStatusFilter === 'Shipped' ? `<p style="color:#6f42c1; font-size:13px;"><strong>🔐 Ask the buyer for their Delivery OTP to confirm handover.</strong></p>` : ''}
 
                     <div class="btn-group">
-                        <a href="tel:${order.buyerPhone}" class="call-btn">📞 Call Buyer</a>
+                        <a href="tel:${encodeURIComponent(order.buyerPhone || '')}" class="call-btn">📞 Call Buyer</a>
                         ${currentStatusFilter === 'Pending' ? `<button class="dash-action-btn btn-accept" onclick="updateOrderStatus('${order.id}', 'Accepted')">Accept</button>` : ''}
                         ${currentStatusFilter === 'Accepted' ? `<button class="dash-action-btn btn-ship" onclick="markShippedMain('${order.id}')">Mark Shipped</button>` : ''}
                         ${currentStatusFilter === 'Shipped' ? `<button class="dash-action-btn btn-delivered" onclick="confirmDeliveryMain('${order.id}')">✅ Confirm Delivery (Enter OTP)</button>` : ''}
