@@ -140,6 +140,7 @@
         import { validateCoupon } from './coupon-logic.js';
         import { decrementStockForCart } from './stock-logic.js';
         import { loadAddresses } from './address-logic.js';
+        import { showToast } from './toast.js';
 
         let currentBuyerUid = null;
         onAuthStateChanged(auth, (user) => {
@@ -313,7 +314,7 @@
         window.placeOrder = async function() {
             const cart = JSON.parse(localStorage.getItem('cart')) || [];
             if (cart.length === 0) {
-                alert('Your cart is empty!');
+                showToast('Your cart is empty!');
                 window.location.href = 'index.html';
                 return;
             }
@@ -326,11 +327,11 @@
             const state = document.getElementById('cState').value.trim();
 
             if (!name || !phone || !address || !city) {
-                alert('Please fill in all delivery details!');
+                showToast('Please fill in all delivery details!', 'error');
                 return;
             }
             if (!/^\d{10}$/.test(phone)) {
-                alert('Please enter a valid 10-digit mobile number.');
+                showToast('Please enter a valid 10-digit mobile number.', 'error');
                 return;
             }
 
@@ -409,11 +410,11 @@
                 localStorage.setItem('myOrders', JSON.stringify(myOrders));
                 localStorage.removeItem('cart');
 
-                alert('Order placed successfully! The seller has been notified. 🎉');
+                showToast('Order placed successfully! The seller has been notified. 🎉');
                 window.location.href = 'orders.html';
             } catch (error) {
                 console.error('Order error:', error);
-                alert('Error placing order: ' + error.message);
+                showToast('Error placing order: ' + error.message, 'error');
                 btn.disabled = false;
                 btn.innerText = 'Place Order';
             }
