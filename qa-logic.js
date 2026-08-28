@@ -1,6 +1,7 @@
 import { collection, addDoc, getDocs, query, where, doc, updateDoc, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { sendNotification } from './notif-logic.js';
 import { showToast } from './toast.js';
+import { escapeHtml } from './sanitize.js';
 
 // ---------- BUYER SIDE (product.html) ----------
 export async function submitQuestion(db, { productId, productName, sellerUid, askerUid, askerName, question }, refreshCallback) {
@@ -57,9 +58,9 @@ export async function loadProductQA(db, productId) {
 
         container.innerHTML = items.map(qa => `
             <div class="qa-item">
-                <p class="qa-question">❓ ${qa.question}</p>
+                <p class="qa-question">❓ ${escapeHtml(qa.question)}</p>
                 ${qa.answered
-                    ? `<p class="qa-answer">💬 <strong>Seller:</strong> ${qa.answer}</p>`
+                    ? `<p class="qa-answer">💬 <strong>Seller:</strong> ${escapeHtml(qa.answer)}</p>`
                     : `<p class="qa-pending">⏳ Waiting for seller's answer...</p>`
                 }
             </div>
@@ -85,10 +86,10 @@ function renderSellerQuestions() {
     container.innerHTML = cachedQuestions.map(qa => `
         <div class="order-card">
             <div class="order-info">
-                <p><strong>${qa.askerName}</strong> asked:</p>
-                <p style="font-style:italic;">"${qa.question}"</p>
+                <p><strong>${escapeHtml(qa.askerName)}</strong> asked:</p>
+                <p style="font-style:italic;">"${escapeHtml(qa.question)}"</p>
                 ${qa.answered
-                    ? `<p style="color:#28a745;"><strong>Your answer:</strong> ${qa.answer}</p>`
+                    ? `<p style="color:#28a745;"><strong>Your answer:</strong> ${escapeHtml(qa.answer)}</p>`
                     : `
                         <textarea id="answerInput-${qa.id}" rows="2" placeholder="Type your answer..." style="width:100%; padding:8px; border:1px solid #ddd; border-radius:5px; margin-top:6px;"></textarea>
                         <button class="dash-action-btn btn-accept" style="margin-top:6px;" onclick="submitAnswerMain('${qa.id}')">Send Answer</button>
