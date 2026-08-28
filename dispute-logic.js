@@ -1,5 +1,6 @@
 import { doc, setDoc, getDoc, addDoc, collection, query, where, getDocs, onSnapshot, orderBy, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { showToast } from './toast.js';
+import { escapeHtml } from './sanitize.js';
 
 export async function createDispute(db, { orderId, raisedByUid, raisedByName, raisedByRole, againstUid, subject, description }, refreshCallback) {
     if (!subject || !description) {
@@ -52,10 +53,10 @@ export async function loadMyDisputes(db, uid) {
         container.innerHTML = disputes.map(d => `
             <div class="dispute-card" onclick="window.location.href='dispute-thread.html?id=${d.id}'">
                 <div class="dispute-top">
-                    <strong>${d.subject}</strong>
+                    <strong>${escapeHtml(d.subject)}</strong>
                     <span class="dispute-status status-${d.status}">${d.status}</span>
                 </div>
-                <p class="dispute-preview">${d.description}</p>
+                <p class="dispute-preview">${escapeHtml(d.description)}</p>
             </div>
         `).join('');
     } catch (error) {
@@ -108,9 +109,9 @@ export async function loadAllDisputes(db) {
         container.innerHTML = disputes.map(d => `
             <div class="admin-row-card ${d.status === 'Closed' ? 'is-blocked' : ''}">
                 <div class="arc-info">
-                    <h4>${d.subject} <span class="blocked-tag" style="background:${d.status === 'Open' ? '#ff9900' : d.status === 'Resolved' ? '#28a745' : '#6c757d'};">${d.status}</span></h4>
-                    <p>${d.description}</p>
-                    <p class="uid-tag">Order: ${d.orderId} | Raised by: ${d.raisedByName} (${d.raisedByRole})</p>
+                    <h4>${escapeHtml(d.subject)} <span class="blocked-tag" style="background:${d.status === 'Open' ? '#ff9900' : d.status === 'Resolved' ? '#28a745' : '#6c757d'};">${d.status}</span></h4>
+                    <p>${escapeHtml(d.description)}</p>
+                    <p class="uid-tag">Order: ${escapeHtml(d.orderId)} | Raised by: ${escapeHtml(d.raisedByName)} (${escapeHtml(d.raisedByRole)})</p>
                 </div>
                 <div class="arc-actions">
                     <a href="dispute-thread.html?id=${d.id}" class="admin-btn admin-btn-unblock" style="text-decoration:none;">💬 Open Thread</a>
