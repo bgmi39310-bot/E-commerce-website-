@@ -1,5 +1,6 @@
-import {
 import { showToast } from './toast.js';
+import { escapeHtml } from './sanitize.js';
+import {
     collection, getDocs, query, where, doc, updateDoc, deleteDoc, getDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
@@ -91,9 +92,9 @@ function renderReviews() {
     container.innerHTML = cachedReviews.map(r => `
         <div class="admin-row-card">
             <div class="arc-info">
-                <h4>${'★'.repeat(r.rating || 0)}${'☆'.repeat(5 - (r.rating || 0))} — ${r.buyerName || 'Anonymous'}</h4>
-                <p>${r.comment || '(no comment)'}</p>
-                <p class="uid-tag">Product ID: ${r.productId || 'N/A'}</p>
+                <h4>${'★'.repeat(r.rating || 0)}${'☆'.repeat(5 - (r.rating || 0))} — ${escapeHtml(r.buyerName || 'Anonymous')}</h4>
+                <p>${escapeHtml(r.comment || '(no comment)')}</p>
+                <p class="uid-tag">Product ID: ${escapeHtml(r.productId || 'N/A')}</p>
             </div>
             <div class="arc-actions">
                 <button class="admin-btn admin-btn-delete" onclick="deleteReviewMain('${r.id}')">🗑️ Remove</button>
@@ -144,10 +145,10 @@ function renderReports() {
         return `
             <div class="admin-row-card ${resolved ? 'is-blocked' : ''}">
                 <div class="arc-info">
-                    <h4>${r.productName || 'Unknown product'} ${resolved ? '<span class="blocked-tag">RESOLVED</span>' : ''}</h4>
-                    <p>🏪 ${r.shopName || 'Unknown shop'} &nbsp; | &nbsp; Reason: <strong>${r.reason || 'N/A'}</strong></p>
-                    ${r.details ? `<p>"${r.details}"</p>` : ''}
-                    <p class="uid-tag">Product ID: ${r.productId || 'N/A'} | Seller UID: ${r.sellerUid || 'N/A'}</p>
+                    <h4>${escapeHtml(r.productName || 'Unknown product')} ${resolved ? '<span class="blocked-tag">RESOLVED</span>' : ''}</h4>
+                    <p>🏪 ${escapeHtml(r.shopName || 'Unknown shop')} &nbsp; | &nbsp; Reason: <strong>${escapeHtml(r.reason || 'N/A')}</strong></p>
+                    ${r.details ? `<p>"${escapeHtml(r.details)}"</p>` : ''}
+                    <p class="uid-tag">Product ID: ${escapeHtml(r.productId || 'N/A')} | Seller UID: ${escapeHtml(r.sellerUid || 'N/A')}</p>
                 </div>
                 ${!resolved ? `
                     <div class="arc-actions">
@@ -201,8 +202,8 @@ function renderKyc() {
     container.innerHTML = cachedKyc.map(s => `
         <div class="admin-row-card">
             <div class="arc-info">
-                <h4>${s.shopName || 'Unnamed Shop'}</h4>
-                <p>Owner: ${s.ownerName || 'N/A'} &nbsp; | &nbsp; PAN: ${s.kycPan || 'N/A'} &nbsp; | &nbsp; Aadhar: xxxx-xxxx-${s.kycAadharLast4 || '----'}</p>
+                <h4>${escapeHtml(s.shopName || 'Unnamed Shop')}</h4>
+                <p>Owner: ${escapeHtml(s.ownerName || 'N/A')} &nbsp; | &nbsp; PAN: ${escapeHtml(s.kycPan || 'N/A')} &nbsp; | &nbsp; Aadhar: xxxx-xxxx-${escapeHtml(s.kycAadharLast4 || '----')}</p>
                 <p class="uid-tag">Seller UID: ${s.id}</p>
             </div>
             <div class="arc-actions">
@@ -253,8 +254,8 @@ function renderSellers() {
         return `
             <div class="admin-row-card ${blocked ? 'is-blocked' : ''}">
                 <div class="arc-info">
-                    <h4>${u.name || 'Unnamed'} ${blocked ? '<span class="blocked-tag">BLOCKED</span>' : ''} ${isPremium ? '<span class="blocked-tag" style="background:#ff9900; color:#111;">🌟 PREMIUM</span>' : ''}</h4>
-                    <p>📞 ${u.phone || 'N/A'} &nbsp; ✉️ ${u.email || 'N/A'}</p>
+                    <h4>${escapeHtml(u.name || 'Unnamed')} ${blocked ? '<span class="blocked-tag">BLOCKED</span>' : ''} ${isPremium ? '<span class="blocked-tag" style="background:#ff9900; color:#111;">🌟 PREMIUM</span>' : ''}</h4>
+                    <p>📞 ${escapeHtml(u.phone || 'N/A')} &nbsp; ✉️ ${escapeHtml(u.email || 'N/A')}</p>
                     <p class="uid-tag">UID: ${u.id}</p>
                 </div>
                 <div class="arc-actions">
@@ -306,8 +307,8 @@ function renderBuyers() {
         return `
             <div class="admin-row-card ${blocked ? 'is-blocked' : ''}">
                 <div class="arc-info">
-                    <h4>${u.name || 'Unnamed'} ${blocked ? '<span class="blocked-tag">BLOCKED</span>' : ''}</h4>
-                    <p>📞 ${u.phone || 'N/A'} &nbsp; ✉️ ${u.email || 'N/A'}</p>
+                    <h4>${escapeHtml(u.name || 'Unnamed')} ${blocked ? '<span class="blocked-tag">BLOCKED</span>' : ''}</h4>
+                    <p>📞 ${escapeHtml(u.phone || 'N/A')} &nbsp; ✉️ ${escapeHtml(u.email || 'N/A')}</p>
                     <p class="uid-tag">UID: ${u.id}</p>
                 </div>
                 <div class="arc-actions">
@@ -369,9 +370,9 @@ function renderProducts() {
         <div class="admin-row-card">
             <img class="arc-thumb" src="${p.image || 'https://via.placeholder.com/60'}" alt="">
             <div class="arc-info">
-                <h4>${p.name || 'Unnamed product'}</h4>
-                <p>₹${p.price || 0} &nbsp; 🏪 ${p.shopName || 'N/A'}</p>
-                <p class="uid-tag">Seller UID: ${p.sellerUid || 'N/A'}</p>
+                <h4>${escapeHtml(p.name || 'Unnamed product')}</h4>
+                <p>₹${p.price || 0} &nbsp; 🏪 ${escapeHtml(p.shopName || 'N/A')}</p>
+                <p class="uid-tag">Seller UID: ${escapeHtml(p.sellerUid || 'N/A')}</p>
             </div>
             <div class="arc-actions">
                 <button class="admin-btn admin-btn-delete" onclick="deleteProductMain('${p.id}')">🗑️ Remove</button>
@@ -437,8 +438,8 @@ export async function loadAllOrders(db, statusFilter = 'All') {
         container.innerHTML = orders.map(o => `
             <div class="admin-row-card">
                 <div class="arc-info">
-                    <h4>📦 ${o.productName || 'Item'} (Qty: ${o.quantity || 1}) — ₹${o.price || 0}</h4>
-                    <p>Buyer: ${o.buyerName || 'N/A'} &nbsp; | &nbsp; Shop: ${o.shopName || 'N/A'}</p>
+                    <h4>📦 ${escapeHtml(o.productName || 'Item')} (Qty: ${o.quantity || 1}) — ₹${o.price || 0}</h4>
+                    <p>Buyer: ${escapeHtml(o.buyerName || 'N/A')} &nbsp; | &nbsp; Shop: ${escapeHtml(o.shopName || 'N/A')}</p>
                     <p class="uid-tag">Status: <strong>${o.status || 'Pending'}</strong></p>
                 </div>
             </div>
