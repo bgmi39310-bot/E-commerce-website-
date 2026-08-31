@@ -1,4 +1,16 @@
 User-agent: *
 Allow: /
+Disallow: /admin-panel.html
+Disallow: /seller-dashboard.html
+Disallow: /orders.html
+Disallow: /account.html
+Disallow: /cart.html
+Disallow: /checkout.html
+Disallow: /chat.html
+Disallow: /messages.html
+Disallow: /wishlist.html
+Disallow: /addresses.html
+Disallow: /disputes.html
+Disallow: /dispute-thread.html
 
-Sitemap: https://YOUR-USERNAME.github.io/YOUR-REPO-NAME/sitemap.xml
+Sitemap: https://bgmi39310-bot.github.io/E-commerce-website/sitemap.xml
