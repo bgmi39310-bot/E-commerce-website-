@@ -8,6 +8,7 @@
     <meta name="theme-color" content="#232f3e">
     <link rel="icon" href="icon-192.png">
     <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="stylesheet" href="shared-ui.css">
     <script src="pwa-init.js" defer></script>
     <script src="click-guard.js"></script>
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
@@ -63,6 +64,7 @@
     <header>
         <div class="back-arrow" onclick="history.back()">⬅️</div>
         <div class="header-title">Checkout</div>
+        <div id="notifBellMount" style="margin-left:auto;"></div>
     </header>
 
     <div class="container">
@@ -141,11 +143,16 @@
         import { decrementStockForCart } from './stock-logic.js';
         import { loadAddresses } from './address-logic.js';
         import { showToast } from './toast.js';
+        import { escapeHtml } from './sanitize.js';
+        import { mountNotificationBell } from './notif-logic.js';
 
         let currentBuyerUid = null;
         onAuthStateChanged(auth, (user) => {
             currentBuyerUid = user ? user.uid : null;
-            if (currentBuyerUid) loadSavedAddresses();
+            if (currentBuyerUid) {
+                loadSavedAddresses();
+                mountNotificationBell(db, currentBuyerUid, 'notifBellMount');
+            }
         });
 
         async function loadSavedAddresses() {
@@ -158,10 +165,10 @@
             }
 
             listEl.innerHTML = addresses.map((a, i) => `
-                <div class="saved-addr-card ${i === 0 ? 'selected' : ''}" onclick='selectSavedAddress(${JSON.stringify(a)}, this)'>
-                    <strong>${a.label || 'Address'}</strong> ${a.isDefault ? '<span class="default-tag">DEFAULT</span>' : ''}<br>
-                    ${a.name}, ${a.phone}<br>
-                    ${a.addressLine}, ${a.city}, ${a.state} ${a.pincode ? '- ' + a.pincode : ''}
+                <div class="saved-addr-card ${i === 0 ? 'selected' : ''}" onclick='selectSavedAddress(${JSON.stringify(a).replace(/'/g, "&#39;")}, this)'>
+                    <strong>${escapeHtml(a.label || 'Address')}</strong> ${a.isDefault ? '<span class="default-tag">DEFAULT</span>' : ''}<br>
+                    ${escapeHtml(a.name)}, ${escapeHtml(a.phone)}<br>
+                    ${escapeHtml(a.addressLine)}, ${escapeHtml(a.city)}, ${escapeHtml(a.state)} ${a.pincode ? '- ' + escapeHtml(a.pincode) : ''}
                 </div>
             `).join('') + `<div class="new-addr-link" onclick="clearAddressSelection()">+ Enter a different address</div>`;
 
@@ -284,7 +291,7 @@
                 const price = parseFloat(item.price) || 0;
                 const lineTotal = qty * price;
                 total += lineTotal;
-                listEl.innerHTML += `<div class="order-item-row"><span>${item.name} × ${qty}</span><span>₹${lineTotal.toFixed(0)}</span></div>`;
+                listEl.innerHTML += `<div class="order-item-row"><span>${escapeHtml(item.name)} × ${qty}</span><span>₹${lineTotal.toFixed(0)}</span></div>`;
             });
 
             const discount = computeDiscount(cart, total);
