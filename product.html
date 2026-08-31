@@ -8,6 +8,7 @@
     <meta name="theme-color" content="#232f3e">
     <link rel="icon" href="icon-192.png">
     <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="stylesheet" href="shared-ui.css">
     <script src="pwa-init.js" defer></script>
     <script src="click-guard.js"></script>
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
@@ -131,6 +132,14 @@
 
     .loading-state, .error-state { text-align: center; padding: 60px 20px; background: white; border-radius: 8px; color: #666; }
 
+    @keyframes dm-shimmer { 0% { background-position: -300px 0; } 100% { background-position: 300px 0; } }
+    .skel { background: linear-gradient(90deg, #eee 25%, #f5f5f5 37%, #eee 63%); background-size: 600px 100%; animation: dm-shimmer 1.4s ease-in-out infinite; border-radius: 6px; }
+    .skel-detail { display: flex; flex-direction: column; gap: 14px; background: white; border-radius: 8px; padding: 16px; }
+    .skel-detail .skel-img { width: 100%; aspect-ratio: 1/1; max-width: 340px; }
+    .skel-detail .skel-line { height: 16px; }
+    .skel-detail .skel-line.title { height: 22px; width: 80%; }
+    .skel-detail .skel-line.short { width: 40%; }
+
     /* Buy Now Modal */
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 500; align-items: flex-end; justify-content: center; }
     .modal-overlay.active { display: flex; }
@@ -159,7 +168,15 @@
 </header>
 
 <div class="container" id="pageContent">
-    <div class="loading-state">Loading product details...</div>
+    <div class="loading-state">
+        <div class="skel-detail">
+            <div class="skel skel-img"></div>
+            <div class="skel skel-line title"></div>
+            <div class="skel skel-line short"></div>
+            <div class="skel skel-line"></div>
+            <div class="skel skel-line"></div>
+        </div>
+    </div>
 </div>
 
 <!-- Seller card lives OUTSIDE pageContent on purpose: pageContent gets fully
