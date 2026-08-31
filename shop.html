@@ -8,6 +8,7 @@
     <meta name="theme-color" content="#232f3e">
     <link rel="icon" href="icon-192.png">
     <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="stylesheet" href="shared-ui.css">
     <script src="pwa-init.js" defer></script>
     <script src="click-guard.js"></script>
 <style>
@@ -42,6 +43,13 @@
     .product-price { font-size: 15px; font-weight: bold; color: #B12704; margin-top: auto; }
 
     .empty-state, .loading-text { text-align: center; padding: 40px 20px; background: white; border-radius: 8px; color: #666; grid-column: 1/-1; }
+
+    @keyframes dm-shimmer { 0% { background-position: -300px 0; } 100% { background-position: 300px 0; } }
+    .skel { background: linear-gradient(90deg, #eee 25%, #f5f5f5 37%, #eee 63%); background-size: 600px 100%; animation: dm-shimmer 1.4s ease-in-out infinite; border-radius: 6px; }
+    .skel-banner { height: 108px; border-radius: 10px; margin-bottom: 18px; }
+    .skel-card { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+    .skel-card .skel-img { width: 100%; aspect-ratio: 1/1; border-radius: 0; }
+    .skel-card .skel-line { height: 12px; margin: 10px; }
 </style>
 </head>
 <body>
@@ -53,12 +61,14 @@
 
 <div class="container">
     <div class="shop-banner" id="shopBanner">
-        <p class="loading-text">Loading shop details...</p>
+        <div class="skel skel-banner" style="width:100%;"></div>
     </div>
 
     <div class="section-title">🛍️ Products from this Shop</div>
     <div id="shopProductGrid" class="product-grid">
-        <div class="loading-text">Loading products...</div>
+        <div class="skel-card"><div class="skel skel-img"></div><div class="skel skel-line"></div></div>
+        <div class="skel-card"><div class="skel skel-img"></div><div class="skel skel-line"></div></div>
+        <div class="skel-card"><div class="skel skel-img"></div><div class="skel skel-line"></div></div>
     </div>
 </div>
 
