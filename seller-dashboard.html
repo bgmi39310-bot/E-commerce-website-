@@ -8,6 +8,7 @@
     <meta name="theme-color" content="#232f3e">
     <link rel="icon" href="icon-192.png">
     <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="stylesheet" href="shared-ui.css">
     <script src="pwa-init.js" defer></script>
     <script src="click-guard.js"></script>
     <style>
@@ -22,6 +23,15 @@
         .side-menu .close-btn { position: absolute; top: 10px; right: 20px; font-size: 30px; margin-left: 50px; }
         .container { max-width: 900px; margin: 20px auto; padding: 20px; }
         .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        /* Perf: sections below the fold skip layout/paint work until scrolled
+           near (content-visibility), and fade in gently once their data loads
+           via the IntersectionObserver lazy-loading below. */
+        .module-loading { color: #666; padding: 12px 0; }
+        .module-error { color: #b42318; background: #fff1f0; border-radius: 6px; padding: 10px 12px; }
+        .card { content-visibility: auto; contain-intrinsic-size: 260px; transition: opacity .2s ease, transform .2s ease; }
+        .card:not(:first-child) { animation: dashboard-enter .35s ease both; }
+        @keyframes dashboard-enter { from { opacity: .72; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
         h2 { color: #232f3e; margin-top: 0; }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         input, textarea, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; background: #fff; }
@@ -258,7 +268,7 @@
         </div>
 
         <!-- 3. Customer Orders Management Section -->
-        <div class="card">
+        <div class="card" id="ordersSection">
             <h2>3. Customer Orders Management</h2>
             <div class="tab-buttons">
                 <button class="tab-btn active" onclick="filterOrdersMain('Pending')" id="tabPending">⏳ Pending</button>
@@ -277,20 +287,20 @@
         </div>
 
         <!-- 4. My Listed Products Hub -->
-        <div class="card">
+        <div class="card" id="productsSection">
             <h2>4. My Listed Products Hub (Manage Your Inventory)</h2>
             <div id="myProductsContainer"><p>Loading your listed products...</p></div>
         </div>
 
         <!-- 5. Shop Analytics -->
-        <div class="card">
+        <div class="card" id="analyticsSection">
             <h2>5. 📊 Shop Analytics</h2>
             <button onclick="downloadReportMain()" class="action-btn" style="width:auto; padding:8px 16px; margin-bottom:14px; font-size:13px;">⬇️ Download Sales Report (CSV)</button>
             <div id="analyticsContainer"><p>Loading analytics...</p></div>
         </div>
 
         <!-- 6. Discount Coupons -->
-        <div class="card">
+        <div class="card" id="couponsSection">
             <h2>6. 🎟️ Discount Coupons</h2>
             <div class="form-grid" style="margin-bottom:16px;">
                 <input type="text" id="couponCode" placeholder="Coupon Code (e.g. SAVE20)" style="text-transform:uppercase;">
@@ -305,25 +315,25 @@
         </div>
 
         <!-- 7. Return / Refund Requests -->
-        <div class="card">
+        <div class="card" id="returnsSection">
             <h2>7. ↩️ Return / Refund Requests</h2>
             <div id="returnsContainer"><p>Loading return requests...</p></div>
         </div>
 
         <!-- 8. Earnings / Payout Summary -->
-        <div class="card">
+        <div class="card" id="payoutSection">
             <h2>8. 💰 Earnings Summary</h2>
             <div id="payoutContainer"><p>Loading earnings...</p></div>
         </div>
 
         <!-- 9. Seller Verification (KYC) -->
-        <div class="card">
+        <div class="card" id="kycSection">
             <h2>9. 🪪 Seller Verification (KYC)</h2>
             <div id="kycContainer"><p>Loading verification status...</p></div>
         </div>
 
         <!-- 10. Customer Questions -->
-        <div class="card">
+        <div class="card" id="questionsSection">
             <h2>10. 💬 Customer Questions</h2>
             <div id="qaSellerContainer"><p>Loading questions...</p></div>
         </div>
@@ -387,6 +397,45 @@
         }
 
         let unsubscribeNotifBell = null;
+        let dashboardObserver = null;
+        const loadedDashboardModules = new Set();
+
+        // Lazy-load each dashboard section's data only once that section
+        // actually scrolls into view, instead of firing all 7 Firestore
+        // queries the instant a seller logs in. Keeps the first paint fast
+        // and avoids a burst of reads for sections the seller may never
+        // scroll down to in that visit.
+        function loadDashboardModule(name, sectionId, task) {
+            if (loadedDashboardModules.has(name)) return;
+            loadedDashboardModules.add(name);
+            const section = document.getElementById(sectionId);
+            const target = section?.querySelector('[id$="Container"]');
+            if (target && !target.dataset.loaded) target.innerHTML = '<p class="module-loading">Loading...</p>';
+            Promise.resolve().then(task).catch((error) => {
+                loadedDashboardModules.delete(name);
+                if (target) target.innerHTML = '<p class="module-error">This section could not be loaded. Please try again.</p>';
+                console.error(`Dashboard module ${name} failed`, error);
+            });
+        }
+
+        function initializeSellerDashboardModules(uid) {
+            const modules = [
+                ['orders', 'ordersSection', () => fetchDashboardOrders(db, uid, renderAnalyticsFromOrders)],
+                ['products', 'productsSection', () => fetchMyListedProducts(db, uid, renderLowStockAlerts)],
+                ['coupons', 'couponsSection', () => loadMyCoupons(db, uid)],
+                ['returns', 'returnsSection', () => loadReturnRequests(db, uid)],
+                ['payouts', 'payoutSection', () => loadPayoutSummary(db, uid)],
+                ['kyc', 'kycSection', () => loadKycStatus(db, uid)],
+                ['questions', 'questionsSection', () => loadSellerQuestions(db, uid)],
+            ];
+            dashboardObserver = new IntersectionObserver((entries) => {
+                entries.filter((entry) => entry.isIntersecting).forEach((entry) => {
+                    const module = modules.find((item) => item[1] === entry.target.id);
+                    if (module) loadDashboardModule(module[0], module[1], module[2]);
+                });
+            }, { rootMargin: '240px 0px' }); // start loading a bit before the section is actually on-screen, so it feels instant
+            modules.forEach((module) => dashboardObserver.observe(document.getElementById(module[1])));
+        }
 
         onAuthStateChanged(auth, async (user) => {
             if (user) {
@@ -422,21 +471,20 @@
                     const el = document.getElementById('dispFollowerCount');
                     if (el) el.innerText = `👥 ${count} Follower${count === 1 ? '' : 's'}`;
                 });
-                fetchDashboardOrders(db, user.uid, renderAnalyticsFromOrders);
-                fetchMyListedProducts(db, user.uid, renderLowStockAlerts);
-                loadMyCoupons(db, user.uid);
-                loadReturnRequests(db, user.uid);
-                loadPayoutSummary(db, user.uid);
-                loadKycStatus(db, user.uid);
-                loadSellerQuestions(db, user.uid);
 
                 // Real-time new-order notifications (bell badge + browser notification + chime).
                 // No manual refresh needed here — the live orders listener above
                 // already updates the screen automatically when a new order arrives.
                 listenForNewOrders(db, user.uid, () => {});
 
-                // Separate bell for persisted notifications (new customer questions, etc.)
+                // Persisted notification bell (new customer questions, order/return
+                // updates, etc.) — mounted right away rather than lazily, since it's
+                // a single lightweight listener and sellers expect it immediately.
                 unsubscribeNotifBell = mountNotificationBell(db, user.uid, 'notifBellMount');
+
+                // Keep the free-tier dashboard light: stagger reads so the first render stays fast and
+                // the browser does not make a burst of Firestore reads when a seller logs in.
+                if (!dashboardObserver) initializeSellerDashboardModules(user.uid);
             } else {
                 window.location.href = "login.html";
             }
@@ -563,6 +611,9 @@
             stopListeningToMyProducts();
             stopListeningToOrders();
             if (unsubscribeNotifBell) unsubscribeNotifBell();
+            dashboardObserver?.disconnect();
+            dashboardObserver = null;
+            loadedDashboardModules.clear();
         });
     </script>
 </body>
