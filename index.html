@@ -10,6 +10,7 @@
     <meta name="theme-color" content="#232f3e">
     <link rel="icon" href="icon-192.png">
     <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="stylesheet" href="shared-ui.css">
     <script src="pwa-init.js" defer></script>
     <script src="click-guard.js"></script>
     <!-- Google Analytics: create a free GA4 property at analytics.google.com and replace G-XXXXXXXXXX below -->
@@ -107,6 +108,16 @@
 
         .loading-text, .no-product { grid-column: 1 / -1; text-align: center; padding: 40px 20px; font-size: 15px; color: #666; background: white; border-radius: 8px; }
         .no-product a { color: #007185; }
+
+        /* Skeleton / shimmer loading placeholders — used instead of plain
+           "Loading..." text so the page doesn't feel frozen while data loads. */
+        @keyframes dm-shimmer { 0% { background-position: -300px 0; } 100% { background-position: 300px 0; } }
+        .skel { background: linear-gradient(90deg, #eee 25%, #f5f5f5 37%, #eee 63%); background-size: 600px 100%; animation: dm-shimmer 1.4s ease-in-out infinite; border-radius: 6px; }
+        .skel-card { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.12); display: flex; flex-direction: column; }
+        .skel-card .skel-img { width: 100%; aspect-ratio: 1/1; border-radius: 0; }
+        .skel-card .skel-line { height: 12px; margin: 10px 10px 0; }
+        .skel-card .skel-line.short { width: 60%; margin-bottom: 10px; }
+        .skel-mini { flex-shrink: 0; width: 150px; height: 168px; border-radius: 10px; }
 
         /* Sellers Near You */
         .sellers-section-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
@@ -206,7 +217,10 @@
         </div>
         <p class="sellers-desc" data-i18n="sellersNearYouDesc">Discover verified local shops around you</p>
         <div class="sellers-scroll" id="sellersScroll">
-            <div class="no-sellers-box">Loading local shops...</div>
+            <div class="skel skel-mini"></div>
+            <div class="skel skel-mini"></div>
+            <div class="skel skel-mini"></div>
+            <div class="skel skel-mini"></div>
         </div>
     </div>
 
@@ -250,7 +264,11 @@
 
         <div class="section-title" data-i18n="trendingProducts">Trending Products Near You</div>
         <div id="productGrid" class="product-grid">
-            <div class="loading-text">Loading live products...</div>
+            <!-- Skeleton placeholders shown until the first live product snapshot arrives -->
+            <div class="skel-card"><div class="skel skel-img"></div><div class="skel skel-line"></div><div class="skel skel-line short"></div></div>
+            <div class="skel-card"><div class="skel skel-img"></div><div class="skel skel-line"></div><div class="skel skel-line short"></div></div>
+            <div class="skel-card"><div class="skel skel-img"></div><div class="skel skel-line"></div><div class="skel skel-line short"></div></div>
+            <div class="skel-card"><div class="skel skel-img"></div><div class="skel skel-line"></div><div class="skel skel-line short"></div></div>
         </div>
         <div id="loadMoreWrap" style="display:none; text-align:center; margin-top:20px;">
             <button onclick="loadMoreProducts()" style="background:white; border:1.5px solid var(--primary-color); color:var(--primary-color); padding:11px 28px; border-radius:6px; font-weight:bold; font-size:14px; cursor:pointer;">
