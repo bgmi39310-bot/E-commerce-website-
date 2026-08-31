@@ -8,6 +8,7 @@
     <meta name="theme-color" content="#232f3e">
     <link rel="icon" href="icon-192.png">
     <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="stylesheet" href="shared-ui.css">
     <script src="pwa-init.js" defer></script>
     <script src="click-guard.js"></script>
 <style>
@@ -110,6 +111,7 @@
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { loadAddresses, saveAddress, deleteAddress, setDefaultAddress } from './address-logic.js';
         import { showToast } from './toast.js';
+        import { escapeHtml } from './sanitize.js';
 
     let currentUid = null;
 
@@ -123,15 +125,15 @@
         container.innerHTML = addresses.map(a => `
             <div class="addr-card">
                 <div class="addr-top">
-                    <span class="addr-label">${a.label || 'Address'} ${a.isDefault ? '<span class="default-tag">DEFAULT</span>' : ''}</span>
+                    <span class="addr-label">${escapeHtml(a.label || 'Address')} ${a.isDefault ? '<span class="default-tag">DEFAULT</span>' : ''}</span>
                 </div>
                 <div class="addr-text">
-                    ${a.name}, ${a.phone}<br>
-                    ${a.addressLine}, ${a.city}, ${a.state} ${a.pincode ? '- ' + a.pincode : ''}
+                    ${escapeHtml(a.name)}, ${escapeHtml(a.phone)}<br>
+                    ${escapeHtml(a.addressLine)}, ${escapeHtml(a.city)}, ${escapeHtml(a.state)} ${a.pincode ? '- ' + escapeHtml(a.pincode) : ''}
                 </div>
                 <div class="addr-actions">
                     ${!a.isDefault ? `<button class="btn-default" onclick="makeDefault('${a.id}')">Set as Default</button>` : ''}
-                    <button class="btn-edit" onclick='editAddress(${JSON.stringify(a)})'>✏️ Edit</button>
+                    <button class="btn-edit" onclick='editAddress(${JSON.stringify(a).replace(/'/g, "&#39;")})'>✏️ Edit</button>
                     <button class="btn-delete" onclick="removeAddress('${a.id}')">🗑️ Delete</button>
                 </div>
             </div>
