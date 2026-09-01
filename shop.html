@@ -74,9 +74,9 @@
 
 <script type="module">
     import { db, auth } from './firebase-config.js';
-    import { doc, getDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { doc, onSnapshot, collection, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     import { onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-    import { getFollowerCount, isFollowingSeller, toggleFollowSeller } from './follow-logic.js';
+    import { isFollowingSeller, toggleFollowSeller } from './follow-logic.js';
     import { showToast } from './toast.js';
     import { escapeHtml } from './sanitize.js';
 
@@ -98,8 +98,19 @@
     });
 
     let sellerData = null;
+    let nowFollowing = false;
+    let followStatusChecked = false;
+    let unsubscribeShop = null;
+    let unsubscribeShopProducts = null;
 
-    async function loadShop() {
+    // READ-COST NOTE: this page listens for live updates (onSnapshot) instead
+    // of fetching once (getDoc/getDocs). Combined with the offline persistence
+    // turned on in firebase-config.js, that means: on a repeat visit the shop
+    // and its products appear instantly from the on-device cache, and if the
+    // seller changes their name, logo, address, or a product's price/stock/
+    // image while this page is open, it updates on screen immediately —
+    // without the visitor needing to refresh.
+    function loadShop() {
         const banner = document.getElementById('shopBanner');
         const grid = document.getElementById('shopProductGrid');
 
@@ -109,24 +120,26 @@
             return;
         }
 
-        try {
-            const snap = await getDoc(doc(db, "sellers_profiles", sellerUid));
+        unsubscribeShop = onSnapshot(doc(db, "sellers_profiles", sellerUid), async (snap) => {
             if (!snap.exists()) {
                 banner.innerHTML = `<p class="loading-text">This shop is no longer available.</p>`;
                 grid.innerHTML = '';
                 return;
             }
             sellerData = snap.data();
-            const followerCount = await getFollowerCount(db, sellerUid);
 
-            await authReady; // wait for existing session (if any) — don't force-create one just to view a shop
-            const nowFollowing = await isFollowingSeller(db, currentBuyerUid, sellerUid);
+            if (!followStatusChecked) {
+                followStatusChecked = true;
+                await authReady; // wait for existing session (if any) — don't force-create one just to view a shop
+                nowFollowing = await isFollowingSeller(db, currentBuyerUid, sellerUid);
+            }
 
             document.title = `${sellerData.shopName || 'Shop'} - DesiMarket`;
 
             const shopNameSafe = escapeHtml(sellerData.shopName || 'Local Seller');
             const citySafe = escapeHtml(sellerData.city || '');
             const addressSafe = escapeHtml(sellerData.address || 'Address not provided');
+            const followerCount = Math.max(0, sellerData.followerCount || 0);
 
             banner.innerHTML = `
                 <img class="shop-logo" src="${sellerData.logo || 'https://via.placeholder.com/76'}" alt="${shopNameSafe}" onerror="this.src='https://via.placeholder.com/76'">
@@ -139,12 +152,12 @@
             `;
 
             document.getElementById('followBtn').addEventListener('click', handleFollowClick);
-
-            loadShopProducts();
-        } catch (error) {
+        }, (error) => {
             console.error(error);
             banner.innerHTML = `<p class="loading-text">Unable to load shop right now.</p>`;
-        }
+        });
+
+        loadShopProducts();
     }
 
     async function handleFollowClick() {
@@ -156,11 +169,12 @@
         const btn = document.getElementById('followBtn');
         btn.disabled = true;
         try {
-            const nowFollowing = await toggleFollowSeller(db, currentBuyerUid, sellerUid, sellerData);
+            nowFollowing = await toggleFollowSeller(db, currentBuyerUid, sellerUid, sellerData);
             btn.innerText = nowFollowing ? '✓ Following' : '➕ Follow';
             btn.classList.toggle('following', nowFollowing);
-            const count = await getFollowerCount(db, sellerUid);
-            document.getElementById('followerCountText').innerText = `👥 ${count} Follower${count === 1 ? '' : 's'}`;
+            // followerCount on screen updates automatically via the seller-doc
+            // listener above (the follow/unfollow write includes an increment
+            // on that same document), no separate read needed here.
             showToast(nowFollowing ? 'Following this shop!' : 'Unfollowed.');
         } catch (e) {
             console.error(e);
@@ -170,11 +184,10 @@
         }
     }
 
-    async function loadShopProducts() {
+    function loadShopProducts() {
         const grid = document.getElementById('shopProductGrid');
-        try {
-            const q = query(collection(db, "vendors"), where("sellerUid", "==", sellerUid));
-            const snap = await getDocs(q);
+        const q = query(collection(db, "vendors"), where("sellerUid", "==", sellerUid));
+        unsubscribeShopProducts = onSnapshot(q, (snap) => {
             const products = [];
             snap.forEach(d => products.push({ id: d.id, ...d.data() }));
 
@@ -194,13 +207,18 @@
                     </div>
                 </div>
             `).join('');
-        } catch (error) {
+        }, (error) => {
             console.error(error);
             grid.innerHTML = `<div class="empty-state">Unable to load products right now.</div>`;
-        }
+        });
     }
 
     window.onload = loadShop;
+
+    window.addEventListener('pagehide', () => {
+        if (unsubscribeShop) unsubscribeShop();
+        if (unsubscribeShopProducts) unsubscribeShopProducts();
+    });
 </script>
 </body>
 </html>
