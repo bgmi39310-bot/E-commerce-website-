@@ -32,6 +32,15 @@
         .card:not(:first-child) { animation: dashboard-enter .35s ease both; }
         @keyframes dashboard-enter { from { opacity: .72; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+
+        /* Edit Product modal */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; align-items: flex-end; justify-content: center; }
+        .modal-overlay.active { display: flex; }
+        .modal-box { background: white; width: 100%; max-width: 520px; border-radius: 14px 14px 0 0; padding: 20px 20px 25px; max-height: 90vh; overflow-y: auto; }
+        @media(min-width: 600px) { .modal-overlay { align-items: center; } .modal-box { border-radius: 12px; } }
+        .modal-box h3 { margin: 0 0 4px; }
+        .modal-close { float: right; font-size: 22px; cursor: pointer; color: #767676; }
+        .modal-box .form-grid { margin-top: 12px; }
         h2 { color: #232f3e; margin-top: 0; }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         input, textarea, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; background: #fff; }
@@ -157,23 +166,27 @@
         <!-- 1. Shop Profile Section -->
         <div class="card">
             <h2>1. Seller / Shop Profile</h2>
-            <div id="sellerIdDisplay" style="background: #e9ecef; padding: 10px; border-radius: 5px; margin-bottom: 15px; font-weight: bold; color: #333; border: 1px dashed #232f3e; font-size: 14px;">Unique Seller ID: Loading...</div>
+            <div id="sellerIdDisplay" style="background: #e9ecef; padding: 10px; border-radius: 5px; margin-bottom: 15px; font-weight: bold; color: #333; border: 1px dashed #232f3e; font-size: 14px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                <span id="sellerIdText">Unique Seller ID: Loading...</span>
+                <button onclick="copySellerId()" style="background:#232f3e; color:white; border:none; padding:6px 10px; border-radius:5px; font-size:12px; cursor:pointer; white-space:nowrap;">📋 Copy</button>
+            </div>
             <div id="premiumStatusBox" style="padding: 10px; border-radius: 5px; margin-bottom: 15px; font-size: 13px; display:none;"></div>
             <div id="profileMsg" class="success-msg">Profile Saved Successfully!</div>
 
             <div id="profileDisplay" style="display: none;">
                 <div class="profile-display-card">
-                    <img id="dispLogo" src="" alt="Shop Logo" class="profile-logo">
+                    <img id="dispLogo" src="" alt="Shop Logo" class="profile-logo" onclick="viewLogoFullscreen()" style="cursor:zoom-in;">
                     <div class="profile-info">
                         <h3 id="dispShopName"></h3>
                         <p><strong>Owner:</strong> <span id="dispOwnerName"></span></p>
                         <p><strong>Phone:</strong> <span id="dispPhone"></span></p>
                         <p><strong>Address:</strong> <span id="dispAddress"></span></p>
                         <p><strong>City / Area:</strong> <span id="dispCity"></span></p>
+                        <p><strong>Delivers to Villages:</strong> <span id="dispVillages"></span></p>
                         <p id="dispFollowerCount" style="color:#c7511f; font-weight:bold;"></p>
                         <div class="btn-group-profile">
                             <button class="btn-edit" onclick="enableEditMode()">✏️ Edit Profile</button>
-                            <button class="btn-view" onclick="viewMyProfile()">👁️ View Profile ID</button>
+                            <button class="btn-view" onclick="viewMyShopPage()">🏪 View My Shop Page</button>
                         </div>
                     </div>
                 </div>
@@ -184,6 +197,7 @@
                 <input type="text" id="ownerName" placeholder="Owner Name">
                 <input type="text" id="shopPhone" placeholder="Contact Number">
                 <input type="text" id="shopCity" placeholder="City / Area (e.g. Indore, MG Road) — shown under 'Sellers Near You'">
+                <input type="text" id="shopVillages" placeholder="Villages you deliver to (comma-separated: Rampur, Shivpur, Ganeshpur)" class="full-width">
                 <input type="text" id="shopUpiId" placeholder="UPI ID (e.g. yourname@okhdfcbank)">
                 <div class="file-upload-box">
                     <label>Shop Logo:</label>
@@ -339,11 +353,78 @@
         </div>
     </div>
 
+    <!-- Full-screen logo viewer -->
+    <div class="modal-overlay" id="logoViewerModal" onclick="closeLogoViewer()" style="align-items:center; background:rgba(0,0,0,0.85);">
+        <img id="logoViewerImg" src="" alt="Shop Logo" style="max-width:90vw; max-height:85vh; border-radius:8px; object-fit:contain;">
+    </div>
+
+    <!-- Edit Product modal -->
+    <div class="modal-overlay" id="editProductModal">
+        <div class="modal-box">
+            <span class="modal-close" onclick="closeEditProductModal()">&times;</span>
+            <h3>✏️ Edit Product</h3>
+            <p class="modal-sub" style="font-size:12.5px; color:#767676;">Update any details — name, category, price, stock, photos, and more.</p>
+            <div class="form-grid">
+                <input type="hidden" id="epId">
+                <input type="text" id="epName" placeholder="Product Name">
+                <input type="number" id="epPrice" placeholder="Price per unit (₹)">
+                <select id="epCategory">
+                    <option value="">Select Category</option>
+                    <option value="grocery">🛒 Grocery</option>
+                    <option value="vegetables">🥦 Vegetables & Fruits</option>
+                    <option value="clothing">👕 Clothing</option>
+                    <option value="electronics">🔌 Electronics</option>
+                    <option value="home">🏠 Home & Kitchen</option>
+                    <option value="beauty">💄 Beauty & Personal Care</option>
+                    <option value="other">📦 Other</option>
+                </select>
+                <select id="epUnit">
+                    <option value="Per Piece">Per Piece</option>
+                    <option value="Per Kg">Per Kg</option>
+                    <option value="Per 250g">Per 250g</option>
+                    <option value="Per Litre">Per Litre</option>
+                    <option value="Per Packet">Per Packet</option>
+                    <option value="Per Dozen">Per Dozen</option>
+                </select>
+                <input type="text" id="epMaterial" placeholder="Material (e.g. Cotton)">
+                <input type="text" id="epWarranty" placeholder="Warranty / Validity">
+                <input type="number" id="epStock" placeholder="Stock Quantity" min="0">
+                <input type="text" id="epSizes" placeholder="Sizes (comma-separated: S,M,L,XL)">
+                <input type="text" id="epColors" placeholder="Colors (comma-separated: Red,Blue,Green)">
+                <div class="file-upload-box full-width">
+                    <label>Product Photos (up to 4):</label>
+                    <div class="img-upload-row">
+                        <input type="url" id="epImageFile" placeholder="Main photo URL">
+                        <label class="upload-btn">📤<input type="file" id="epImageFileUpload" accept="image/*" hidden></label>
+                    </div>
+                    <span class="upload-status" id="epImageStatus"></span>
+                    <div class="img-upload-row" style="margin-top:8px;">
+                        <input type="url" id="epImageFile2" placeholder="Photo 2 (optional)">
+                        <label class="upload-btn">📤<input type="file" id="epImageFile2Upload" accept="image/*" hidden></label>
+                    </div>
+                    <span class="upload-status" id="epImage2Status"></span>
+                    <div class="img-upload-row" style="margin-top:8px;">
+                        <input type="url" id="epImageFile3" placeholder="Photo 3 (optional)">
+                        <label class="upload-btn">📤<input type="file" id="epImageFile3Upload" accept="image/*" hidden></label>
+                    </div>
+                    <span class="upload-status" id="epImage3Status"></span>
+                    <div class="img-upload-row" style="margin-top:8px;">
+                        <input type="url" id="epImageFile4" placeholder="Photo 4 (optional)">
+                        <label class="upload-btn">📤<input type="file" id="epImageFile4Upload" accept="image/*" hidden></label>
+                    </div>
+                    <span class="upload-status" id="epImage4Status"></span>
+                </div>
+                <textarea id="epDesc" placeholder="Full Details Description" class="full-width" rows="3"></textarea>
+                <button onclick="saveProductEditsMain()" class="action-btn full-width">💾 Save Changes</button>
+            </div>
+        </div>
+    </div>
+
     <script type="module">
         import { auth, db } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { loadSellerProfileFromFirestore, saveSellerProfile } from './profile-logic.js';
-        import { addProductToFirebase, fetchMyListedProducts, editProduct, deleteProduct, stopListeningToMyProducts } from './product-logic.js';
+        import { addProductToFirebase, fetchMyListedProducts, saveProductEdits, closeEditProductModal, deleteProduct, stopListeningToMyProducts } from './product-logic.js';
         import { fetchDashboardOrders, filterOrders, updateOrderStatus, markAsShipped, confirmDelivery, stopListeningToOrders } from './order-logic.js';
         import { renderAnalyticsFromOrders, downloadSalesReport } from './analytics-logic.js';
         import { bulkUploadProducts } from './bulk-upload-logic.js';
@@ -364,6 +445,10 @@
         wireImageUpload('pImageFile2Upload', 'pImageFile2', 'pImage2Status');
         wireImageUpload('pImageFile3Upload', 'pImageFile3', 'pImage3Status');
         wireImageUpload('pImageFile4Upload', 'pImageFile4', 'pImage4Status');
+        wireImageUpload('epImageFileUpload', 'epImageFile', 'epImageStatus');
+        wireImageUpload('epImageFile2Upload', 'epImageFile2', 'epImage2Status');
+        wireImageUpload('epImageFile3Upload', 'epImageFile3', 'epImage3Status');
+        wireImageUpload('epImageFile4Upload', 'epImageFile4', 'epImage4Status');
 
         let currentLoggedInUser = null;
 
@@ -450,7 +535,7 @@
                 }
 
                 currentLoggedInUser = user;
-                document.getElementById('sellerIdDisplay').innerText = "Unique Seller ID: " + user.uid;
+                document.getElementById('sellerIdText').innerText = "Unique Seller ID: " + user.uid;
 
                 isPremiumSeller(db, user.uid).then(premium => {
                     const box = document.getElementById('premiumStatusBox');
@@ -499,18 +584,32 @@
             document.getElementById('profileForm').style.display = 'grid';
         }
 
-        window.viewMyProfile = function() {
-            if (currentLoggedInUser) {
-                const shopName = document.getElementById('dispShopName').innerText;
-                const idText = `Shop: ${shopName} — ID: ${currentLoggedInUser.uid}`;
-                if (navigator.clipboard) {
-                    navigator.clipboard.writeText(currentLoggedInUser.uid)
-                        .then(() => showToast('Shop ID copied to clipboard! 📋'))
-                        .catch(() => showToast(idText));
-                } else {
-                    showToast(idText);
-                }
+        window.copySellerId = function() {
+            if (!currentLoggedInUser) return;
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(currentLoggedInUser.uid)
+                    .then(() => showToast('Shop ID copied to clipboard! 📋'))
+                    .catch(() => showToast('Your Shop ID: ' + currentLoggedInUser.uid));
+            } else {
+                showToast('Your Shop ID: ' + currentLoggedInUser.uid);
             }
+        }
+
+        window.viewMyShopPage = function() {
+            if (currentLoggedInUser) {
+                window.open(`shop.html?id=${currentLoggedInUser.uid}`, '_blank');
+            }
+        }
+
+        window.viewLogoFullscreen = function() {
+            const logoSrc = document.getElementById('dispLogo').src;
+            if (!logoSrc) return;
+            document.getElementById('logoViewerImg').src = logoSrc;
+            document.getElementById('logoViewerModal').classList.add('active');
+        }
+
+        window.closeLogoViewer = function() {
+            document.getElementById('logoViewerModal').classList.remove('active');
         }
 
         window.saveSellerProfileMain = function() {
@@ -525,11 +624,13 @@
             filterOrders(status);
         }
 
-        window.editProduct = function(productId, currentPrice, currentStock) {
-            if(currentLoggedInUser) {
-                editProduct(db, productId, currentPrice, currentStock, currentLoggedInUser.uid, (uid) => fetchMyListedProducts(db, uid));
+        window.saveProductEditsMain = function() {
+            if (currentLoggedInUser) {
+                saveProductEdits(db, currentLoggedInUser.uid, (uid) => fetchMyListedProducts(db, uid));
             }
         }
+
+        window.closeEditProductModal = closeEditProductModal;
 
         window.deleteProduct = function(productId) {
             if(currentLoggedInUser) {
