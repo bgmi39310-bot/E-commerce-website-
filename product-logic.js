@@ -1,6 +1,7 @@
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { isPremiumSeller, countSellerProducts, FREE_TIER_LIMITS } from './premium-logic.js';
 import { showToast } from './toast.js';
+import { escapeHtml } from './sanitize.js';
 
 // Keeps track of the active listener so we never stack up duplicate onSnapshot
 // subscriptions (which would waste Firestore reads) if this gets called more than once.
@@ -143,19 +144,20 @@ export function fetchMyListedProducts(db, uid, onLowStockUpdate) {
                 }
             }
             previousStockLevels[docSnap.id] = stock;
+            myProductsCache[docSnap.id] = { id: docSnap.id, ...prod };
 
             html += `
                 <div class="product-item-card">
                     <div style="display: flex; gap: 15px; align-items: center;">
                         <img src="${prod.image || 'https://via.placeholder.com/60'}" class="product-thumb" alt="Product">
                         <div class="product-info">
-                            <h4>${prod.name} ${stockTag}</h4>
-                            <p><strong>Price:</strong> ₹${prod.price} (${prod.unit || 'Per Piece'})</p>
+                            <h4>${escapeHtml(prod.name)} ${stockTag}</h4>
+                            <p><strong>Price:</strong> ₹${prod.price} (${escapeHtml(prod.unit || 'Per Piece')})</p>
                             <p style="font-size:12px; color:#888;">👁️ ${prod.views || 0} views &nbsp; | &nbsp; 🛒 ${prod.unitsSold || 0} sold</p>
                         </div>
                     </div>
                     <div class="btn-group">
-                        <button class="btn-edit" onclick="editProduct('${docSnap.id}', ${prod.price}, ${stock})">✏️ Edit</button>
+                        <button class="btn-edit" onclick="openEditProductFromCache('${docSnap.id}')">✏️ Edit</button>
                         <button class="btn-delete" onclick="deleteProduct('${docSnap.id}')">🗑️ Delete</button>
                     </div>
                 </div>
@@ -169,32 +171,88 @@ export function fetchMyListedProducts(db, uid, onLowStockUpdate) {
     });
 }
 
-export function editProduct(db, productId, currentPrice, currentStock, uid, fetchProductsCallback) {
-    const newPrice = prompt("Enter new price:", currentPrice);
-    if (newPrice === null || newPrice.trim() === "") return;
-    const updatedPrice = Number(newPrice);
-    if (isNaN(updatedPrice)) {
-        showToast("Please enter a valid number for the price!", 'error');
-        return;
-    }
+// Keeps the seller's own products around in module scope so the Edit button
+// can hand the full product object to the modal without needing to re-fetch
+// it or embed a fragile JSON blob inside an HTML attribute.
+const myProductsCache = {};
 
-    const newStock = prompt("Enter updated stock quantity:", currentStock !== undefined ? currentStock : 10);
-    if (newStock === null || newStock.trim() === "") return;
-    const updatedStock = Number(newStock);
-    if (isNaN(updatedStock) || updatedStock < 0) {
-        showToast("Please enter a valid stock quantity (0 or more)!", 'error');
-        return;
-    }
+window.openEditProductFromCache = function(productId) {
+    const product = myProductsCache[productId];
+    if (product) openEditProductModal(product);
+};
 
-    updateDoc(doc(db, "vendors", productId), {
-        price: updatedPrice,
-        stock: updatedStock
-    }).then(() => {
+let editingProductId = null;
+
+// Opens the Edit Product modal pre-filled with everything about this
+// product (not just price/stock) — name, category, unit, description,
+// material, warranty, sizes, colors, and all 4 photos.
+export function openEditProductModal(product) {
+    editingProductId = product.id;
+    document.getElementById('epId').value = product.id;
+    document.getElementById('epName').value = product.name || '';
+    document.getElementById('epPrice').value = product.price || '';
+    document.getElementById('epCategory').value = product.category || '';
+    document.getElementById('epUnit').value = product.unit || 'Per Piece';
+    document.getElementById('epMaterial').value = product.material || '';
+    document.getElementById('epWarranty').value = product.warranty || '';
+    document.getElementById('epStock').value = product.stock !== undefined ? product.stock : 10;
+    document.getElementById('epSizes').value = (product.sizes || []).join(', ');
+    document.getElementById('epColors').value = (product.colors || []).join(', ');
+    document.getElementById('epDesc').value = product.description || '';
+    const images = product.images && product.images.length ? product.images : [product.image || ''];
+    document.getElementById('epImageFile').value = images[0] || '';
+    document.getElementById('epImageFile2').value = images[1] || '';
+    document.getElementById('epImageFile3').value = images[2] || '';
+    document.getElementById('epImageFile4').value = images[3] || '';
+    document.getElementById('editProductModal').classList.add('active');
+}
+
+export function closeEditProductModal() {
+    document.getElementById('editProductModal').classList.remove('active');
+    editingProductId = null;
+}
+
+export async function saveProductEdits(db, uid, fetchProductsCallback) {
+    const productId = document.getElementById('epId').value || editingProductId;
+    if (!productId) return;
+
+    const name = document.getElementById('epName').value.trim();
+    const priceVal = document.getElementById('epPrice').value.trim();
+    if (!name || !priceVal) { showToast("Please enter Product Name and Price!", 'error'); return; }
+
+    const stockVal = document.getElementById('epStock').value.trim();
+    const sizesVal = document.getElementById('epSizes').value.trim();
+    const colorsVal = document.getElementById('epColors').value.trim();
+
+    const imageUrl = document.getElementById('epImageFile').value.trim();
+    const imageUrl2 = document.getElementById('epImageFile2').value.trim();
+    const imageUrl3 = document.getElementById('epImageFile3').value.trim();
+    const imageUrl4 = document.getElementById('epImageFile4').value.trim();
+    const defaultImg = "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80";
+    let imagesArray = [imageUrl, imageUrl2, imageUrl3, imageUrl4].filter(url => url !== '');
+    if (imagesArray.length === 0) imagesArray.push(defaultImg);
+
+    try {
+        await updateDoc(doc(db, "vendors", productId), {
+            name: name,
+            price: Number(priceVal),
+            unit: document.getElementById('epUnit').value,
+            category: document.getElementById('epCategory').value || 'other',
+            material: document.getElementById('epMaterial').value.trim() || "100% Original",
+            warranty: document.getElementById('epWarranty').value.trim() || "Verified Quality",
+            image: imagesArray[0],
+            images: imagesArray,
+            description: document.getElementById('epDesc').value.trim() || `${name} available in best quality.`,
+            stock: stockVal === '' ? 0 : Number(stockVal),
+            sizes: sizesVal ? sizesVal.split(',').map(s => s.trim()).filter(s => s) : [],
+            colors: colorsVal ? colorsVal.split(',').map(c => c.trim()).filter(c => c) : []
+        });
         showToast("Product updated successfully! 🎉");
+        closeEditProductModal();
         fetchProductsCallback(uid);
-    }).catch((error) => {
+    } catch (error) {
         showToast("Error updating product: " + error.message, 'error');
-    });
+    }
 }
 
 export async function deleteProduct(db, productId, uid, fetchProductsCallback) {
