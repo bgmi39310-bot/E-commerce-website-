@@ -124,6 +124,10 @@
         .sellers-section-head .section-title { margin-bottom: 0; }
         .sellers-desc { font-size: 12px; color: #666; margin: -2px 0 12px; }
         .city-select-wrap select { padding: 7px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 12.5px; background: white; }
+        .village-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; color: #333; margin-bottom: 8px; }
+        .village-bar input { flex: 1; min-width: 160px; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 12.5px; }
+        .village-bar button { background: #232f3e; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-size: 12.5px; font-weight: bold; cursor: pointer; white-space: nowrap; }
+        .village-link { color: #007185; font-weight: 600; cursor: pointer; text-decoration: underline; }
         .sellers-scroll { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; }
         .seller-card-mini { flex-shrink: 0; width: 150px; background: white; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); padding: 14px 10px; text-align: center; }
         .seller-card-mini img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; border: 1.5px solid #eee; margin-bottom: 8px; }
@@ -209,12 +213,18 @@
     <div class="container" style="padding-bottom:0;">
         <div class="sellers-section-head">
             <div class="section-title" data-i18n="sellersNearYou">Sellers Near You</div>
-            <div class="city-select-wrap">
-                <select id="citySelect">
-                    <option value="all" data-i18n="allAreas">All Areas</option>
-                </select>
-            </div>
         </div>
+
+        <div class="village-bar" id="villageDisplay" style="display:none;">
+            📍 Showing shops for <strong id="villageNameText"></strong>
+            <span class="village-link" onclick="startEditVillage()">Change</span>
+            <span class="village-link" onclick="toggleShowAllShops()" id="showAllToggleLink">Show all shops</span>
+        </div>
+        <div class="village-bar" id="villageEditRow">
+            <input type="text" id="villageInput" placeholder="Enter your village / area name">
+            <button onclick="saveMyVillage()">📍 Save</button>
+        </div>
+
         <p class="sellers-desc" data-i18n="sellersNearYouDesc">Discover verified local shops around you</p>
         <div class="sellers-scroll" id="sellersScroll">
             <div class="skel skel-mini"></div>
@@ -252,11 +262,6 @@
 
     <!-- Main Content -->
     <div class="container">
-        <div id="recentlyViewedWrap" style="display:none; margin-bottom:24px;">
-            <div class="section-title">🕒 Recently Viewed</div>
-            <div id="recentlyViewedScroll" style="display:flex; gap:12px; overflow-x:auto; padding-bottom:6px;"></div>
-        </div>
-
         <div id="followedFeedWrap" style="display:none; margin-bottom:24px;">
             <div class="section-title" data-i18n="fromFollowedSellers">🆕 New From Shops You Follow</div>
             <div id="followedFeedScroll" style="display:flex; gap:12px; overflow-x:auto; padding-bottom:6px;"></div>
@@ -373,7 +378,6 @@
                     allProducts.push({ id: docSnap.id, ...docSnap.data() });
                 });
                 applyFilters();
-                renderRecentlyViewed();
                 renderFollowedFeed();
             }, (error) => {
                 console.error("Error fetching products: ", error);
@@ -455,30 +459,6 @@
         };
 
         // ---------- Wishlist ----------
-        function renderRecentlyViewed() {
-            const recentIds = JSON.parse(localStorage.getItem('recentlyViewed')) || [];
-            const wrap = document.getElementById('recentlyViewedWrap');
-            const scrollEl = document.getElementById('recentlyViewedScroll');
-
-            const recentProducts = recentIds
-                .map(id => allProducts.find(p => p.id === id))
-                .filter(p => p); // drop any that no longer exist
-
-            if (recentProducts.length === 0) {
-                wrap.style.display = 'none';
-                return;
-            }
-
-            wrap.style.display = 'block';
-            scrollEl.innerHTML = recentProducts.slice(0, 10).map(p => `
-                <div style="flex-shrink:0; width:110px; cursor:pointer;" onclick="window.location.href='product.html?id=${p.id}'">
-                    <img src="${p.image || 'https://via.placeholder.com/110'}" loading="lazy" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:8px; background:#f5f5f5;" onerror="this.src='https://via.placeholder.com/110?text=No+Image'">
-                    <div style="font-size:11.5px; margin-top:4px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${escapeHtml(p.name || 'Product')}</div>
-                    <div style="font-size:12.5px; font-weight:bold; color:#B12704;">₹${(parseFloat(p.price) || 0).toFixed(0)}</div>
-                </div>
-            `).join('');
-        }
-
         function getWishlist() {
             return JSON.parse(localStorage.getItem('wishlist')) || [];
         }
@@ -561,7 +541,7 @@
         window.switchLanguage = function() {
             toggleLanguage(() => {
                 renderVisibleProducts();
-                applySellerCityFilter();
+                applySellerVillageFilter();
                 renderFollowedFeed();
             });
         };
@@ -663,8 +643,8 @@
                     // Cache hit — zero Firestore reads for this visit.
                     allSellers = cached.sellers;
                     followedSellerIds = new Set(cached.followedIds);
-                    populateCityDropdown();
-                    renderSellers(allSellers);
+                    renderVillageBar();
+                    applySellerVillageFilter();
                     renderFollowedFeed();
                     return;
                 }
@@ -677,8 +657,8 @@
                 const followed = await getFollowedSellers(db, currentBuyerUid);
                 followedSellerIds = new Set(followed.map(f => f.id));
 
-                populateCityDropdown();
-                renderSellers(allSellers);
+                renderVillageBar();
+                applySellerVillageFilter();
                 renderFollowedFeed();
                 writeSellersCache();
             } catch (error) {
@@ -687,32 +667,79 @@
             }
         }
 
-        function populateCityDropdown() {
-            const select = document.getElementById('citySelect');
-            const cities = [...new Set(allSellers.map(s => (s.city || '').trim()).filter(c => c))].sort();
-            cities.forEach(city => {
-                const opt = document.createElement('option');
-                opt.value = city;
-                opt.textContent = city;
-                select.appendChild(opt);
-            });
+        // ---------- My Village (default "near me" filter) ----------
+        // Sellers separately list which villages they deliver to
+        // (seller.deliveryVillages, set in the Seller Dashboard). By default
+        // this homepage only shows: (a) sellers who deliver to the buyer's
+        // own village, plus (b) any seller the buyer already follows —
+        // NOT every seller on the platform. "Show all shops" is available
+        // any time as an explicit opt-out for browsing further afield.
+        const MY_VILLAGE_KEY = 'dm_my_village';
+        let myVillage = (localStorage.getItem(MY_VILLAGE_KEY) || '').trim();
+        let showAllSellersMode = false;
+
+        function renderVillageBar() {
+            const displayEl = document.getElementById('villageDisplay');
+            const editRow = document.getElementById('villageEditRow');
+            const toggleLink = document.getElementById('showAllToggleLink');
+            if (myVillage) {
+                displayEl.style.display = 'flex';
+                editRow.style.display = 'none';
+                document.getElementById('villageNameText').innerText = myVillage;
+                toggleLink.innerText = showAllSellersMode ? 'Show only my village' : 'Show all shops';
+            } else {
+                displayEl.style.display = 'none';
+                editRow.style.display = 'flex';
+            }
         }
 
-        document.getElementById('citySelect').addEventListener('change', (e) => {
-            selectedCity = e.target.value;
-            applySellerCityFilter();
-        });
+        window.startEditVillage = function() {
+            document.getElementById('villageInput').value = myVillage;
+            document.getElementById('villageDisplay').style.display = 'none';
+            document.getElementById('villageEditRow').style.display = 'flex';
+        };
 
-        let selectedCity = 'all';
-        function applySellerCityFilter() {
-            const filtered = selectedCity === 'all' ? allSellers : allSellers.filter(s => (s.city || '').trim() === selectedCity);
+        window.saveMyVillage = function() {
+            const val = document.getElementById('villageInput').value.trim();
+            if (!val) { showToast('Please enter your village or area name.', 'error'); return; }
+            myVillage = val;
+            localStorage.setItem(MY_VILLAGE_KEY, myVillage);
+            showAllSellersMode = false;
+            renderVillageBar();
+            applySellerVillageFilter();
+            showToast('Saved! Showing shops near ' + myVillage + '.');
+        };
+
+        window.toggleShowAllShops = function() {
+            showAllSellersMode = !showAllSellersMode;
+            renderVillageBar();
+            applySellerVillageFilter();
+        };
+
+        function applySellerVillageFilter() {
+            let filtered;
+            if (showAllSellersMode || !myVillage) {
+                // No village saved yet — show only followed sellers (if any)
+                // rather than defaulting to "everyone", per the same
+                // near-you-first principle; "Show all shops" is explicit opt-in.
+                filtered = myVillage ? allSellers : allSellers.filter(s => followedSellerIds.has(s.id));
+            } else {
+                const villageLower = myVillage.toLowerCase();
+                filtered = allSellers.filter(s => {
+                    const villages = (s.deliveryVillages || []).map(v => (v || '').toLowerCase());
+                    return villages.includes(villageLower) || followedSellerIds.has(s.id);
+                });
+            }
             renderSellers(filtered);
         }
 
         function renderSellers(sellers) {
             const scrollEl = document.getElementById('sellersScroll');
             if (sellers.length === 0) {
-                scrollEl.innerHTML = `<div class="no-sellers-box">${t('noSellersYet')}</div>`;
+                const emptyMsg = myVillage && !showAllSellersMode
+                    ? `No shops deliver to <strong>${escapeHtml(myVillage)}</strong> yet. <span class="village-link" onclick="toggleShowAllShops()">Show all shops</span> or follow shops you like.`
+                    : t('noSellersYet');
+                scrollEl.innerHTML = `<div class="no-sellers-box">${emptyMsg}</div>`;
                 return;
             }
             scrollEl.innerHTML = sellers.map(s => {
@@ -748,9 +775,11 @@
                     showToast('Following this shop!');
                 } else {
                     followedSellerIds.delete(sellerId);
-                    btnEl.innerText = '➕ ' + t('follow');
-                    btnEl.classList.remove('following');
                     showToast('Unfollowed.');
+                    // This seller might have only been visible because they were
+                    // followed — re-apply the village filter so they drop out of
+                    // the list if they no longer qualify either way.
+                    applySellerVillageFilter();
                 }
                 renderFollowedFeed();
                 writeSellersCache();
