@@ -18,6 +18,8 @@ export async function loadSellerProfileFromFirestore(db, uid) {
             document.getElementById('dispLogo').src = profile.logo || 'https://via.placeholder.com/80';
             const dispCityEl = document.getElementById('dispCity');
             if (dispCityEl) dispCityEl.innerText = profile.city || 'N/A';
+            const dispVillagesEl = document.getElementById('dispVillages');
+            if (dispVillagesEl) dispVillagesEl.innerText = (profile.deliveryVillages && profile.deliveryVillages.length) ? profile.deliveryVillages.join(', ') : 'N/A';
 
             document.getElementById('shopName').value = profile.shopName || '';
             document.getElementById('ownerName').value = profile.ownerName || '';
@@ -26,6 +28,8 @@ export async function loadSellerProfileFromFirestore(db, uid) {
             document.getElementById('shopAddress').value = profile.address || '';
             const cityField = document.getElementById('shopCity');
             if (cityField) cityField.value = profile.city || '';
+            const villagesField = document.getElementById('shopVillages');
+            if (villagesField) villagesField.value = (profile.deliveryVillages || []).join(', ');
             const upiField = document.getElementById('shopUpiId');
             if (upiField) upiField.value = profile.upiId || '';
         } else {
@@ -45,6 +49,10 @@ export async function saveSellerProfile(db, currentLoggedInUser, loadProfileCall
 
     const logoUrl = document.getElementById('shopLogoFile').value.trim();
     const upiField = document.getElementById('shopUpiId');
+    const villagesField = document.getElementById('shopVillages');
+    const deliveryVillages = villagesField
+        ? villagesField.value.split(',').map(v => v.trim()).filter(v => v)
+        : [];
 
     const profile = {
         uid: currentLoggedInUser.uid,
@@ -53,12 +61,17 @@ export async function saveSellerProfile(db, currentLoggedInUser, loadProfileCall
         phone: document.getElementById('shopPhone').value.trim(),
         address: document.getElementById('shopAddress').value.trim(),
         city: document.getElementById('shopCity') ? document.getElementById('shopCity').value.trim() : '',
+        deliveryVillages,
         upiId: upiField ? upiField.value.trim() : '',
         logo: logoUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
     };
 
     try {
-        await setDoc(doc(db, "sellers_profiles", currentLoggedInUser.uid), profile);
+        // merge: true is important — without it, saving the basic profile form
+        // would silently wipe out fields that live on this same document but
+        // are set elsewhere (followerCount from follow-logic.js, isPremium
+        // from premium-logic.js, KYC status from kyc-logic.js, etc).
+        await setDoc(doc(db, "sellers_profiles", currentLoggedInUser.uid), profile, { merge: true });
         loadProfileCallback(currentLoggedInUser.uid);
 
         const msg = document.getElementById('profileMsg');
