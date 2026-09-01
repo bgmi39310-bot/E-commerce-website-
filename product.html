@@ -893,22 +893,12 @@
         }
     });
 
-    function trackRecentlyViewed(productId) {
-        if (!productId) return;
-        let recent = JSON.parse(localStorage.getItem('recentlyViewed')) || [];
-        recent = recent.filter(id => id !== productId);
-        recent.unshift(productId);
-        recent = recent.slice(0, 10);
-        localStorage.setItem('recentlyViewed', JSON.stringify(recent));
-    }
-
     window.onload = function() {
         loadProduct();
         updateCartBadge();
         if (productId) {
             loadProductReviews(db, productId);
             loadProductQA(db, productId);
-            trackRecentlyViewed(productId);
         }
     };
 </script>
