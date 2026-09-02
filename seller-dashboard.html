@@ -41,6 +41,14 @@
         .modal-box h3 { margin: 0 0 4px; }
         .modal-close { float: right; font-size: 22px; cursor: pointer; color: #767676; }
         .modal-box .form-grid { margin-top: 12px; }
+
+        /* "⋮" overflow menu for secondary dashboard sections */
+        .dots-menu-panel { display:none; position:absolute; right:0; top:32px; background:white; border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,0.25); z-index:3000; min-width:220px; overflow:hidden; text-align:left; }
+        .dots-menu-panel.active { display:block; }
+        .dots-menu-panel a { display:block; padding:12px 16px; color:#232f3e; text-decoration:none; font-size:13.5px; cursor:pointer; border-bottom:1px solid #f0f0f0; }
+        .dots-menu-panel a:last-child { border-bottom:none; }
+        .dots-menu-panel a:hover { background:#f5f5f5; }
+        .card.dash-hidden-section { display:none; }
         h2 { color: #232f3e; margin-top: 0; }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         input, textarea, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; background: #fff; }
@@ -138,11 +146,20 @@
 
     <header>
         <div class="header-title">Seller Hub & Dashboard</div>
-        <div style="display: flex; align-items: center; gap: 18px;">
-            <div id="notifBellMount" title="Questions & Updates"></div>
-            <div class="bell-wrap" id="bellIcon" title="New Orders">
-                🔔
-                <span class="notif-badge" id="notifBadge">0</span>
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <div id="notifBellMount" title="Notifications"></div>
+            <div class="dots-menu-wrap" style="position:relative;">
+                <div onclick="toggleDotsMenu()" style="cursor:pointer; font-size:22px; color:white; line-height:1; padding:2px 4px;">⋮</div>
+                <div id="dotsMenuPanel" class="dots-menu-panel">
+                    <a onclick="showDashboardSection('shopProfileSection')">👤 Shop Profile</a>
+                    <a onclick="showDashboardSection('addProductSection')">📦 Add New Product</a>
+                    <a onclick="showDashboardSection('productsSection')">📋 My Listed Products</a>
+                    <a onclick="showDashboardSection('bulkUploadSection')">📤 Bulk Upload</a>
+                    <a onclick="showDashboardSection('analyticsSection')">📊 Shop Analytics</a>
+                    <a onclick="showDashboardSection('couponsSection')">🎟️ Discount Coupons</a>
+                    <a onclick="showDashboardSection('payoutSection')">💰 Earnings Summary</a>
+                    <a onclick="showDashboardSection('kycSection')">🪪 KYC Verification</a>
+                </div>
             </div>
             <button onclick="logoutSeller()" style="background:#dc3545; color:white; border:none; padding:6px 10px; border-radius:4px; cursor:pointer; font-weight:bold;">Logout</button>
             <div class="menu-icon" onclick="toggleMenu()">
@@ -153,18 +170,12 @@
 
     <div id="sideMenu" class="side-menu">
         <a href="javascript:void(0)" class="close-btn" onclick="toggleMenu()">&times;</a>
-        <a href="index.html">🏠 Home</a>
-        <a href="seller-dashboard.html">🛒 Seller Hub</a>
-        <a href="cart.html">🛍️ Cart</a>
-        <a href="messages.html">💬 Messages</a>
-        <a href="disputes.html">⚖️ Disputes</a>
-        <a href="orders.html">📦 My Orders (Buyer)</a>
-        <a href="account.html">👤 Account</a>
+        <a href="index.html">🏠 Back to Home</a>
     </div>
 
     <div class="container">
         <!-- 1. Shop Profile Section -->
-        <div class="card">
+        <div class="card dash-hidden-section" id="shopProfileSection">
             <h2>1. Seller / Shop Profile</h2>
             <div id="sellerIdDisplay" style="background: #e9ecef; padding: 10px; border-radius: 5px; margin-bottom: 15px; font-weight: bold; color: #333; border: 1px dashed #232f3e; font-size: 14px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
                 <span id="sellerIdText">Unique Seller ID: Loading...</span>
@@ -213,7 +224,7 @@
         </div>
 
         <!-- 2. Add New Product Section -->
-        <div class="card">
+        <div class="card dash-hidden-section" id="addProductSection">
             <h2>2. Add New Product</h2>
             <div class="form-grid">
                 <input type="text" id="pName" placeholder="Product Name">
@@ -238,6 +249,12 @@
                 </select>
                 <input type="text" id="pMaterial" placeholder="Material (e.g. Cotton)">
                 <input type="text" id="pWarranty" placeholder="Warranty / Validity">
+                <select id="pReturnWindow" title="How many days after delivery can a buyer request a return for this item?">
+                    <option value="7" selected>↩️ Returnable within 7 days</option>
+                    <option value="3">↩️ Returnable within 3 days</option>
+                    <option value="15">↩️ Returnable within 15 days</option>
+                    <option value="0">❌ No returns accepted</option>
+                </select>
                 <input type="number" id="pStock" placeholder="Stock Quantity (e.g. 50)" min="0">
                 <input type="text" id="pSizes" placeholder="Sizes (optional, comma-separated: S,M,L,XL)">
                 <input type="text" id="pColors" placeholder="Colors (optional, comma-separated: Red,Blue,Green)">
@@ -270,7 +287,7 @@
         </div>
 
         <!-- 2b. Bulk Upload via CSV -->
-        <div class="card">
+        <div class="card dash-hidden-section" id="bulkUploadSection">
             <h2>2b. 📑 Bulk Upload Products (CSV)</h2>
             <p style="font-size:13px; color:#666; margin-top:0;">
                 Upload many products at once using a CSV file. Columns required (in this exact order):<br>
@@ -301,20 +318,20 @@
         </div>
 
         <!-- 4. My Listed Products Hub -->
-        <div class="card" id="productsSection">
+        <div class="card dash-hidden-section" id="productsSection">
             <h2>4. My Listed Products Hub (Manage Your Inventory)</h2>
             <div id="myProductsContainer"><p>Loading your listed products...</p></div>
         </div>
 
         <!-- 5. Shop Analytics -->
-        <div class="card" id="analyticsSection">
+        <div class="card dash-hidden-section" id="analyticsSection">
             <h2>5. 📊 Shop Analytics</h2>
             <button onclick="downloadReportMain()" class="action-btn" style="width:auto; padding:8px 16px; margin-bottom:14px; font-size:13px;">⬇️ Download Sales Report (CSV)</button>
             <div id="analyticsContainer"><p>Loading analytics...</p></div>
         </div>
 
         <!-- 6. Discount Coupons -->
-        <div class="card" id="couponsSection">
+        <div class="card dash-hidden-section" id="couponsSection">
             <h2>6. 🎟️ Discount Coupons</h2>
             <div class="form-grid" style="margin-bottom:16px;">
                 <input type="text" id="couponCode" placeholder="Coupon Code (e.g. SAVE20)" style="text-transform:uppercase;">
@@ -335,13 +352,13 @@
         </div>
 
         <!-- 8. Earnings / Payout Summary -->
-        <div class="card" id="payoutSection">
+        <div class="card dash-hidden-section" id="payoutSection">
             <h2>8. 💰 Earnings Summary</h2>
             <div id="payoutContainer"><p>Loading earnings...</p></div>
         </div>
 
         <!-- 9. Seller Verification (KYC) -->
-        <div class="card" id="kycSection">
+        <div class="card dash-hidden-section" id="kycSection">
             <h2>9. 🪪 Seller Verification (KYC)</h2>
             <div id="kycContainer"><p>Loading verification status...</p></div>
         </div>
@@ -388,6 +405,12 @@
                 </select>
                 <input type="text" id="epMaterial" placeholder="Material (e.g. Cotton)">
                 <input type="text" id="epWarranty" placeholder="Warranty / Validity">
+                <select id="epReturnWindow" title="How many days after delivery can a buyer request a return for this item?">
+                    <option value="7">↩️ Returnable within 7 days</option>
+                    <option value="3">↩️ Returnable within 3 days</option>
+                    <option value="15">↩️ Returnable within 15 days</option>
+                    <option value="0">❌ No returns accepted</option>
+                </select>
                 <input type="number" id="epStock" placeholder="Stock Quantity" min="0">
                 <input type="text" id="epSizes" placeholder="Sizes (comma-separated: S,M,L,XL)">
                 <input type="text" id="epColors" placeholder="Colors (comma-separated: Red,Blue,Green)">
@@ -428,7 +451,6 @@
         import { fetchDashboardOrders, filterOrders, updateOrderStatus, markAsShipped, confirmDelivery, stopListeningToOrders } from './order-logic.js';
         import { renderAnalyticsFromOrders, downloadSalesReport } from './analytics-logic.js';
         import { bulkUploadProducts } from './bulk-upload-logic.js';
-        import { listenForNewOrders, clearUnreadNotifications } from './notification-logic.js';
         import { mountNotificationBell } from './notif-logic.js';
         import { wireImageUpload } from './image-upload.js';
         import { addCoupon, loadMyCoupons, toggleCouponActive, deleteCoupon } from './coupon-logic.js';
@@ -457,6 +479,33 @@
             menu.style.width = menu.style.width === '250px' ? '0' : '250px';
         }
         window.toggleMenu = toggleMenu;
+
+        window.toggleDotsMenu = function() {
+            document.getElementById('dotsMenuPanel').classList.toggle('active');
+        };
+        document.addEventListener('click', (e) => {
+            const wrap = document.querySelector('.dots-menu-wrap');
+            if (wrap && !wrap.contains(e.target)) {
+                document.getElementById('dotsMenuPanel').classList.remove('active');
+            }
+        });
+
+        const ALL_SECONDARY_SECTION_IDS = ['shopProfileSection', 'addProductSection', 'bulkUploadSection', 'productsSection', 'analyticsSection', 'couponsSection', 'payoutSection', 'kycSection'];
+
+        window.showDashboardSection = function(sectionId) {
+            document.getElementById('dotsMenuPanel').classList.remove('active');
+            ALL_SECONDARY_SECTION_IDS.forEach(id => {
+                document.getElementById(id)?.classList.toggle('dash-hidden-section', id !== sectionId);
+            });
+            const target = document.getElementById(sectionId);
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                if (currentDashboardUid) {
+                    const module = buildSecondaryModules(currentDashboardUid).find(m => m[1] === sectionId);
+                    if (module) loadDashboardModule(module[0], module[1], module[2]);
+                }
+            }
+        };
 
         function renderLowStockAlerts(lowStockList) {
             const card = document.getElementById('lowStockAlertCard');
@@ -490,6 +539,34 @@
         // queries the instant a seller logs in. Keeps the first paint fast
         // and avoids a burst of reads for sections the seller may never
         // scroll down to in that visit.
+        let currentDashboardUid = null;
+
+        // Sections visible by default (Orders/Returns/Questions) load their
+        // data automatically via IntersectionObserver, same as before.
+        function buildPrimaryModules(uid) {
+            return [
+                ['orders', 'ordersSection', () => fetchDashboardOrders(db, uid, renderAnalyticsFromOrders)],
+                ['returns', 'returnsSection', () => loadReturnRequests(db, uid)],
+                ['questions', 'questionsSection', () => loadSellerQuestions(db, uid)],
+            ];
+        }
+
+        // Sections tucked away in the "⋮" menu only load their data once the
+        // seller actually opens them from that menu — see showDashboardSection().
+        function buildSecondaryModules(uid) {
+            return [
+                ['products', 'productsSection', () => fetchMyListedProducts(db, uid, renderLowStockAlerts)],
+                ['coupons', 'couponsSection', () => loadMyCoupons(db, uid)],
+                ['payouts', 'payoutSection', () => loadPayoutSummary(db, uid)],
+                ['kyc', 'kycSection', () => loadKycStatus(db, uid)],
+                // Analytics has no reads of its own — it's rendered from the
+                // same order data the (auto-loaded) Orders module already
+                // fetched, so opening it just re-triggers that module if it
+                // somehow hasn't loaded yet rather than paying for a second read.
+                ['analytics', 'analyticsSection', () => loadDashboardModule('orders', 'ordersSection', () => fetchDashboardOrders(db, uid, renderAnalyticsFromOrders))],
+            ];
+        }
+
         function loadDashboardModule(name, sectionId, task) {
             if (loadedDashboardModules.has(name)) return;
             loadedDashboardModules.add(name);
@@ -504,15 +581,7 @@
         }
 
         function initializeSellerDashboardModules(uid) {
-            const modules = [
-                ['orders', 'ordersSection', () => fetchDashboardOrders(db, uid, renderAnalyticsFromOrders)],
-                ['products', 'productsSection', () => fetchMyListedProducts(db, uid, renderLowStockAlerts)],
-                ['coupons', 'couponsSection', () => loadMyCoupons(db, uid)],
-                ['returns', 'returnsSection', () => loadReturnRequests(db, uid)],
-                ['payouts', 'payoutSection', () => loadPayoutSummary(db, uid)],
-                ['kyc', 'kycSection', () => loadKycStatus(db, uid)],
-                ['questions', 'questionsSection', () => loadSellerQuestions(db, uid)],
-            ];
+            const modules = buildPrimaryModules(uid);
             dashboardObserver = new IntersectionObserver((entries) => {
                 entries.filter((entry) => entry.isIntersecting).forEach((entry) => {
                     const module = modules.find((item) => item[1] === entry.target.id);
@@ -535,6 +604,7 @@
                 }
 
                 currentLoggedInUser = user;
+                currentDashboardUid = user.uid;
                 document.getElementById('sellerIdText').innerText = "Unique Seller ID: " + user.uid;
 
                 isPremiumSeller(db, user.uid).then(premium => {
@@ -557,14 +627,9 @@
                     if (el) el.innerText = `👥 ${count} Follower${count === 1 ? '' : 's'}`;
                 });
 
-                // Real-time new-order notifications (bell badge + browser notification + chime).
-                // No manual refresh needed here — the live orders listener above
-                // already updates the screen automatically when a new order arrives.
-                listenForNewOrders(db, user.uid, () => {});
-
-                // Persisted notification bell (new customer questions, order/return
-                // updates, etc.) — mounted right away rather than lazily, since it's
-                // a single lightweight listener and sellers expect it immediately.
+                // Persisted notification bell — covers new orders, new customer
+                // questions, and order/return status updates, all in one place
+                // now (previously there were two separate bells here).
                 unsubscribeNotifBell = mountNotificationBell(db, user.uid, 'notifBellMount');
 
                 // Keep the free-tier dashboard light: stagger reads so the first render stays fast and
@@ -573,10 +638,6 @@
             } else {
                 window.location.href = "login.html";
             }
-        });
-
-        document.getElementById('bellIcon').addEventListener('click', () => {
-            clearUnreadNotifications();
         });
 
         window.enableEditMode = function() {
