@@ -144,7 +144,7 @@
         import { loadAddresses } from './address-logic.js';
         import { showToast } from './toast.js';
         import { escapeHtml } from './sanitize.js';
-        import { mountNotificationBell } from './notif-logic.js';
+        import { mountNotificationBell, sendNotification } from './notif-logic.js';
 
         let currentBuyerUid = null;
         onAuthStateChanged(auth, (user) => {
@@ -381,6 +381,7 @@
                         quantity: qty,
                         shopName: item.shopName || 'Local Shop',
                         sellerUid: item.sellerUid || null,
+                        returnWindowDays: item.returnWindowDays !== undefined ? item.returnWindowDays : 7,
                         buyerUid: currentBuyerUid,
                         buyerName: name,
                         buyerPhone: phone,
@@ -390,6 +391,15 @@
                         status: 'Pending',
                         createdAt: new Date()
                     });
+
+                    if (item.sellerUid) {
+                        sendNotification(db, item.sellerUid, {
+                            title: `New order: ${item.name || 'Item'} (Qty ${qty})`,
+                            body: `From ${name} — ₹${lineTotal.toFixed(0)}`,
+                            type: 'new_order',
+                            link: 'seller-dashboard.html'
+                        });
+                    }
 
                     // Reduce stock for the purchased quantity so it stays accurate live
                     if (item.id) {
