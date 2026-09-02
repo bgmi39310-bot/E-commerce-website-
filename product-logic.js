@@ -64,6 +64,7 @@ export async function addProductToFirebase(db, currentLoggedInUser, fetchProduct
             sizes: sizesVal ? sizesVal.split(',').map(s => s.trim()).filter(s => s) : [],
             category: categoryVal || 'other',
             colors: colorsVal ? colorsVal.split(',').map(c => c.trim()).filter(c => c) : [],
+            returnWindowDays: Number(document.getElementById('pReturnWindow').value),
             createdAt: new Date()
         });
 
@@ -81,6 +82,7 @@ export async function addProductToFirebase(db, currentLoggedInUser, fetchProduct
         document.getElementById('pSizes').value = '';
         document.getElementById('pCategory').value = '';
         document.getElementById('pColors').value = '';
+        document.getElementById('pReturnWindow').value = '7';
 
         fetchProductsCallback(currentLoggedInUser.uid);
     } catch (error) {
@@ -199,6 +201,8 @@ export function openEditProductModal(product) {
     document.getElementById('epSizes').value = (product.sizes || []).join(', ');
     document.getElementById('epColors').value = (product.colors || []).join(', ');
     document.getElementById('epDesc').value = product.description || '';
+    const returnWindowEl = document.getElementById('epReturnWindow');
+    if (returnWindowEl) returnWindowEl.value = String(product.returnWindowDays !== undefined ? product.returnWindowDays : 7);
     const images = product.images && product.images.length ? product.images : [product.image || ''];
     document.getElementById('epImageFile').value = images[0] || '';
     document.getElementById('epImageFile2').value = images[1] || '';
@@ -245,7 +249,8 @@ export async function saveProductEdits(db, uid, fetchProductsCallback) {
             description: document.getElementById('epDesc').value.trim() || `${name} available in best quality.`,
             stock: stockVal === '' ? 0 : Number(stockVal),
             sizes: sizesVal ? sizesVal.split(',').map(s => s.trim()).filter(s => s) : [],
-            colors: colorsVal ? colorsVal.split(',').map(c => c.trim()).filter(c => c) : []
+            colors: colorsVal ? colorsVal.split(',').map(c => c.trim()).filter(c => c) : [],
+            returnWindowDays: Number(document.getElementById('epReturnWindow').value)
         });
         showToast("Product updated successfully! 🎉");
         closeEditProductModal();
