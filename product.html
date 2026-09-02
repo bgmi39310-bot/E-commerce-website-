@@ -312,7 +312,7 @@
     import { isFollowingSeller, toggleFollowSeller } from './follow-logic.js';
     import { showToast } from './toast.js';
     import { escapeHtml } from './sanitize.js';
-    import { mountNotificationBell } from './notif-logic.js';
+    import { mountNotificationBell, sendNotification } from './notif-logic.js';
 
     let currentBuyerUid = null;
     let authReadyResolve;
@@ -405,6 +405,7 @@
         const imageList = (Array.isArray(p.images) && p.images.length > 0) ? p.images : [image];
         const stock = p.stock !== undefined ? p.stock : 10;
         const outOfStock = stock <= 0;
+        const returnWindow = p.returnWindowDays !== undefined ? p.returnWindowDays : 7;
 
         content.innerHTML = `
             <div class="product-layout">
@@ -425,6 +426,10 @@
                         <span class="badge">✅ ${escapeHtml(p.material || 'Original Quality')}</span>
                         <span class="badge warranty">🛡️ ${escapeHtml(p.warranty || 'Verified Quality')}</span>
                         ${outOfStock ? '<span class="badge" style="background:#fdecea;color:#c0392b;">❌ Out of Stock</span>' : `<span class="badge" style="background:#eafaf1;color:#1a7f4b;">✔️ ${stock} in stock</span>`}
+                        ${returnWindow > 0
+                            ? `<span class="badge" style="background:#f3e8ff;color:#6f42c1;">↩️ Returnable within ${returnWindow} day${returnWindow === 1 ? '' : 's'}</span>`
+                            : `<span class="badge" style="background:#f0f2f2;color:#666;">🚫 No returns accepted</span>`
+                        }
                     </div>
 
                     <div class="desc-block">${escapeHtml(p.description || 'No additional description provided by the seller.')}</div>
@@ -784,6 +789,7 @@
                 image: currentProduct.image,
                 shopName: currentProduct.shopName || 'Local Shop',
                 sellerUid: currentProduct.sellerUid || null,
+                returnWindowDays: currentProduct.returnWindowDays !== undefined ? currentProduct.returnWindowDays : 7,
                 selectedSize: selectedVariants.size || null,
                 selectedColor: selectedVariants.color || null
             });
@@ -857,6 +863,7 @@
                 quantity: currentQty,
                 shopName: currentProduct.shopName || 'Local Shop',
                 sellerUid: currentProduct.sellerUid || null,
+                returnWindowDays: currentProduct.returnWindowDays !== undefined ? currentProduct.returnWindowDays : 7,
                 buyerUid: currentBuyerUid,
                 buyerName: name,
                 buyerPhone: phone,
@@ -865,6 +872,15 @@
                 status: 'Pending',
                 createdAt: new Date()
             });
+
+            if (currentProduct.sellerUid) {
+                sendNotification(db, currentProduct.sellerUid, {
+                    title: `New order: ${currentProduct.name || 'Item'} (Qty ${currentQty})`,
+                    body: `From ${name} — ₹${((parseFloat(currentProduct.price) || 0) * currentQty).toFixed(0)}`,
+                    type: 'new_order',
+                    link: 'seller-dashboard.html'
+                });
+            }
 
             // Reduce stock live so it's accurate for everyone browsing right now
             try {
