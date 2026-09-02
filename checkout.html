@@ -58,6 +58,7 @@
         .btn-place:hover { background-color: #e07b00; }
         .btn-place:disabled { opacity: 0.6; cursor: not-allowed; }
     </style>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 <body>
 
@@ -125,6 +126,7 @@
             <div class="payment-options">
                 <div class="payment-card active" data-method="COD" onclick="selectPayment('COD')">💵 Cash on Delivery</div>
                 <div class="payment-card" data-method="UPI" onclick="selectPayment('UPI')">📱 Pay via UPI Now</div>
+                <div class="payment-card" data-method="RAZORPAY" onclick="selectPayment('RAZORPAY')">💳 Pay Online (Card / UPI / Netbanking)</div>
             </div>
             <div id="upiPayBox" style="display:none; margin-top:14px; text-align:center;">
                 <button type="button" id="upiPayBtn" style="background:#232f3e; color:white; border:none; padding:11px 20px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:13.5px;">📲 Open UPI App to Pay</button>
@@ -147,8 +149,10 @@
         import { mountNotificationBell, sendNotification } from './notif-logic.js';
 
         let currentBuyerUid = null;
+        let currentBuyerUser = null;
         onAuthStateChanged(auth, (user) => {
             currentBuyerUid = user ? user.uid : null;
+            currentBuyerUser = user;
             if (currentBuyerUid) {
                 loadSavedAddresses();
                 mountNotificationBell(db, currentBuyerUid, 'notifBellMount');
@@ -348,6 +352,11 @@
 
             const fullAddress = `${address}, ${city}, ${state}${pincode ? ' - ' + pincode : ''}`;
 
+            if (selectedPayment === 'RAZORPAY') {
+                await placeOrderViaRazorpay({ name, phone, address: fullAddress, btn });
+                return;
+            }
+
             try {
                 // Reserve stock first — if any item is out of stock or short, this
                 // throws and we stop before creating any orders (no half-placed orders).
@@ -438,6 +447,110 @@
         };
 
         document.getElementById('placeOrderBtn').addEventListener('click', window.placeOrder);
+
+        // ====================================================================
+        // Backend URL for the Flask API (payments/admin/cron) — see
+        // render.yaml. Update this if you ever rename the vande-market-api
+        // service (its URL changes with the name) or move to a custom domain.
+        // ====================================================================
+        const BACKEND_BASE_URL = 'https://vande-market-api.onrender.com';
+
+        async function placeOrderViaRazorpay({ name, phone, address, btn }) {
+            try {
+                await decrementStockForCart(db, cart);
+
+                const eligibleSubtotal = appliedCoupon
+                    ? cart.filter(item => item.sellerUid === appliedCoupon.sellerUid)
+                          .reduce((sum, item) => sum + (parseInt(item.qty) || 1) * (parseFloat(item.price) || 0), 0)
+                    : 0;
+                const totalDiscount = appliedCoupon ? computeDiscount(cart, 0) : 0;
+
+                const items = cart.map(item => {
+                    const qty = parseInt(item.qty) || 1;
+                    const price = parseFloat(item.price) || 0;
+                    let lineTotal = price * qty;
+                    if (appliedCoupon && item.sellerUid === appliedCoupon.sellerUid && eligibleSubtotal > 0) {
+                        const shareOfDiscount = (lineTotal / eligibleSubtotal) * totalDiscount;
+                        lineTotal = Math.max(0, lineTotal - shareOfDiscount);
+                    }
+                    return {
+                        productId: item.id || null,
+                        productName: item.name,
+                        shopName: item.shopName || 'Local Shop',
+                        sellerUid: item.sellerUid || null,
+                        returnWindowDays: item.returnWindowDays !== undefined ? item.returnWindowDays : 7,
+                        selectedSize: item.selectedSize || null,
+                        selectedColor: item.selectedColor || null,
+                        price: lineTotal,
+                        quantity: qty
+                    };
+                });
+                const grandTotal = items.reduce((sum, i) => sum + i.price, 0);
+
+                const idToken = await currentBuyerUser.getIdToken();
+
+                const createRes = await fetch(`${BACKEND_BASE_URL}/api/payments/create-order`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+                    body: JSON.stringify({ amount: grandTotal })
+                });
+                if (!createRes.ok) throw new Error((await createRes.json()).error || 'Could not start payment.');
+                const { razorpayOrderId, amount, currency, keyId } = await createRes.json();
+
+                const rzp = new Razorpay({
+                    key: keyId,
+                    order_id: razorpayOrderId,
+                    amount, currency,
+                    name: 'DesiMarket',
+                    description: `${items.length} item${items.length === 1 ? '' : 's'}`,
+                    prefill: { name, contact: phone },
+                    theme: { color: '#232f3e' },
+                    handler: async function(response) {
+                        try {
+                            const verifyRes = await fetch(`${BACKEND_BASE_URL}/api/payments/verify-and-place-order`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+                                body: JSON.stringify({
+                                    razorpay_order_id: response.razorpay_order_id,
+                                    razorpay_payment_id: response.razorpay_payment_id,
+                                    razorpay_signature: response.razorpay_signature,
+                                    items,
+                                    delivery: { name, phone, address }
+                                })
+                            });
+                            if (!verifyRes.ok) throw new Error((await verifyRes.json()).error || 'Payment verification failed.');
+
+                            localStorage.removeItem('cart');
+                            showToast('Payment successful! Order placed. 🎉');
+                            window.location.href = 'orders.html';
+                        } catch (verifyErr) {
+                            console.error(verifyErr);
+                            showToast('Payment received but order placement failed: ' + verifyErr.message + '. Please contact support with your payment ID: ' + response.razorpay_payment_id, 'error');
+                            btn.disabled = false;
+                            btn.innerText = 'Place Order';
+                        }
+                    },
+                    modal: {
+                        ondismiss: function() {
+                            showToast('Payment cancelled.', 'error');
+                            btn.disabled = false;
+                            btn.innerText = 'Place Order';
+                        }
+                    }
+                });
+                rzp.on('payment.failed', function(response) {
+                    showToast('Payment failed: ' + (response.error?.description || 'Please try again.'), 'error');
+                    btn.disabled = false;
+                    btn.innerText = 'Place Order';
+                });
+                rzp.open();
+            } catch (error) {
+                console.error('Razorpay checkout error:', error);
+                showToast('Error starting payment: ' + error.message, 'error');
+                btn.disabled = false;
+                btn.innerText = 'Place Order';
+            }
+        }
 
         window.onload = function() {
             renderSummary();
