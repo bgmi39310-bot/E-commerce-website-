@@ -1,0 +1,94 @@
+services:
+  # ---------------- Frontend: the static site itself ----------------
+  - type: web
+    name: vande-market
+    runtime: static
+    buildCommand: ""
+    staticPublishPath: .
+    pullRequestPreviewsEnabled: false
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: SAMEORIGIN
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*.png
+        name: Cache-Control
+        value: public, max-age=604800, immutable
+      - path: /*.json
+        name: Cache-Control
+        value: public, max-age=3600
+
+  # ---------------- Backend: Flask API (payments/admin/cron) ----------------
+  - type: web
+    name: vande-market-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app"
+    envVars:
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false      # paste the full service-account JSON in the Render dashboard — never in this file
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: CRON_SECRET
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: "https://vande-market.onrender.com,https://bgmi39310-bot.github.io"
+
+  # ---------------- Scheduled housekeeping jobs ----------------
+  - type: cron
+    name: vande-market-cleanup-anonymous
+    runtime: python
+    plan: free
+    rootDir: backend
+    schedule: "0 3 * * 0"   # every Sunday at 3:00 AM UTC
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python cron_runner.py cleanup"
+    envVars:
+      - key: BACKEND_BASE_URL
+        value: "https://vande-market-api.onrender.com"
+      - key: CRON_SECRET
+        sync: false
+
+  - type: cron
+    name: vande-market-return-reminders
+    runtime: python
+    plan: free
+    rootDir: backend
+    schedule: "0 9 * * *"   # every day at 9:00 AM UTC
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python cron_runner.py reminders"
+    envVars:
+      - key: BACKEND_BASE_URL
+        value: "https://vande-market-api.onrender.com"
+      - key: CRON_SECRET
+        sync: false
+
+# ============================================================================
+# Notes:
+#
+# - The frontend (vande-market) is a plain multi-page static site — real
+#   .html files per page, no bundler — so buildCommand is empty and
+#   staticPublishPath is "." (repo root). No SPA rewrite-to-index.html rule
+#   is used on purpose; that pattern is for single-page apps only and would
+#   be wrong here.
+#
+# - The backend (vande-market-api) and both cron jobs live in the backend/
+#   folder (rootDir: backend), so Render only installs/runs what's needed
+#   for each — the static frontend build doesn't touch Python at all.
+#
+# - Every `sync: false` env var must be filled in manually from the Render
+#   Dashboard -> that service -> Environment. They're marked sync: false so
+#   real secrets are never written into this file / committed to git.
+#
+# - Update ALLOWED_ORIGINS and the two BACKEND_BASE_URL values above if you
+#   ever rename the vande-market-api service (its URL changes with the name).
+# ============================================================================
