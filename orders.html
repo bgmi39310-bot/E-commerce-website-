@@ -75,15 +75,6 @@
         .review-submit-btn { background: #232f3e; color: white; border: none; padding: 8px 16px; border-radius: 5px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
         .reviewed-note { font-size: 12px; color: #28a745; margin-top: 8px; font-weight: 600; }
 
-        .return-btn { display: inline-block; margin-top: 8px; margin-right: 6px; background: none; border: 1px solid #6f42c1; color: #6f42c1; padding: 7px 14px; border-radius: 5px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
-        .return-form { margin-top: 12px; background: #f3e8ff; border: 1px solid #d9c2f0; border-radius: 8px; padding: 12px; }
-        .return-form select, .return-form textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 13px; margin-bottom: 8px; }
-        .return-submit-btn { background: #6f42c1; color: white; border: none; padding: 8px 16px; border-radius: 5px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
-        .return-status-note { font-size: 12.5px; margin-top: 8px; font-weight: 600; padding: 6px 10px; border-radius: 6px; display: inline-block; }
-        .return-status-Pending { background: #fff3cd; color: #8a6800; }
-        .return-status-Approved { background: #d4edda; color: #1a7f4b; }
-        .return-status-Rejected { background: #f8d7da; color: #842029; }
-
         .return-btn { display: block; margin-top: 8px; background: none; border: 1px solid #6f42c1; color: #6f42c1; padding: 7px 14px; border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer; }
         .return-form { margin-top: 10px; background: #f3e8ff; border: 1px solid #d8bfff; border-radius: 8px; padding: 12px; }
         .return-form select, .return-form textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 13px; margin-bottom: 8px; }
@@ -168,6 +159,18 @@
                 const sizeSafe = escapeHtml(order.selectedSize || '');
                 const colorSafe = escapeHtml(order.selectedColor || '');
                 const returnReasonSafe = escapeHtml(order.returnReason || '');
+
+                // Return eligibility: only within the window (in days) that
+                // was in effect on this product when the order was placed —
+                // set by the seller, defaults to 7 if the order predates this
+                // feature. 0 means the seller doesn't accept returns at all.
+                const returnWindowDays = order.returnWindowDays !== undefined ? order.returnWindowDays : 7;
+                let daysSinceDelivered = null;
+                if (order.deliveredAt && order.deliveredAt.toDate) {
+                    daysSinceDelivered = (Date.now() - order.deliveredAt.toDate().getTime()) / (1000 * 60 * 60 * 24);
+                }
+                const returnWindowOpen = returnWindowDays > 0 && daysSinceDelivered !== null && daysSinceDelivered <= returnWindowDays;
+                const returnWindowExpired = returnWindowDays > 0 && daysSinceDelivered !== null && daysSinceDelivered > returnWindowDays;
                 html += `
                     <div class="order-card">
                         <div class="order-top">
@@ -201,8 +204,8 @@
                             </div>
                         ` : ''}
                         ${status === 'Delivered' && order.reviewed ? `<div class="reviewed-note">✅ You reviewed this order</div>` : ''}
-                        ${status === 'Delivered' && !order.returnRequested ? `
-                            <button class="return-btn" onclick="toggleReturnForm('${order.id}')">↩️ Return / Refund</button>
+                        ${status === 'Delivered' && !order.returnRequested && returnWindowOpen ? `
+                            <button class="return-btn" onclick="toggleReturnForm('${order.id}')">↩️ Request Return / Refund</button>
                             <div class="return-form" id="returnForm-${order.id}" style="display:none;">
                                 <select id="returnReason-${order.id}">
                                     <option value="">Select a reason</option>
@@ -216,25 +219,16 @@
                                 <button class="return-submit-btn" onclick="submitMyReturn('${order.id}')">Submit Request</button>
                             </div>
                         ` : ''}
-                        ${order.returnRequested ? `<div class="return-status-note return-status-${order.returnStatus || 'Pending'}">Return: ${order.returnStatus || 'Pending'}</div>` : ''}
-                        ${status === 'Delivered' && !order.returnRequested ? `
-                            <button class="return-btn" onclick="toggleReturnForm('${order.id}')">↩️ Request Return / Refund</button>
-                            <div class="return-form" id="returnForm-${order.id}" style="display:none;">
-                                <select id="returnReason-${order.id}">
-                                    <option value="">Select a reason</option>
-                                    <option value="Item damaged/defective">Item damaged/defective</option>
-                                    <option value="Wrong item received">Wrong item received</option>
-                                    <option value="Item not as described">Item not as described</option>
-                                    <option value="No longer needed">No longer needed</option>
-                                    <option value="Other">Other</option>
-                                </select>
-                                <button class="return-submit-btn" onclick="submitMyReturn('${order.id}')">Submit Request</button>
-                            </div>
-                        ` : ''}
                         ${order.returnRequested ? `
                             <div class="return-status-note ${(order.returnStatus || 'pending').toLowerCase()}">
                                 ↩️ Return ${order.returnStatus || 'Pending'} — ${returnReasonSafe}
                             </div>
+                        ` : ''}
+                        ${status === 'Delivered' && !order.returnRequested && returnWindowDays === 0 ? `
+                            <div class="return-status-note" style="background:#f0f2f2; color:#666;">🚫 This seller doesn't accept returns for this item.</div>
+                        ` : ''}
+                        ${status === 'Delivered' && !order.returnRequested && returnWindowExpired ? `
+                            <div class="return-status-note" style="background:#f0f2f2; color:#666;">⏳ Return window (${returnWindowDays} day${returnWindowDays === 1 ? '' : 's'}) has expired.</div>
                         ` : ''}
                         <div class="order-date">${dateStr ? 'Ordered on ' + dateStr : ''}</div>
                     </div>
