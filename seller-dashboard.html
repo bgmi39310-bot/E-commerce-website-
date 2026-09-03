@@ -18,7 +18,7 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="stylesheet" href="shared-ui.css">
     <script src="pwa-init.js" defer></script>
-    <script src="click-guard.js"></script>
+    <script src="click-guard.js" defer></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
         header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 998; }
@@ -72,9 +72,23 @@
         button.action-btn:hover { background-color: #f7ca00; }
         .success-msg { color: green; font-weight: bold; margin-bottom: 10px; display: none; }
         .profile-display-card { display: flex; align-items: center; gap: 20px; }
-        .profile-logo { width: 80px; height: 80px; object-fit: cover; border-radius: 50%; border: 2px solid #ddd; }
         .profile-info h3 { margin: 0 0 5px 0; color: #232f3e; }
         .profile-info p { margin: 3px 0; color: #555; font-size: 14px; }
+
+        /* Redesigned profile view */
+        .profile-banner { position: relative; text-align: center; padding: 50px 16px 18px; margin-bottom: 4px; }
+        .profile-banner-bg { position: absolute; top: 0; left: -20px; right: -20px; height: 76px; background: linear-gradient(135deg, #232f3e, #3a4d63); border-radius: 10px 10px 0 0; }
+        .profile-logo { position: relative; width: 88px; height: 88px; object-fit: cover; border-radius: 50%; border: 4px solid white; box-shadow: 0 3px 10px rgba(0,0,0,0.2); cursor: zoom-in; background: #eee; }
+        .profile-shop-name { margin: 12px 0 2px; color: #232f3e; font-size: 19px; }
+        .profile-owner-line { margin: 0 0 10px; color: #777; font-size: 13px; }
+        .profile-badges { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+        .profile-badge { background: #fff3e0; color: #c7511f; font-weight: bold; font-size: 12px; padding: 5px 12px; border-radius: 20px; }
+        .profile-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+        .profile-info-item { background: #f8f9fa; border: 1px solid #eee; border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; }
+        .profile-info-item.full-width { grid-column: 1 / -1; }
+        .pii-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.3px; font-weight: 600; }
+        .pii-value { font-size: 13.5px; color: #232f3e; font-weight: 500; word-break: break-word; }
+        @media (max-width: 500px) { .profile-info-grid { grid-template-columns: 1fr; } }
         .btn-group-profile { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
         .btn-edit { background-color: #232f3e; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 14px; }
         .btn-view { background-color: #007bff; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 14px; }
@@ -153,7 +167,10 @@
 <body>
 
     <header>
-        <div class="header-title">Seller Hub & Dashboard</div>
+        <div style="display:flex; align-items:center; gap:12px;">
+            <a href="index.html" style="color:white; font-size:20px; text-decoration:none; line-height:1;" title="Back to Home">⬅️</a>
+            <div class="header-title">Seller Hub & Dashboard</div>
+        </div>
         <div style="display: flex; align-items: center; gap: 16px;">
             <div id="notifBellMount" title="Notifications"></div>
             <div class="dots-menu-wrap" style="position:relative;">
@@ -170,18 +187,12 @@
                 </div>
             </div>
             <button onclick="logoutSeller()" style="background:#dc3545; color:white; border:none; padding:6px 10px; border-radius:4px; cursor:pointer; font-weight:bold;">Logout</button>
-            <div class="menu-icon" onclick="toggleMenu()">
-                <span></span><span></span><span></span>
-            </div>
         </div>
     </header>
 
-    <div id="sideMenu" class="side-menu">
-        <a href="javascript:void(0)" class="close-btn" onclick="toggleMenu()">&times;</a>
-        <a href="index.html">🏠 Back to Home</a>
-    </div>
-
     <div class="container">
+        <button id="backToDashboardBtn" onclick="backToDashboard()" style="display:none; background:#232f3e; color:white; border:none; padding:10px 16px; border-radius:6px; font-size:13.5px; font-weight:bold; cursor:pointer; margin-bottom:16px;">⬅️ Back to Dashboard</button>
+
         <!-- 1. Shop Profile Section -->
         <div class="card dash-hidden-section" id="shopProfileSection">
             <h2>1. Seller / Shop Profile</h2>
@@ -193,21 +204,24 @@
             <div id="profileMsg" class="success-msg">Profile Saved Successfully!</div>
 
             <div id="profileDisplay" style="display: none;">
-                <div class="profile-display-card">
-                    <img id="dispLogo" src="" alt="Shop Logo" class="profile-logo" onclick="viewLogoFullscreen()" style="cursor:zoom-in;">
-                    <div class="profile-info">
-                        <h3 id="dispShopName"></h3>
-                        <p><strong>Owner:</strong> <span id="dispOwnerName"></span></p>
-                        <p><strong>Phone:</strong> <span id="dispPhone"></span></p>
-                        <p><strong>Address:</strong> <span id="dispAddress"></span></p>
-                        <p><strong>City / Area:</strong> <span id="dispCity"></span></p>
-                        <p><strong>Delivers to Villages:</strong> <span id="dispVillages"></span></p>
-                        <p id="dispFollowerCount" style="color:#c7511f; font-weight:bold;"></p>
-                        <div class="btn-group-profile">
-                            <button class="btn-edit" onclick="enableEditMode()">✏️ Edit Profile</button>
-                            <button class="btn-view" onclick="viewMyShopPage()">🏪 View My Shop Page</button>
-                        </div>
+                <div class="profile-banner">
+                    <div class="profile-banner-bg"></div>
+                    <img id="dispLogo" src="" alt="Shop Logo" class="profile-logo" onclick="viewLogoFullscreen()" title="Tap to view full size">
+                    <h3 id="dispShopName" class="profile-shop-name"></h3>
+                    <p class="profile-owner-line">👤 <span id="dispOwnerName"></span></p>
+                    <div class="profile-badges">
+                        <span class="profile-badge" id="dispFollowerCount">👥 0 Followers</span>
                     </div>
+                </div>
+                <div class="profile-info-grid">
+                    <div class="profile-info-item"><span class="pii-label">📞 Phone</span><span class="pii-value" id="dispPhone"></span></div>
+                    <div class="profile-info-item"><span class="pii-label">📍 City / Area</span><span class="pii-value" id="dispCity"></span></div>
+                    <div class="profile-info-item full-width"><span class="pii-label">🏠 Address</span><span class="pii-value" id="dispAddress"></span></div>
+                    <div class="profile-info-item full-width"><span class="pii-label">🚚 Delivers to Villages</span><span class="pii-value" id="dispVillages"></span></div>
+                </div>
+                <div class="btn-group-profile">
+                    <button class="btn-edit" onclick="enableEditMode()">✏️ Edit Profile</button>
+                    <button class="btn-view" onclick="viewMyShopPage()">🏪 View My Shop Page</button>
                 </div>
             </div>
 
@@ -482,12 +496,6 @@
 
         let currentLoggedInUser = null;
 
-        function toggleMenu() {
-            const menu = document.getElementById('sideMenu');
-            menu.style.width = menu.style.width === '250px' ? '0' : '250px';
-        }
-        window.toggleMenu = toggleMenu;
-
         window.toggleDotsMenu = function() {
             document.getElementById('dotsMenuPanel').classList.toggle('active');
         };
@@ -499,20 +507,38 @@
         });
 
         const ALL_SECONDARY_SECTION_IDS = ['shopProfileSection', 'addProductSection', 'bulkUploadSection', 'productsSection', 'analyticsSection', 'couponsSection', 'payoutSection', 'kycSection'];
+        const PRIMARY_SECTION_IDS = ['ordersSection', 'returnsSection', 'questionsSection'];
 
+        // Selecting an item from "⋮" now SWAPS the view entirely — hides the
+        // always-visible Orders/Returns/Questions too, shows only the picked
+        // section plus a "Back to Dashboard" button — instead of the old
+        // behaviour of just appending it below everything else, which felt
+        // cluttered since it landed in the middle of already-visible content.
         window.showDashboardSection = function(sectionId) {
             document.getElementById('dotsMenuPanel').classList.remove('active');
             ALL_SECONDARY_SECTION_IDS.forEach(id => {
                 document.getElementById(id)?.classList.toggle('dash-hidden-section', id !== sectionId);
             });
-            const target = document.getElementById(sectionId);
-            if (target) {
-                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                if (currentDashboardUid) {
-                    const module = buildSecondaryModules(currentDashboardUid).find(m => m[1] === sectionId);
-                    if (module) loadDashboardModule(module[0], module[1], module[2]);
-                }
+            PRIMARY_SECTION_IDS.forEach(id => {
+                document.getElementById(id)?.classList.add('dash-hidden-section');
+            });
+            document.getElementById('backToDashboardBtn').style.display = 'block';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            if (currentDashboardUid) {
+                const module = buildSecondaryModules(currentDashboardUid).find(m => m[1] === sectionId);
+                if (module) loadDashboardModule(module[0], module[1], module[2]);
             }
+        };
+
+        window.backToDashboard = function() {
+            ALL_SECONDARY_SECTION_IDS.forEach(id => {
+                document.getElementById(id)?.classList.add('dash-hidden-section');
+            });
+            PRIMARY_SECTION_IDS.forEach(id => {
+                document.getElementById(id)?.classList.remove('dash-hidden-section');
+            });
+            document.getElementById('backToDashboardBtn').style.display = 'none';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         };
 
         function renderLowStockAlerts(lowStockList) {
