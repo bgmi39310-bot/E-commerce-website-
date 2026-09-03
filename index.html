@@ -12,7 +12,7 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="stylesheet" href="shared-ui.css">
     <script src="pwa-init.js" defer></script>
-    <script src="click-guard.js"></script>
+    <script src="click-guard.js" defer></script>
     <!-- Google Analytics (GA4) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-SKX86X8V6K"></script>
     <script>
@@ -165,12 +165,12 @@
 
         <div class="nav-actions">
             <div id="notifBellMount" style="display:flex; align-items:center;"></div>
-            <a href="orders.html" class="nav-link"><i class="fas fa-box"></i><span>Orders</span></a>
-            <a href="cart.html" class="nav-link"><i class="fas fa-shopping-cart"></i><span>Cart</span><span class="cart-badge" id="cartBadge" style="display:none;">0</span></a>
-            <a href="account.html" class="nav-link"><i class="fas fa-user"></i><span>Account</span></a>
-            <div class="nav-link" onclick="toggleMenu()" style="cursor: pointer;"><i class="fas fa-bars"></i><span>Menu</span></div>
             <button class="lang-toggle-btn" onclick="switchLanguage()" style="background:none; border:1px solid rgba(255,255,255,0.4); color:white; padding:6px 10px; border-radius:5px; font-size:11.5px; cursor:pointer; white-space:nowrap;">🌐 हिंदी</button>
             <button id="installAppBtn" style="display:none; background:#ff9900; border:none; color:#111; padding:6px 10px; border-radius:5px; font-size:11.5px; font-weight:bold; cursor:pointer; white-space:nowrap;">📲 Install App</button>
+            <div class="nav-link" onclick="toggleMenu()" style="cursor: pointer; position:relative;">
+                <i class="fas fa-bars"></i><span>Menu</span>
+                <span class="cart-badge" id="cartBadge" style="display:none; position:absolute; top:-6px; right:-8px;">0</span>
+            </div>
         </div>
     </header>
 
@@ -184,10 +184,10 @@
     <div id="sideMenu" class="side-menu">
         <a href="javascript:void(0)" class="close-btn" onclick="toggleMenu()">&times;</a>
         <a href="index.html"><i class="fas fa-home"></i> Home</a>
+        <a href="cart.html"><i class="fas fa-shopping-cart"></i> Cart</a>
         <a href="orders.html"><i class="fas fa-box"></i> <span data-i18n="myOrders">My Orders</span></a>
         <a href="wishlist.html"><i class="fas fa-heart"></i> <span data-i18n="myWishlist">My Wishlist</span></a>
         <a href="messages.html"><i class="fas fa-comment-dots"></i> <span data-i18n="myMessages">My Messages</span></a>
-        <a href="cart.html"><i class="fas fa-shopping-cart"></i> Cart</a>
         <hr style="border: 0.5px solid #444;">
         <a href="account.html"><i class="fas fa-user-circle"></i> My Account</a>
         <a href="seller-dashboard.html" id="menuSellerHub"><i class="fas fa-store"></i> <span data-i18n="sellerHub">Seller Hub (डैशबोर्ड)</span></a>
