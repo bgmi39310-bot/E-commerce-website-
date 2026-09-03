@@ -10,7 +10,9 @@
 }
 
 html { scroll-behavior: smooth; }
-body { color: var(--dm-ink); background: var(--dm-paper); }
+body { color: var(--dm-ink); background: var(--dm-paper); overflow-x: hidden; }
+img, video { max-width: 100%; height: auto; }
+* { box-sizing: border-box; }
 button, input, select, textarea { font: inherit; }
 button, a, input, select, textarea { transition: border-color .18s ease, box-shadow .18s ease, background-color .18s ease, transform .18s ease; }
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid rgba(8, 127, 140, .28); outline-offset: 2px; }
@@ -37,9 +39,9 @@ input::placeholder, textarea::placeholder { color: #7b8790; }
     .full-width { grid-column: auto !important; }
     .action-row, .fbt-footer { flex-wrap: wrap; }
     .action-row > *, .fbt-footer > * { min-width: min(100%, 180px); }
-    .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px; }
-    .product-title { font-size: 13px; }
-    .product-price { font-size: 15px; }
+    .product-grid, .wish-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px; }
+    .product-title, .wish-title { font-size: 13px; }
+    .product-price, .wish-price { font-size: 15px; }
     table { display: block; overflow-x: auto; max-width: 100%; }
     .card, .shop-banner, .gallery, .info-panel, .seller-card, .reviews-card, .related-card, .qa-card, .fbt-card { padding: 14px; }
     .shop-banner, .seller-card { align-items: flex-start; }
