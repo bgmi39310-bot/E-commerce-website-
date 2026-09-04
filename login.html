@@ -166,6 +166,7 @@
     }
 
     async function handleLogin() {
+        if (loginBtn.disabled) return; // guards against rapid repeated Enter presses, which bypass the button's own disabled state
         hideError();
         const email = emailInput.value.trim();
         const password = passInput.value;
