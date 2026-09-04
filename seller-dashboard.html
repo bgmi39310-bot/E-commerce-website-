@@ -474,6 +474,7 @@
         import { renderAnalyticsFromOrders, downloadSalesReport } from './analytics-logic.js';
         import { bulkUploadProducts } from './bulk-upload-logic.js';
         import { mountNotificationBell } from './notif-logic.js';
+        import { escapeHtml } from './sanitize.js';
         import { wireImageUpload } from './image-upload.js';
         import { addCoupon, loadMyCoupons, toggleCouponActive, deleteCoupon } from './coupon-logic.js';
         import { loadReturnRequests, updateReturnStatus } from './return-logic.js';
@@ -553,7 +554,7 @@
             card.style.display = 'block';
             listEl.innerHTML = lowStockList.map(p => `
                 <div class="low-stock-item">
-                    <span>${p.name}</span>
+                    <span>${escapeHtml(p.name)}</span>
                     <span class="warn-count">${p.stock <= 0 ? 'Out of Stock' : p.stock + ' left'}</span>
                 </div>
             `).join('');
