@@ -152,7 +152,7 @@
             banner.innerHTML = `
                 <img class="shop-logo" src="${sellerData.logo || 'https://via.placeholder.com/76'}" alt="${shopNameSafe}" onerror="this.src='https://via.placeholder.com/76'">
                 <div class="shop-info">
-                    <h2 class="shop-name">${shopNameSafe} <span class="verified-tick">✔️ Verified</span> ${sellerData.isPremium ? '<span class="premium-tag">🌟 PREMIUM</span>' : ''}</h2>
+                    <h2 class="shop-name">${shopNameSafe} ${sellerData.kycStatus === 'Verified' ? '<span class="verified-tick">✔️ Verified</span>' : ''} ${sellerData.isPremium ? '<span class="premium-tag">🌟 PREMIUM</span>' : ''}</h2>
                     <div class="shop-meta">📍 ${citySafe ? citySafe + ' — ' : ''}${addressSafe}</div>
                     <div class="shop-stats" id="followerCountText">👥 ${followerCount} Follower${followerCount === 1 ? '' : 's'}</div>
                 </div>
