@@ -221,7 +221,14 @@ export async function loadPendingKyc(db) {
         const q = query(collection(db, "sellers_profiles"), where("kycStatus", "==", "Pending"));
         const snap = await getDocs(q);
         cachedKyc = [];
-        snap.forEach(d => cachedKyc.push({ id: d.id, ...d.data() }));
+        // PAN/Aadhar live in the separate seller_private_kyc collection now
+        // (not on the public sellers_profiles doc) — fetch each one so the
+        // admin can still review it here.
+        for (const d of snap.docs) {
+            const privSnap = await getDoc(doc(db, "seller_private_kyc", d.id));
+            const priv = privSnap.exists() ? privSnap.data() : {};
+            cachedKyc.push({ id: d.id, ...d.data(), kycPan: priv.pan, kycAadharLast4: priv.aadharLast4 });
+        }
         renderKyc();
     } catch (error) {
         console.error(error);
