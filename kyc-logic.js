@@ -4,6 +4,11 @@ import { showToast } from './toast.js';
 const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
 const AADHAR_REGEX = /^\d{12}$/;
 
+// PAN and Aadhar are kept in a SEPARATE, non-public collection
+// (seller_private_kyc/{uid}) — not on sellers_profiles, which anyone can
+// read (it's the public shop page data). Only kycStatus stays on the public
+// profile, since the "Verified Seller" badge needs to be readable by buyers;
+// the actual PAN/Aadhar numbers never need to be.
 export async function submitKycDetails(db, uid, panNumber, aadharNumber, refreshCallback) {
     const pan = panNumber.trim().toUpperCase();
     const aadhar = aadharNumber.trim();
@@ -18,11 +23,14 @@ export async function submitKycDetails(db, uid, panNumber, aadharNumber, refresh
     }
 
     try {
+        await setDoc(doc(db, "seller_private_kyc", uid), {
+            pan,
+            aadharLast4: aadhar.slice(-4), // only store last 4 digits for privacy
+            submittedAt: new Date()
+        }, { merge: true });
+
         await setDoc(doc(db, "sellers_profiles", uid), {
-            kycPan: pan,
-            kycAadharLast4: aadhar.slice(-4), // only store last 4 digits for privacy
-            kycStatus: 'Pending',
-            kycSubmittedAt: new Date()
+            kycStatus: 'Pending'
         }, { merge: true });
 
         showToast("KYC details submitted! Our team will review them shortly.");
@@ -38,14 +46,15 @@ export async function loadKycStatus(db, uid) {
     if (!container) return;
 
     try {
-        const snap = await getDoc(doc(db, "sellers_profiles", uid));
-        const data = snap.exists() ? snap.data() : {};
-        const status = data.kycStatus || 'Not Submitted';
+        const profileSnap = await getDoc(doc(db, "sellers_profiles", uid));
+        const status = profileSnap.exists() ? (profileSnap.data().kycStatus || 'Not Submitted') : 'Not Submitted';
 
         if (status === 'Verified') {
             container.innerHTML = `<div class="kyc-status-box verified">✅ <strong>KYC Verified</strong> — your shop shows a trusted seller badge to buyers.</div>`;
         } else if (status === 'Pending') {
-            container.innerHTML = `<div class="kyc-status-box pending">⏳ <strong>KYC Under Review</strong> — PAN: ${data.kycPan || 'N/A'}, Aadhar ending in ${data.kycAadharLast4 || '----'}. We'll notify you once verified.</div>`;
+            const privateSnap = await getDoc(doc(db, "seller_private_kyc", uid));
+            const priv = privateSnap.exists() ? privateSnap.data() : {};
+            container.innerHTML = `<div class="kyc-status-box pending">⏳ <strong>KYC Under Review</strong> — PAN: ${escapeForDisplay(priv.pan) || 'N/A'}, Aadhar ending in ${escapeForDisplay(priv.aadharLast4) || '----'}. We'll notify you once verified.</div>`;
         } else if (status === 'Rejected') {
             container.innerHTML = `
                 <div class="kyc-status-box rejected">❌ <strong>KYC Rejected</strong> — please re-check your details and submit again.</div>
@@ -63,6 +72,14 @@ export async function loadKycStatus(db, uid) {
         console.error("Error loading KYC status:", error);
         container.innerHTML = `<p style="color:red;">Unable to load KYC status.</p>`;
     }
+}
+
+// PAN/Aadhar are seller-typed but only ever shown back to that same seller
+// (never to another user), so this is a light safety net, not a defense
+// against another person — still worth doing for consistency.
+function escapeForDisplay(value) {
+    if (!value) return '';
+    return String(value).replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function renderKycForm() {
