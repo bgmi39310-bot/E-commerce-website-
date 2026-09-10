@@ -1,10 +1,8 @@
-// Free image hosting for product/shop photos, powered by ImgBB.
+// DEPRECATED — the ImgBB API key used to live here, in plain frontend JS,
+// where anyone could open dev tools and copy it. It has moved to the
+// BACKEND (backend/.env -> IMGBB_API_KEY), which now proxies uploads via
+// POST /api/uploads/image (see routes/uploads.py). image-upload.js no
+// longer imports anything from this file.
 //
-// HOW TO GET YOUR FREE API KEY (takes 1 minute, no cost):
-// 1. Go to https://api.imgbb.com/
-// 2. Sign up / log in (free)
-// 3. Copy your API key
-// 4. Paste it below, replacing the placeholder text
-
-export const IMGBB_API_KEY = "cb22a453a079a9422c7f87e16b41c61c";
-
+// This file is kept only so nothing breaks if something old still
+// references it. Safe to delete once you've confirmed nothing does.
