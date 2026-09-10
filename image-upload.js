@@ -1,4 +1,4 @@
-import { IMGBB_API_KEY } from './imgbb-config.js';
+import { auth } from './firebase-config.js';
 
 // Resizes and re-compresses an image in the browser BEFORE it's ever
 // uploaded. A phone camera photo can easily be 3000px wide and several MB —
@@ -37,26 +37,38 @@ async function compressImage(file, maxDimension = 1600, quality = 0.82) {
     return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
 }
 
+// Backend URL for the Flask API — see render.yaml. Update this if you ever
+// rename the vande-market-api service (its URL changes with the name) or
+// move to a custom domain.
+const BACKEND_BASE_URL = 'https://vande-market-api.onrender.com';
+
+// Uploads an image via our OWN backend (/api/uploads/image), which forwards
+// it to ImgBB using a server-side API key. The ImgBB key never ships to the
+// browser at all anymore — previously it sat in plain JS (imgbb-config.js)
+// where anyone could open dev tools, copy it, and burn through the
+// account's free quota (or host unrelated content on it).
 export async function uploadToImgBB(file) {
-    if (IMGBB_API_KEY === "PASTE_YOUR_IMGBB_API_KEY_HERE") {
-        throw new Error("Image upload isn't set up yet. Please paste an image URL instead, or ask the site owner to add an ImgBB API key.");
+    if (!auth.currentUser) {
+        throw new Error("Please log in before uploading an image.");
     }
 
     const uploadFile = await compressImage(file);
+    const idToken = await auth.currentUser.getIdToken();
 
     const formData = new FormData();
     formData.append('image', uploadFile);
 
-    const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/uploads/image`, {
         method: 'POST',
+        headers: { 'Authorization': `Bearer ${idToken}` },
         body: formData
     });
     const data = await response.json();
 
-    if (!data.success) {
-        throw new Error((data.error && data.error.message) || 'Upload failed');
+    if (!response.ok) {
+        throw new Error(data.error || 'Upload failed');
     }
-    return data.data.url;
+    return data.url;
 }
 
 // Wires a hidden file input to automatically upload on selection and
