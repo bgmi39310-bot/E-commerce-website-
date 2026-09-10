@@ -312,6 +312,7 @@
     import { isFollowingSeller, toggleFollowSeller } from './follow-logic.js';
     import { showToast } from './toast.js';
     import { escapeHtml } from './sanitize.js';
+    import { resizedImageUrl } from './img-utils.js';
     import { mountNotificationBell, sendNotification } from './notif-logic.js';
 
     let currentBuyerUid = null;
@@ -354,9 +355,21 @@
         else { badge.style.display = 'none'; }
     }
 
-    // Live-listens to this one product so stock/price updates reflect instantly
-    // without needing a refresh. Only ONE listener is ever open per page view,
-    // and it's closed automatically when the person navigates away (see pagehide below).
+    // Loads the product in two stages, for the fastest possible first paint:
+    //
+    //   1) A single one-time getDoc() — a plain request/response, so it shows
+    //      the product's name/price/image as soon as physically possible.
+    //      (onSnapshot() alone is slower for this FIRST result, because it
+    //      has to open a live, ongoing connection before it can deliver
+    //      anything — noticeable on slower mobile networks.)
+    //   2) A live onSnapshot() attached right after, purely so stock/price
+    //      changes still reflect instantly without a refresh. Only ONE
+    //      listener is ever open per page view, and it's closed
+    //      automatically when the person navigates away (see pagehide below).
+    //
+    // Both stages call the same handler, guarded by isFirstProductLoad so
+    // the view-count write and the seller-info/related-products loads only
+    // ever happen once, not twice.
     function loadProduct() {
         const content = document.getElementById('pageContent');
         if (!productId) {
@@ -364,7 +377,9 @@
             return;
         }
 
-        unsubscribeProduct = onSnapshot(doc(db, "vendors", productId), (snap) => {
+        const productRef = doc(db, "vendors", productId);
+
+        function handleProductSnapshot(snap) {
             if (!snap.exists()) {
                 content.innerHTML = `<div class="error-state">This product is no longer available. <a href="index.html">Browse other products</a></div>`;
                 return;
@@ -378,7 +393,7 @@
             // infinite read/write loop that could run away for as long as
             // the tab stayed open, racking up Firestore usage the whole time.
             if (isFirstProductLoad) {
-                updateDoc(doc(db, "vendors", productId), { views: increment(1) }).catch(() => {});
+                updateDoc(productRef, { views: increment(1) }).catch(() => {});
             }
             renderProduct(currentProduct);
 
@@ -393,9 +408,15 @@
                 loadSellerInfo(currentProduct.sellerUid);
                 loadRelatedProducts(currentProduct);
             }
-        }, (error) => {
+        }
+
+        getDoc(productRef).then(handleProductSnapshot).catch((error) => {
             console.error(error);
             content.innerHTML = `<div class="error-state">Unable to load product. Please try again.</div>`;
+        });
+
+        unsubscribeProduct = onSnapshot(productRef, handleProductSnapshot, (error) => {
+            console.error(error);
         });
     }
 
@@ -418,10 +439,10 @@
         content.innerHTML = `
             <div class="product-layout">
                 <div class="gallery">
-                    <img class="main-img" id="mainProductImg" src="${imageList[0]}" alt="${escapeHtml(p.name || 'Product')}" onerror="this.src='https://via.placeholder.com/400?text=No+Image'">
+                    <img class="main-img" id="mainProductImg" src="${resizedImageUrl(imageList[0], 800)}" alt="${escapeHtml(p.name || 'Product')}" onerror="this.src='https://via.placeholder.com/400?text=No+Image'">
                     ${imageList.length > 1 ? `
                         <div class="thumb-strip">
-                            ${imageList.map((img, i) => `<img src="${img}" loading="lazy" class="${i === 0 ? 'active' : ''}" onclick="switchMainImage('${img.replace(/'/g, "\\'")}', this)" onerror="this.style.display='none'">`).join('')}
+                            ${imageList.map((img, i) => `<img src="${resizedImageUrl(img, 110)}" data-full="${img.replace(/"/g, '&quot;')}" loading="lazy" class="${i === 0 ? 'active' : ''}" onclick="switchMainImage(this.dataset.full, this)" onerror="this.style.display='none'">`).join('')}
                         </div>
                     ` : ''}
                 </div>
@@ -590,7 +611,7 @@
             card.style.display = 'block';
             scrollEl.innerHTML = related.map(p => `
                 <div class="related-item" onclick="window.location.href='product.html?id=${p.id}'">
-                    <img src="${p.image || 'https://via.placeholder.com/150'}" loading="lazy" onerror="this.src='https://via.placeholder.com/150?text=No+Image'">
+                    <img src="${resizedImageUrl(p.image || 'https://via.placeholder.com/150', 260)}" loading="lazy" onerror="this.src='https://via.placeholder.com/150?text=No+Image'">
                     <div class="r-name">${escapeHtml(p.name || 'Product')}</div>
                     <div class="r-price">₹${(parseFloat(p.price) || 0).toFixed(0)}</div>
                 </div>
@@ -618,7 +639,7 @@
             ${i > 0 ? '<span class="fbt-plus">+</span>' : ''}
             <div class="fbt-item">
                 <input type="checkbox" checked ${p.isMain ? 'disabled' : ''} onchange="toggleFbtItem('${p.id}', this.checked)">
-                <img src="${p.image || 'https://via.placeholder.com/80'}" loading="lazy" onerror="this.src='https://via.placeholder.com/80?text=No+Image'">
+                <img src="${resizedImageUrl(p.image || 'https://via.placeholder.com/80', 160)}" loading="lazy" onerror="this.src='https://via.placeholder.com/80?text=No+Image'">
                 <div class="fbt-name">${escapeHtml(p.name || 'Product')}</div>
                 <div class="fbt-price">₹${(parseFloat(p.price) || 0).toFixed(0)}</div>
             </div>
