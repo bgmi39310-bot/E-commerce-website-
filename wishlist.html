@@ -68,18 +68,18 @@
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { escapeHtml } from './sanitize.js';
     import { mountNotificationBell } from './notif-logic.js';
+    import { getWishlist, saveWishlist, migrateLegacyCartData } from './cart-storage.js';
 
     onAuthStateChanged(auth, (user) => {
-        if (user) mountNotificationBell(db, user.uid, 'notifBellMount');
+        if (user) {
+            mountNotificationBell(db, user.uid, 'notifBellMount');
+            if (!user.isAnonymous) migrateLegacyCartData(user.uid);
+        }
     });
-
-    function getWishlist() {
-        return JSON.parse(localStorage.getItem('wishlist')) || [];
-    }
 
     window.removeFromWishlist = function(productId) {
         let wishlist = getWishlist().filter(id => id !== productId);
-        localStorage.setItem('wishlist', JSON.stringify(wishlist));
+        saveWishlist(wishlist);
         loadWishlist();
     };
 
