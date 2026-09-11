@@ -1,13 +1,21 @@
 import { showToast } from './toast.js';
 import { escapeHtml } from './sanitize.js';
 import {
-    collection, getDocs, query, where, doc, updateDoc, deleteDoc, getDoc
+    collection, getDocs, query, where, doc, updateDoc, deleteDoc, getDoc,
+    getCountFromServer, getAggregateFromServer, sum, limit, orderBy, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // Local caches — each list is fetched from Firestore ONCE per admin session.
 // After any action (block, delete, approve, etc.) we patch these arrays directly
 // and re-render from memory, instead of re-querying Firestore. This is the
 // single biggest read-saver in the whole admin panel.
+//
+// Every list below is also capped (see LIST_FETCH_LIMIT) and sorted newest
+// first, so as the marketplace grows, the admin panel keeps loading fast
+// and cheap instead of downloading every document in every collection on
+// every visit — which is what it used to do.
+const LIST_FETCH_LIMIT = 300;
+
 let cachedSellers = [];
 let cachedBuyers = [];
 let cachedProducts = [];
@@ -18,19 +26,53 @@ let cachedReviews = [];
 // ---------- DASHBOARD CHARTS DATA ----------
 export async function loadDashboardCharts(db, renderCallback) {
     try {
-        const [usersSnap, productsSnap, ordersSnap] = await Promise.all([
-            getDocs(collection(db, "users")),
-            getDocs(collection(db, "vendors")),
-            getDocs(collection(db, "orders"))
+        const now = new Date();
+        const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(now.getDate() - 29); thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+        // Exact platform-wide counts via Firestore's count() aggregation —
+        // these read ONLY a count, never the underlying documents, so they
+        // stay fast and cheap no matter how large these collections grow.
+        // (This function used to download every single user/product/order
+        // document just to count and sum them — that's the actual "admin
+        // dashboard reads everything" problem being fixed here.)
+        const [
+            sellersCountSnap, buyersCountSnap, productsCountSnap, ordersCountSnap,
+            pendingCountSnap, acceptedCountSnap, shippedCountSnap, deliveredCountSnap, cancelledCountSnap,
+            revenueSnap
+        ] = await Promise.all([
+            getCountFromServer(query(collection(db, "users"), where("role", "==", "seller"))),
+            getCountFromServer(query(collection(db, "users"), where("role", "==", "customer"))),
+            getCountFromServer(collection(db, "vendors")),
+            getCountFromServer(collection(db, "orders")),
+            getCountFromServer(query(collection(db, "orders"), where("status", "==", "Pending"))),
+            getCountFromServer(query(collection(db, "orders"), where("status", "==", "Accepted"))),
+            getCountFromServer(query(collection(db, "orders"), where("status", "==", "Shipped"))),
+            getCountFromServer(query(collection(db, "orders"), where("status", "==", "Delivered"))),
+            getCountFromServer(query(collection(db, "orders"), where("status", "==", "Cancelled"))),
+            getAggregateFromServer(query(collection(db, "orders"), where("status", "!=", "Cancelled")), { totalRevenue: sum("price") }),
         ]);
 
-        let totalSellers = 0, totalBuyers = 0;
-        usersSnap.forEach(d => {
-            if (d.data().role === 'seller') totalSellers++; else totalBuyers++;
-        });
+        const statusCounts = {
+            Pending: pendingCountSnap.data().count,
+            Accepted: acceptedCountSnap.data().count,
+            Shipped: shippedCountSnap.data().count,
+            Delivered: deliveredCountSnap.data().count,
+            Cancelled: cancelledCountSnap.data().count,
+        };
+        const totalRevenue = revenueSnap.data().totalRevenue || 0;
 
-        let orders = [];
-        ordersSnap.forEach(d => orders.push({ id: d.id, ...d.data() }));
+        // The 7-day revenue chart and "Top Sellers" panel are inherently
+        // recent-activity views, not full history — one bounded query
+        // (last 30 days, capped at 1000 orders as a hard safety limit)
+        // covers both, instead of ever pulling the platform's ENTIRE order
+        // history into the browser just to compute them.
+        const recentSnap = await getDocs(query(
+            collection(db, "orders"),
+            where("createdAt", ">=", thirtyDaysAgo),
+            limit(1000)
+        ));
+        let recentOrdersAll = [];
+        recentSnap.forEach(d => recentOrdersAll.push({ id: d.id, ...d.data() }));
 
         const dayLabels = [];
         const dayTotals = [];
@@ -40,7 +82,7 @@ export async function loadDashboardCharts(db, renderCallback) {
             dayLabels.push(d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }));
             dayTotals.push(0);
         }
-        orders.forEach(o => {
+        recentOrdersAll.forEach(o => {
             if (o.status === 'Cancelled') return;
             const created = o.createdAt && o.createdAt.toDate ? o.createdAt.toDate() : null;
             if (!created) return;
@@ -50,31 +92,26 @@ export async function loadDashboardCharts(db, renderCallback) {
             }
         });
 
-        const statusCounts = { Pending: 0, Accepted: 0, Shipped: 0, Delivered: 0, Cancelled: 0 };
-        orders.forEach(o => {
-            const s = o.status || 'Pending';
-            if (statusCounts[s] !== undefined) statusCounts[s]++;
-        });
-
         const sellerRevenue = {};
-        orders.forEach(o => {
+        recentOrdersAll.forEach(o => {
             if (o.status === 'Cancelled') return;
             const shop = o.shopName || 'Unknown Shop';
             sellerRevenue[shop] = (sellerRevenue[shop] || 0) + (Number(o.price) || 0);
         });
-        const topSellers = Object.entries(sellerRevenue).sort((a, b) => b[1] - a[1]).slice(0, 5);
+        const topSellers = Object.entries(sellerRevenue).sort((a, b) => b[1] - a[1]).slice(0, 5); // last 30 days
 
-        const recentOrders = [...orders].sort((a, b) => {
-            const ta = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate() : 0;
-            const tb = b.createdAt && b.createdAt.toDate ? b.createdAt.toDate() : 0;
-            return tb - ta;
-        }).slice(0, 6);
-
-        let totalRevenue = 0;
-        orders.forEach(o => { if (o.status !== 'Cancelled') totalRevenue += Number(o.price) || 0; });
+        // Its own small, precise query — rather than being sliced out of the
+        // 30-day batch above — so "Recent Orders" is always genuinely the
+        // most recent orders, even on a day with zero orders in the last 30.
+        const latestSnap = await getDocs(query(collection(db, "orders"), orderBy("createdAt", "desc"), limit(6)));
+        const recentOrders = [];
+        latestSnap.forEach(d => recentOrders.push({ id: d.id, ...d.data() }));
 
         renderCallback({
-            totalSellers, totalBuyers, totalProducts: productsSnap.size, totalOrders: orders.length,
+            totalSellers: sellersCountSnap.data().count,
+            totalBuyers: buyersCountSnap.data().count,
+            totalProducts: productsCountSnap.data().count,
+            totalOrders: ordersCountSnap.data().count,
             totalRevenue, dayLabels, dayTotals, statusCounts, topSellers, recentOrders
         });
     } catch (error) {
@@ -107,14 +144,9 @@ export async function loadAllReviews(db) {
     const container = document.getElementById('reviewsAdminContainer');
     container.innerHTML = "<p>Loading reviews...</p>";
     try {
-        const snap = await getDocs(collection(db, "reviews"));
+        const snap = await getDocs(query(collection(db, "reviews"), orderBy("createdAt", "desc"), limit(LIST_FETCH_LIMIT)));
         cachedReviews = [];
         snap.forEach(d => cachedReviews.push({ id: d.id, ...d.data() }));
-        cachedReviews.sort((a, b) => {
-            const ta = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate() : 0;
-            const tb = b.createdAt && b.createdAt.toDate ? b.createdAt.toDate() : 0;
-            return tb - ta;
-        });
         renderReviews();
     } catch (error) {
         console.error(error);
@@ -165,14 +197,9 @@ export async function loadReports(db) {
     const container = document.getElementById('reportsContainer');
     container.innerHTML = "<p>Loading reports...</p>";
     try {
-        const snap = await getDocs(collection(db, "reports"));
+        const snap = await getDocs(query(collection(db, "reports"), orderBy("createdAt", "desc"), limit(LIST_FETCH_LIMIT)));
         cachedReports = [];
         snap.forEach(d => cachedReports.push({ id: d.id, ...d.data() }));
-        cachedReports.sort((a, b) => {
-            const ta = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate() : 0;
-            const tb = b.createdAt && b.createdAt.toDate ? b.createdAt.toDate() : 0;
-            return tb - ta;
-        });
         renderReports();
     } catch (error) {
         console.error(error);
@@ -189,6 +216,30 @@ export async function resolveReport(db, reportId) {
     } catch (error) {
         console.error(error);
         showToast("Error updating report.", 'error');
+    }
+}
+
+// Marking a report Resolved AND removing the product it was about used to
+// be two completely separate, unawaited Firestore calls — either one could
+// fail independently of the other, leaving the report marked "Resolved"
+// while the reported product was still live (or vice versa). A single
+// batch commits both writes together, or neither.
+export async function resolveReportAndDeleteProduct(db, reportId, productId) {
+    try {
+        const batch = writeBatch(db);
+        batch.set(doc(db, "reports", reportId), { status: 'Resolved' }, { merge: true });
+        batch.delete(doc(db, "vendors", productId));
+        await batch.commit();
+
+        const r = cachedReports.find(x => x.id === reportId);
+        if (r) r.status = 'Resolved';
+        cachedProducts = cachedProducts.filter(p => p.id !== productId);
+        renderReports();
+        renderProducts();
+        showToast("Product removed and report resolved.");
+    } catch (error) {
+        console.error(error);
+        showToast("Error resolving report / removing product.", 'error');
     }
 }
 
@@ -218,7 +269,7 @@ export async function loadPendingKyc(db) {
     const container = document.getElementById('kycReviewContainer');
     container.innerHTML = "<p>Loading KYC submissions...</p>";
     try {
-        const q = query(collection(db, "sellers_profiles"), where("kycStatus", "==", "Pending"));
+        const q = query(collection(db, "sellers_profiles"), where("kycStatus", "==", "Pending"), limit(LIST_FETCH_LIMIT));
         const snap = await getDocs(q);
         cachedKyc = [];
         // PAN/Aadhar live in the separate seller_private_kyc collection now
@@ -282,7 +333,7 @@ export async function loadSellers(db) {
     const container = document.getElementById('sellersContainer');
     container.innerHTML = "<p>Loading sellers...</p>";
     try {
-        const q = query(collection(db, "users"), where("role", "==", "seller"));
+        const q = query(collection(db, "users"), where("role", "==", "seller"), orderBy("createdAt", "desc"), limit(LIST_FETCH_LIMIT));
         const snap = await getDocs(q);
 
         const sellerDocs = snap.docs;
@@ -332,7 +383,7 @@ export async function loadBuyers(db) {
     const container = document.getElementById('buyersContainer');
     container.innerHTML = "<p>Loading buyers...</p>";
     try {
-        const q = query(collection(db, "users"), where("role", "==", "customer"));
+        const q = query(collection(db, "users"), where("role", "==", "customer"), orderBy("createdAt", "desc"), limit(LIST_FETCH_LIMIT));
         const snap = await getDocs(q);
         cachedBuyers = [];
         snap.forEach(d => cachedBuyers.push({ id: d.id, ...d.data() }));
@@ -392,7 +443,7 @@ export async function loadAllProducts(db) {
     const container = document.getElementById('productsContainer');
     container.innerHTML = "<p>Loading all products...</p>";
     try {
-        const snap = await getDocs(collection(db, "vendors"));
+        const snap = await getDocs(query(collection(db, "vendors"), orderBy("createdAt", "desc"), limit(LIST_FETCH_LIMIT)));
         cachedProducts = [];
         snap.forEach(d => cachedProducts.push({ id: d.id, ...d.data() }));
         renderProducts();
@@ -422,7 +473,7 @@ export async function loadAllOrders(db, statusFilter = 'All') {
     container.innerHTML = "<p>Loading orders...</p>";
     try {
         if (cachedAllOrders.length === 0) {
-            const snap = await getDocs(collection(db, "orders"));
+            const snap = await getDocs(query(collection(db, "orders"), orderBy("createdAt", "desc"), limit(LIST_FETCH_LIMIT)));
             cachedAllOrders = [];
             snap.forEach(d => cachedAllOrders.push({ id: d.id, ...d.data() }));
         }
@@ -431,18 +482,16 @@ export async function loadAllOrders(db, statusFilter = 'All') {
         if (statusFilter !== 'All') {
             orders = orders.filter(o => (o.status || 'Pending') === statusFilter);
         }
-        orders = [...orders].sort((a, b) => {
-            const ta = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate() : 0;
-            const tb = b.createdAt && b.createdAt.toDate ? b.createdAt.toDate() : 0;
-            return tb - ta;
-        });
+        // cachedAllOrders is already newest-first from the query above
 
         if (orders.length === 0) {
             container.innerHTML = `<div class="admin-no-data">No orders found for this filter.</div>`;
             return;
         }
 
-        container.innerHTML = orders.map(o => `
+        container.innerHTML = `
+            <p style="font-size:12px; color:#8a94a6; margin-bottom:10px;">Showing the ${LIST_FETCH_LIMIT} most recent orders${statusFilter !== 'All' ? ` (filtered to "${statusFilter}")` : ''}.</p>
+            ${orders.map(o => `
             <div class="admin-row-card">
                 <div class="arc-info">
                     <h4>📦 ${escapeHtml(o.productName || 'Item')} (Qty: ${o.quantity || 1}) — ₹${o.price || 0}</h4>
@@ -450,7 +499,7 @@ export async function loadAllOrders(db, statusFilter = 'All') {
                     <p class="uid-tag">Status: <strong>${o.status || 'Pending'}</strong></p>
                 </div>
             </div>
-        `).join('');
+        `).join('')}`;
     } catch (error) {
         console.error(error);
         container.innerHTML = `<p style="color:red;">Unable to load orders.</p>`;
