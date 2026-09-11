@@ -2,6 +2,68 @@ import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, o
 import { isPremiumSeller, countSellerProducts, FREE_TIER_LIMITS } from './premium-logic.js';
 import { showToast } from './toast.js';
 import { escapeHtml } from './sanitize.js';
+import { buildVariantKey } from './stock-logic.js';
+
+// Builds the list of size/color combinations a seller can optionally set
+// per-variant stock for. If both sizes and colors are given, every
+// combination of the two; if only one is given, just that one dimension.
+function combosForVariantStock(sizes, colors) {
+    if (sizes.length && colors.length) {
+        const combos = [];
+        sizes.forEach(s => colors.forEach(c => combos.push({ key: buildVariantKey(s, c), label: `${s} / ${c}` })));
+        return combos;
+    }
+    if (sizes.length) return sizes.map(s => ({ key: buildVariantKey(s, null), label: s }));
+    if (colors.length) return colors.map(c => ({ key: buildVariantKey(null, c), label: c }));
+    return [];
+}
+
+// Renders an optional per-variant stock grid under the Sizes/Colors fields
+// (id prefix 'p' for Add Product, 'ep' for Edit Product). Sellers who don't
+// touch this at all keep using the single overall Stock Quantity field,
+// exactly as before — this is purely additive.
+export function generateVariantStockGrid(prefix, existingVariantStock) {
+    const sizesVal = (document.getElementById(prefix + 'Sizes').value || '').trim();
+    const colorsVal = (document.getElementById(prefix + 'Colors').value || '').trim();
+    const sizes = sizesVal ? sizesVal.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const colors = colorsVal ? colorsVal.split(',').map(c => c.trim()).filter(Boolean) : [];
+    const combos = combosForVariantStock(sizes, colors);
+    const container = document.getElementById(prefix + 'VariantStockContainer');
+    if (!container) return;
+
+    if (combos.length === 0) {
+        container.innerHTML = `<p style="font-size:12px; color:#888; margin-top:6px;">Add sizes and/or colors above first, then click this again.</p>`;
+        return;
+    }
+
+    const existing = existingVariantStock || {};
+    container.innerHTML = `
+        <p style="font-size:12px; color:#666; margin:8px 0 4px;">Optional: set stock for each option below. Leave any blank to just rely on the overall Stock Quantity above for it.</p>
+        ${combos.map(c => `
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                <label style="min-width:110px; font-size:13px;">${escapeHtml(c.label)}</label>
+                <input type="number" min="0" data-variant-key="${escapeHtml(c.key)}" class="${prefix}-variant-stock-input" value="${existing[c.key] !== undefined ? existing[c.key] : ''}" placeholder="stock">
+            </div>
+        `).join('')}
+    `;
+}
+
+// Reads back whatever's currently in the variant-stock grid. Returns null
+// if the seller never opened/filled it in — meaning "don't track
+// per-variant stock for this product", not "everything is 0".
+function collectVariantStock(prefix) {
+    const inputs = document.querySelectorAll(`.${prefix}-variant-stock-input`);
+    const result = {};
+    let any = false;
+    inputs.forEach(inp => {
+        const val = inp.value.trim();
+        if (val !== '') {
+            result[inp.dataset.variantKey] = Math.max(0, Number(val) || 0);
+            any = true;
+        }
+    });
+    return any ? result : null;
+}
 
 // Keeps track of the active listener so we never stack up duplicate onSnapshot
 // subscriptions (which would waste Firestore reads) if this gets called more than once.
@@ -48,6 +110,8 @@ export async function addProductToFirebase(db, currentLoggedInUser, fetchProduct
     }
     if (imagesArray.length === 0) imagesArray.push(defaultImg);
 
+    const variantStock = collectVariantStock('p'); // null unless the seller filled in the optional per-variant grid
+
     try {
         await addDoc(collection(db, "vendors"), {
             name: name,
@@ -64,6 +128,7 @@ export async function addProductToFirebase(db, currentLoggedInUser, fetchProduct
             sizes: sizesVal ? sizesVal.split(',').map(s => s.trim()).filter(s => s) : [],
             category: categoryVal || 'other',
             colors: colorsVal ? colorsVal.split(',').map(c => c.trim()).filter(c => c) : [],
+            variantStock: variantStock, // null = not tracked per-variant, just uses overall stock
             returnWindowDays: Number(document.getElementById('pReturnWindow').value),
             createdAt: new Date()
         });
@@ -83,6 +148,8 @@ export async function addProductToFirebase(db, currentLoggedInUser, fetchProduct
         document.getElementById('pCategory').value = '';
         document.getElementById('pColors').value = '';
         document.getElementById('pReturnWindow').value = '7';
+        const pVariantContainer = document.getElementById('pVariantStockContainer');
+        if (pVariantContainer) pVariantContainer.innerHTML = '';
 
         fetchProductsCallback(currentLoggedInUser.uid);
     } catch (error) {
@@ -208,6 +275,16 @@ export function openEditProductModal(product) {
     document.getElementById('epImageFile2').value = images[1] || '';
     document.getElementById('epImageFile3').value = images[2] || '';
     document.getElementById('epImageFile4').value = images[3] || '';
+    const epVariantContainer = document.getElementById('epVariantStockContainer');
+    if (epVariantContainer) {
+        // Pre-fill the grid automatically if this product already tracks
+        // per-variant stock, so editing shows the current numbers right away.
+        if (product.variantStock && Object.keys(product.variantStock).length) {
+            generateVariantStockGrid('ep', product.variantStock);
+        } else {
+            epVariantContainer.innerHTML = '';
+        }
+    }
     document.getElementById('editProductModal').classList.add('active');
 }
 
@@ -236,6 +313,8 @@ export async function saveProductEdits(db, uid, fetchProductsCallback) {
     let imagesArray = [imageUrl, imageUrl2, imageUrl3, imageUrl4].filter(url => url !== '');
     if (imagesArray.length === 0) imagesArray.push(defaultImg);
 
+    const variantStock = collectVariantStock('ep'); // null unless the grid was shown and filled in
+
     try {
         await updateDoc(doc(db, "vendors", productId), {
             name: name,
@@ -250,6 +329,7 @@ export async function saveProductEdits(db, uid, fetchProductsCallback) {
             stock: stockVal === '' ? 0 : Number(stockVal),
             sizes: sizesVal ? sizesVal.split(',').map(s => s.trim()).filter(s => s) : [],
             colors: colorsVal ? colorsVal.split(',').map(c => c.trim()).filter(c => c) : [],
+            variantStock: variantStock,
             returnWindowDays: Number(document.getElementById('epReturnWindow').value)
         });
         showToast("Product updated successfully! 🎉");
