@@ -35,6 +35,7 @@ here, not trusted from the request body:
 import os
 import hmac
 import hashlib
+import logging
 from datetime import datetime, timezone
 
 import razorpay
@@ -43,6 +44,8 @@ from firebase_admin import firestore
 
 from utils.auth import require_auth
 from utils.firebase_admin_init import db
+
+logger = logging.getLogger(__name__)
 
 payments_bp = Blueprint("payments", __name__, url_prefix="/api/payments")
 
@@ -60,6 +63,14 @@ class InsufficientStock(Exception):
 @payments_bp.route("/create-order", methods=["POST"])
 @require_auth
 def create_order():
+    # Same rule as the Firestore rules for placing an order / listing a
+    # product: a verified email is required. Checked HERE too (not just on
+    # verify-and-place-order) so an unverified caller is stopped before
+    # Razorpay ever collects a payment, rather than after — no refund ever
+    # has to be issued for this reason.
+    if not g.user.get("email_verified"):
+        return jsonify({"error": "Please verify your email before placing an order."}), 403
+
     data = request.get_json(silent=True) or {}
     amount_rupees = data.get("amount")
     if not isinstance(amount_rupees, (int, float)) or amount_rupees <= 0:
@@ -80,7 +91,8 @@ def create_order():
             "notes": {"buyerUid": g.uid},
         })
     except Exception as e:
-        return jsonify({"error": "Could not create payment order.", "detail": str(e)}), 502
+        logger.exception("Failed to create Razorpay order for uid=%s", g.uid)
+        return jsonify({"error": "Could not create payment order. Please try again."}), 502
 
     return jsonify({
         "razorpayOrderId": rp_order["id"],
@@ -108,10 +120,10 @@ def _refund_and_fail(payment_id, amount_paise, message):
     try:
         _razorpay_client.payment.refund(payment_id, {"amount": amount_paise})
     except Exception as e:
+        logger.exception("Refund failed for payment_id=%s amount=%s", payment_id, amount_paise)
         return jsonify({
             "error": message + " Automatic refund also failed — please contact "
                      f"support with payment ID {payment_id}.",
-            "detail": str(e),
         }), 400
     return jsonify({"error": message + " Your payment has been refunded."}), 400
 
@@ -119,6 +131,14 @@ def _refund_and_fail(payment_id, amount_paise, message):
 @payments_bp.route("/verify-and-place-order", methods=["POST"])
 @require_auth
 def verify_and_place_order():
+    # Redundant with the same check in /create-order (which should already
+    # have stopped an unverified caller before any payment was collected) —
+    # kept here too as a safety net. If this ever DOES fire, payment has
+    # already been captured by Razorpay, so it must be refunded, not just
+    # rejected outright.
+    if not g.user.get("email_verified"):
+        return jsonify({"error": "Please verify your email before placing an order."}), 403
+
     data = request.get_json(silent=True) or {}
     razorpay_order_id = data.get("razorpay_order_id")
     razorpay_payment_id = data.get("razorpay_payment_id")
@@ -138,7 +158,8 @@ def verify_and_place_order():
     try:
         rp_payment = _razorpay_client.payment.fetch(razorpay_payment_id)
     except Exception as e:
-        return jsonify({"error": "Could not confirm payment with Razorpay.", "detail": str(e)}), 502
+        logger.exception("Could not fetch Razorpay payment_id=%s", razorpay_payment_id)
+        return jsonify({"error": "Could not confirm payment with Razorpay. Please try again shortly."}), 502
 
     if rp_payment.get("status") != "captured":
         return jsonify({"error": f"Payment status is '{rp_payment.get('status')}', not captured."}), 400
