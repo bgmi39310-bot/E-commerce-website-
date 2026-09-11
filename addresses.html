@@ -110,6 +110,13 @@
             </div>
         </div>
 
+        <div class="form-group">
+            <label>📍 Pin Exact Location (optional — helps with accurate delivery)</label>
+            <button type="button" id="useMyLocationBtn" style="width:100%; background:#f0f2f2; border:1px solid #ccc; padding:9px; border-radius:5px; font-weight:600; cursor:pointer; margin-bottom:8px;">📍 Use My Current Location</button>
+            <div id="addrLocationMap" style="height:200px; border-radius:8px; overflow:hidden; margin-bottom:6px;"></div>
+            <p id="addrLocationStatus" style="font-size:12px; color:#666; margin:0;">Tap the map, or drag the pin, to mark exactly where this address is.</p>
+        </div>
+
         <button class="btn-save-addr" id="saveAddrBtn">Save Address</button>
     </div>
 </div>
@@ -120,8 +127,38 @@
     import { loadAddresses, saveAddress, deleteAddress, setDefaultAddress } from './address-logic.js';
         import { showToast } from './toast.js';
         import { escapeHtml } from './sanitize.js';
+        import { initPickerMap } from './map-utils.js';
 
     let currentUid = null;
+    let addrMapController = null; // created once, reused across every open of the modal
+    let pickedAddrLat = null;
+    let pickedAddrLng = null;
+
+    async function ensureAddrMap() {
+        if (addrMapController) return addrMapController;
+        try {
+            addrMapController = await initPickerMap('addrLocationMap', (latlng) => {
+                pickedAddrLat = latlng.lat;
+                pickedAddrLng = latlng.lng;
+                document.getElementById('addrLocationStatus').textContent = `📍 Location pinned (${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}).`;
+            });
+        } catch (error) {
+            console.error('Could not load address map:', error);
+            document.getElementById('addrLocationStatus').textContent = 'Map unavailable right now — you can still save this address without pinning it.';
+        }
+        return addrMapController;
+    }
+
+    document.getElementById('useMyLocationBtn').addEventListener('click', async () => {
+        const controller = await ensureAddrMap();
+        if (!controller) return;
+        try {
+            await controller.useCurrentLocation();
+            showToast('Location pinned from your device. 📍');
+        } catch (error) {
+            showToast("Couldn't get your location — please allow location access, or tap the map to pin it manually.", 'error');
+        }
+    });
 
     function renderAddresses(addresses) {
         const container = document.getElementById('addressList');
@@ -159,7 +196,14 @@
         ['addrLabel', 'addrName', 'addrPhone', 'addrPincode', 'addrLine', 'addrCity', 'addrState'].forEach(id => {
             document.getElementById(id).value = id === 'addrLabel' ? 'Home' : '';
         });
+        pickedAddrLat = null;
+        pickedAddrLng = null;
+        document.getElementById('addrLocationStatus').textContent = 'Tap the map, or drag the pin, to mark exactly where this address is.';
         document.getElementById('addrModal').classList.add('active');
+        setTimeout(async () => {
+            const controller = await ensureAddrMap();
+            if (controller) { controller.clear(); controller.invalidateSize(); }
+        }, 50);
     };
 
     window.closeAddressModal = function() {
@@ -176,7 +220,19 @@
         document.getElementById('addrLine').value = addr.addressLine || '';
         document.getElementById('addrCity').value = addr.city || '';
         document.getElementById('addrState').value = addr.state || '';
+        pickedAddrLat = typeof addr.lat === 'number' ? addr.lat : null;
+        pickedAddrLng = typeof addr.lng === 'number' ? addr.lng : null;
+        document.getElementById('addrLocationStatus').textContent = pickedAddrLat
+            ? `📍 Location pinned (${pickedAddrLat.toFixed(5)}, ${pickedAddrLng.toFixed(5)}).`
+            : 'Tap the map, or drag the pin, to mark exactly where this address is.';
         document.getElementById('addrModal').classList.add('active');
+        setTimeout(async () => {
+            const controller = await ensureAddrMap();
+            if (!controller) return;
+            if (pickedAddrLat !== null) controller.setPosition(pickedAddrLat, pickedAddrLng);
+            else controller.clear();
+            controller.invalidateSize();
+        }, 50);
     };
 
     window.removeAddress = async function(addressId) {
@@ -211,7 +267,9 @@
             pincode: document.getElementById('addrPincode').value.trim(),
             addressLine,
             city,
-            state: document.getElementById('addrState').value.trim()
+            state: document.getElementById('addrState').value.trim(),
+            lat: pickedAddrLat,
+            lng: pickedAddrLng
         };
 
         const editingId = document.getElementById('editingAddressId').value;
