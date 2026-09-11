@@ -76,6 +76,10 @@ const previousStockLevels = {};
 
 export async function addProductToFirebase(db, currentLoggedInUser, fetchProductsCallback) {
     if (!currentLoggedInUser) return;
+    if (!currentLoggedInUser.emailVerified) {
+        showToast("Please verify your email before listing products. Go to My Account to resend the verification email.", 'error');
+        return;
+    }
 
     const name = document.getElementById('pName').value.trim();
     const priceVal = document.getElementById('pPrice').value.trim();
