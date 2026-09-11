@@ -68,7 +68,7 @@ export async function loadDashboardCharts(db, renderCallback) {
         };
     } catch (error) {
         console.error("Dashboard: count queries failed —", error);
-        errors.push('counts');
+        errors.push({ section: 'counts', message: error.message || String(error) });
     }
 
     // ---- Lifetime revenue via sum() aggregation. Isolated separately from
@@ -85,8 +85,8 @@ export async function loadDashboardCharts(db, renderCallback) {
         );
         totalRevenue = revenueSnap.data().totalRevenue || 0;
     } catch (error) {
-        console.error("Dashboard: revenue sum query failed — if this says 'requires an index', open the link Firestore printed right above this line in the console to create it:", error);
-        errors.push('revenue');
+        console.error("Dashboard: revenue sum query failed —", error);
+        errors.push({ section: 'revenue', message: error.message || String(error) });
     }
 
     // ---- 7-day revenue chart + "Top Sellers" (last 30 days).
@@ -125,7 +125,7 @@ export async function loadDashboardCharts(db, renderCallback) {
         topSellers = Object.entries(sellerRevenue).sort((a, b) => b[1] - a[1]).slice(0, 5);
     } catch (error) {
         console.error("Dashboard: 30-day orders query failed —", error);
-        errors.push('recentActivity');
+        errors.push({ section: 'recentActivity', message: error.message || String(error) });
     }
 
     // ---- "Recent Orders" — its own small, precise query.
@@ -135,7 +135,7 @@ export async function loadDashboardCharts(db, renderCallback) {
         latestSnap.forEach(d => recentOrders.push({ id: d.id, ...d.data() }));
     } catch (error) {
         console.error("Dashboard: recent orders query failed —", error);
-        errors.push('recentOrders');
+        errors.push({ section: 'recentOrders', message: error.message || String(error) });
     }
 
     renderCallback({
@@ -176,7 +176,7 @@ export async function loadAllReviews(db) {
         renderReviews();
     } catch (error) {
         console.error(error);
-        container.innerHTML = `<p style="color:red;">Unable to load reviews.</p>`;
+        container.innerHTML = `<p style="color:red;">Unable to load reviews.<br><small style="color:#c77;">${escapeHtml(error.message || String(error))}</small></p>`;
     }
 }
 
@@ -229,7 +229,7 @@ export async function loadReports(db) {
         renderReports();
     } catch (error) {
         console.error(error);
-        container.innerHTML = `<p style="color:red;">Unable to load reports.</p>`;
+        container.innerHTML = `<p style="color:red;">Unable to load reports.<br><small style="color:#c77;">${escapeHtml(error.message || String(error))}</small></p>`;
     }
 }
 
@@ -309,7 +309,7 @@ export async function loadPendingKyc(db) {
         renderKyc();
     } catch (error) {
         console.error(error);
-        container.innerHTML = `<p style="color:red;">Unable to load KYC submissions.</p>`;
+        container.innerHTML = `<p style="color:red;">Unable to load KYC submissions.<br><small style="color:#c77;">${escapeHtml(error.message || String(error))}</small></p>`;
     }
 }
 
@@ -375,7 +375,7 @@ export async function loadSellers(db) {
         renderSellers();
     } catch (error) {
         console.error(error);
-        container.innerHTML = `<p style="color:red;">Unable to load sellers.</p>`;
+        container.innerHTML = `<p style="color:red;">Unable to load sellers.<br><small style="color:#c77;">${escapeHtml(error.message || String(error))}</small></p>`;
     }
 }
 
@@ -416,7 +416,7 @@ export async function loadBuyers(db) {
         renderBuyers();
     } catch (error) {
         console.error(error);
-        container.innerHTML = `<p style="color:red;">Unable to load buyers.</p>`;
+        container.innerHTML = `<p style="color:red;">Unable to load buyers.<br><small style="color:#c77;">${escapeHtml(error.message || String(error))}</small></p>`;
     }
 }
 
@@ -475,7 +475,7 @@ export async function loadAllProducts(db) {
         renderProducts();
     } catch (error) {
         console.error(error);
-        container.innerHTML = `<p style="color:red;">Unable to load products.</p>`;
+        container.innerHTML = `<p style="color:red;">Unable to load products.<br><small style="color:#c77;">${escapeHtml(error.message || String(error))}</small></p>`;
     }
 }
 
@@ -528,6 +528,6 @@ export async function loadAllOrders(db, statusFilter = 'All') {
         `).join('')}`;
     } catch (error) {
         console.error(error);
-        container.innerHTML = `<p style="color:red;">Unable to load orders.</p>`;
+        container.innerHTML = `<p style="color:red;">Unable to load orders.<br><small style="color:#c77;">${escapeHtml(error.message || String(error))}</small></p>`;
     }
 }
