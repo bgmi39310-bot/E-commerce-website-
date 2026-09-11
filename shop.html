@@ -71,6 +71,7 @@
     <div class="shop-banner" id="shopBanner">
         <div class="skel skel-banner" style="width:100%;"></div>
     </div>
+    <div id="shopLocationMap" style="height:200px; border-radius:8px; overflow:hidden; margin:-10px 0 16px; display:none;"></div>
 
     <div class="section-title">🛍️ Products from this Shop</div>
     <div id="shopProductGrid" class="product-grid">
@@ -87,6 +88,7 @@
     import { isFollowingSeller, toggleFollowSeller } from './follow-logic.js';
     import { showToast } from './toast.js';
     import { escapeHtml } from './sanitize.js';
+    import { initViewMap } from './map-utils.js';
 
     const params = new URLSearchParams(window.location.search);
     const sellerUid = params.get('id');
@@ -108,6 +110,7 @@
     let sellerData = null;
     let nowFollowing = false;
     let followStatusChecked = false;
+    let shopMapShown = false;
     let unsubscribeShop = null;
     let unsubscribeShopProducts = null;
 
@@ -160,6 +163,20 @@
             `;
 
             document.getElementById('followBtn').addEventListener('click', handleFollowClick);
+
+            // Only ever initialize this map ONCE — the snapshot above can
+            // fire again later (e.g. follower count changes), but the map
+            // div isn't inside banner.innerHTML so it survives those
+            // re-renders and doesn't need to be rebuilt.
+            if (!shopMapShown && typeof sellerData.lat === 'number' && typeof sellerData.lng === 'number') {
+                shopMapShown = true;
+                const mapEl = document.getElementById('shopLocationMap');
+                mapEl.style.display = 'block';
+                initViewMap('shopLocationMap', sellerData.lat, sellerData.lng, shopNameSafe).catch(err => {
+                    console.error('Could not load shop map:', err);
+                    mapEl.style.display = 'none';
+                });
+            }
         }, (error) => {
             console.error(error);
             banner.innerHTML = `<p class="loading-text">Unable to load shop right now.</p>`;
