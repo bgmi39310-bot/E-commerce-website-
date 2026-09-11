@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, query, where, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, getDocs, query, where, doc, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { showToast } from './toast.js';
 import { escapeHtml } from './sanitize.js';
 
@@ -22,16 +22,25 @@ export async function submitReview(db, { orderId, productId, sellerUid, buyerUid
         return;
     }
     try {
-        await addDoc(collection(db, "reviews"), {
+        // Creating the review and marking the order as reviewed used to be
+        // two separate writes — if the second one failed after the first
+        // succeeded (network blip, etc.), the order would never show as
+        // reviewed, and the "Write a Review" prompt would keep appearing,
+        // letting the same buyer submit a second review for the same order
+        // (the Firestore rule that blocks that only checks orders.reviewed,
+        // which would have been stuck at false). A batch commits both
+        // writes together, or neither.
+        const batch = writeBatch(db);
+        const reviewRef = doc(collection(db, "reviews"));
+        batch.set(reviewRef, {
             orderId, productId, sellerUid, buyerUid,
             buyerName: buyerName || 'DesiMarket Buyer',
             rating: Number(rating),
             comment: (comment || '').trim(),
             createdAt: new Date()
         });
-
-        // Mark the order as reviewed so the "Write a Review" prompt doesn't show again
-        await updateDoc(doc(db, "orders", orderId), { reviewed: true });
+        batch.update(doc(db, "orders", orderId), { reviewed: true });
+        await batch.commit();
 
         showToast("Thank you for your review! ⭐");
         if (refreshCallback) refreshCallback();
