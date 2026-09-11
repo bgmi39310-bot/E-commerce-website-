@@ -304,6 +304,7 @@
     import { db, auth } from './firebase-config.js';
     import { doc, getDoc, addDoc, collection, getDocs, query, where, limit, updateDoc, increment, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     import { onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getCart, saveCart, migrateLegacyCartData } from './cart-storage.js';
     import { loadProductReviews } from './review-logic.js';
     import { submitReport } from './report-logic.js';
     import { submitQuestion, loadProductQA } from './qa-logic.js';
@@ -313,6 +314,7 @@
     import { showToast } from './toast.js';
     import { escapeHtml } from './sanitize.js';
     import { resizedImageUrl } from './img-utils.js';
+    import { buildVariantKey } from './stock-logic.js';
     import { mountNotificationBell, sendNotification } from './notif-logic.js';
 
     let currentBuyerUid = null;
@@ -330,6 +332,7 @@
     let unsubscribeNotifBell = null;
     onAuthStateChanged(auth, (user) => {
         currentBuyerUid = user ? user.uid : null;
+        if (user && !user.isAnonymous) migrateLegacyCartData(user.uid);
         authReadyResolve();
         if (unsubscribeNotifBell) { unsubscribeNotifBell(); unsubscribeNotifBell = null; }
         if (currentBuyerUid) {
@@ -348,7 +351,7 @@
     let isFirstProductLoad = true;
 
     function updateCartBadge() {
-        const cart = JSON.parse(localStorage.getItem('cart')) || [];
+        const cart = getCart();
         const badge = document.getElementById('cartBadge');
         const count = cart.reduce((sum, item) => sum + (parseInt(item.qty) || 1), 0);
         if (count > 0) { badge.style.display = 'flex'; badge.innerText = count > 99 ? '99+' : count; }
@@ -478,7 +481,7 @@
                             <div class="variant-group">
                                 <label>Size:</label>
                                 <div class="variant-chips" id="sizeChips">
-                                    ${p.sizes.map(s => `<div class="variant-chip" data-value="${escapeHtml(s)}" onclick="selectVariant('size', '${String(s).replace(/'/g, "\\'")}', this)">${escapeHtml(s)}</div>`).join('')}
+                                    ${p.sizes.map(s => `<div class="variant-chip" data-value="${escapeHtml(s)}" onclick="selectVariant('size', this.dataset.value, this)">${escapeHtml(s)}</div>`).join('')}
                                 </div>
                             </div>
                         ` : ''}
@@ -486,10 +489,11 @@
                             <div class="variant-group">
                                 <label>Color:</label>
                                 <div class="variant-chips" id="colorChips">
-                                    ${p.colors.map(c => `<div class="variant-chip" data-value="${escapeHtml(c)}" onclick="selectVariant('color', '${String(c).replace(/'/g, "\\'")}', this)">${escapeHtml(c)}</div>`).join('')}
+                                    ${p.colors.map(c => `<div class="variant-chip" data-value="${escapeHtml(c)}" onclick="selectVariant('color', this.dataset.value, this)">${escapeHtml(c)}</div>`).join('')}
                                 </div>
                             </div>
                         ` : ''}
+                        <div id="variantStockHint" style="font-size:13px; font-weight:600; margin-bottom:8px;"></div>
                         <div class="qty-row">
                             <label>Quantity:</label>
                             <div class="qty-stepper">
@@ -664,7 +668,7 @@
 
     window.addBundleToCart = async function() {
         await ensureAuthenticated();
-        let cart = JSON.parse(localStorage.getItem('cart')) || [];
+        let cart = getCart();
 
         (window.fbtAllItems || []).filter(p => fbtSelectedItems.includes(p.id)).forEach(p => {
             const existing = cart.find(item => item.id === p.id && !item.selectedSize && !item.selectedColor);
@@ -678,7 +682,7 @@
             }
         });
 
-        localStorage.setItem('cart', JSON.stringify(cart));
+        saveCart(cart);
         updateCartBadge();
         showToast('Bundle added to cart! 🛍️');
     };
@@ -779,7 +783,38 @@
         const containerId = type === 'size' ? 'sizeChips' : 'colorChips';
         document.querySelectorAll(`#${containerId} .variant-chip`).forEach(c => c.classList.remove('selected'));
         chipEl.classList.add('selected');
+        updateVariantStockHint();
     };
+
+    // Shows a specific "X left for this option" message when the product
+    // tracks per-size/color stock and the buyer has picked a combination
+    // that's actually in that map — otherwise stays quiet and just relies
+    // on the overall stock badge shown near the top of the page.
+    function updateVariantStockHint() {
+        const hintEl = document.getElementById('variantStockHint');
+        if (!hintEl || !currentProduct) return;
+
+        const variantStock = currentProduct.variantStock;
+        if (!variantStock || typeof variantStock !== 'object') { hintEl.textContent = ''; return; }
+
+        const key = buildVariantKey(selectedVariants.size, selectedVariants.color);
+        if (!key || !Object.prototype.hasOwnProperty.call(variantStock, key)) { hintEl.textContent = ''; return; }
+
+        const available = variantStock[key];
+        const addBtn = document.querySelector('.btn-cart');
+        const buyBtn = document.querySelector('.btn-buy');
+        if (available <= 0) {
+            hintEl.textContent = '❌ Out of stock for this option';
+            hintEl.style.color = '#c0392b';
+            if (addBtn) addBtn.disabled = true;
+            if (buyBtn) buyBtn.disabled = true;
+        } else {
+            hintEl.textContent = `✔️ ${available} left for this option`;
+            hintEl.style.color = '#1a7f4b';
+            if (addBtn) addBtn.disabled = false;
+            if (buyBtn) buyBtn.disabled = false;
+        }
+    }
 
     function variantsSelected() {
         const sizeChips = document.getElementById('sizeChips');
@@ -798,7 +833,7 @@
         if (!currentProduct) return;
         if (!variantsSelected()) return;
         await ensureAuthenticated();
-        let cart = JSON.parse(localStorage.getItem('cart')) || [];
+        let cart = getCart();
 
         // If the SAME product with the SAME variant is already in cart, bump quantity;
         // otherwise (different size/color) add it as a new, separate line item.
@@ -823,7 +858,7 @@
                 selectedColor: selectedVariants.color || null
             });
         }
-        localStorage.setItem('cart', JSON.stringify(cart));
+        saveCart(cart);
         updateCartBadge();
         showToast(`${currentQty} x ${currentProduct.name} added to cart! 🛍️`);
     };
