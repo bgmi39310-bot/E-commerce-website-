@@ -325,6 +325,16 @@
         }
 
         window.placeOrder = async function() {
+            if (!currentBuyerUid || !currentBuyerUser) {
+                showToast('Please login to place an order.', 'error');
+                window.location.href = 'login.html';
+                return;
+            }
+            if (!currentBuyerUser.emailVerified) {
+                showToast('Please verify your email before placing an order. Go to My Account to resend the verification email.', 'error');
+                return;
+            }
+
             const cart = getCart();
             if (cart.length === 0) {
                 showToast('Your cart is empty!');
