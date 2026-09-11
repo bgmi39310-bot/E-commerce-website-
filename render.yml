@@ -16,6 +16,12 @@ services:
       - path: /*
         name: Referrer-Policy
         value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: "geolocation=(), microphone=(), camera=(), usb=(), interest-cohort=()"
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.googletagmanager.com https://checkout.razorpay.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://vande-market-api.onrender.com https://api.razorpay.com https://lumberjack.razorpay.com https://images.weserv.nl https://www.google-analytics.com https://www.googletagmanager.com; frame-src https://checkout.razorpay.com https://api.razorpay.com; object-src 'none'; base-uri 'self'; form-action 'self'"
       - path: /*.png
         name: Cache-Control
         value: public, max-age=604800, immutable
@@ -92,3 +98,26 @@ services:
 # - Update ALLOWED_ORIGINS and the two BACKEND_BASE_URL values above if you
 #   ever rename the vande-market-api service (its URL changes with the name).
 # ============================================================================
+
+# ----------------------------------------------------------------------------
+# A note on the Content-Security-Policy above:
+#
+# It includes 'unsafe-inline' for scripts and styles. This is a real, known
+# limitation, not an oversight: every page here uses inline
+# <script type="module"> blocks and inline onclick="..." attributes for its
+# actual logic (there's no build step to generate per-request nonces on a
+# static site). A stricter CSP without 'unsafe-inline' would break every
+# page immediately. Removing it properly would mean moving all page logic
+# into external .js files and converting every onclick handler to
+# addEventListener -- a large refactor, not a config change. The CSP above
+# still meaningfully restricts which THIRD-PARTY origins can load scripts,
+# connect out, or frame the site, which is real protection even with that
+# limitation.
+#
+# Also: img-src is deliberately permissive (any https: origin) because
+# sellers can paste arbitrary image URLs from anywhere, not just ImgBB.
+#
+# After deploying, check the browser console on each page type (product,
+# checkout, admin, etc.) for "Refused to..." CSP violation messages, in
+# case some third-party domain was missed above.
+# ----------------------------------------------------------------------------
