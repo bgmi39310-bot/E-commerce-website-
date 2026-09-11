@@ -114,6 +114,8 @@
         import { generateInvoice } from './invoice-logic.js';
         import { mountNotificationBell } from './notif-logic.js';
         import { showToast } from './toast.js';
+        import { restoreStock, buildVariantKey } from './stock-logic.js';
+        import { getCart, saveCart, migrateLegacyCartData } from './cart-storage.js';
 
         let currentBuyerUid = null;
         let currentBuyerName = 'DesiMarket Buyer';
@@ -323,7 +325,7 @@
                     return;
                 }
 
-                let cart = JSON.parse(localStorage.getItem('cart')) || [];
+                let cart = getCart();
                 const existing = cart.find(item => item.id === productId);
                 if (existing) {
                     existing.qty = (parseInt(existing.qty) || 1) + 1;
@@ -333,7 +335,7 @@
                         image: p.image, shopName: p.shopName || 'Local Shop', sellerUid: p.sellerUid || null
                     });
                 }
-                localStorage.setItem('cart', JSON.stringify(cart));
+                saveCart(cart);
                 showToast(`${p.name} added to cart! 🛍️`);
                 window.location.href = 'cart.html';
             } catch (error) {
@@ -345,7 +347,27 @@
         window.cancelMyOrder = async function(orderId) {
             if (!confirm("Are you sure you want to cancel this order?")) return;
             try {
-                await updateDoc(doc(db, "orders", orderId), { status: 'Cancelled', cancelledAt: new Date(), cancelledBy: 'buyer' });
+                // Re-check the CURRENT status from Firestore, not the possibly
+                // stale copy in ordersById — the cancel button only shows for
+                // "Pending" orders in the UI, but a direct call could otherwise
+                // cancel an order that's already Shipped/Delivered.
+                const orderRef = doc(db, "orders", orderId);
+                const freshSnap = await getDoc(orderRef);
+                if (!freshSnap.exists()) {
+                    showToast("Order not found.", 'error');
+                    return;
+                }
+                const freshOrder = freshSnap.data();
+                if ((freshOrder.status || 'Pending') !== 'Pending') {
+                    showToast(`This order is already "${freshOrder.status}" and can no longer be cancelled.`, 'error');
+                    return;
+                }
+
+                await updateDoc(orderRef, { status: 'Cancelled', cancelledAt: new Date(), cancelledBy: 'buyer' });
+
+                // Give the reserved stock back now that the order won't be fulfilled.
+                await restoreStock(db, freshOrder.productId, freshOrder.quantity || 1, buildVariantKey(freshOrder.selectedSize, freshOrder.selectedColor));
+
                 showToast("Order cancelled successfully.");
             } catch (error) {
                 console.error(error);
@@ -359,6 +381,7 @@
             if (user) {
                 currentBuyerUid = user.uid;
                 currentBuyerName = user.displayName || 'DesiMarket Buyer';
+                migrateLegacyCartData(user.uid);
                 fetchMyOrders(user.uid);
                 unsubscribeNotifBell = mountNotificationBell(db, user.uid, 'notifBellMount');
             } else {
