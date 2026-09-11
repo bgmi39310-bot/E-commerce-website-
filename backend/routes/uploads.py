@@ -13,10 +13,13 @@ can't use this site's backend as a free anonymous image host.
 """
 
 import os
+import logging
 import requests
 from flask import Blueprint, request, jsonify
 
 from utils.auth import require_auth
+
+logger = logging.getLogger(__name__)
 
 uploads_bp = Blueprint("uploads", __name__, url_prefix="/api/uploads")
 
@@ -52,11 +55,11 @@ def upload_image():
         )
         data = resp.json()
     except Exception as e:
-        return jsonify({"error": "Could not reach the image host.", "detail": str(e)}), 502
+        logger.exception("ImgBB upload failed")
+        return jsonify({"error": "Could not reach the image host. Please try again."}), 502
 
     if not data.get("success"):
         detail = (data.get("error") or {}).get("message") or "Upload failed."
         return jsonify({"error": detail}), 502
 
     return jsonify({"url": data["data"]["url"]})
-
