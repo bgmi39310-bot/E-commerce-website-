@@ -224,6 +224,9 @@
             <input type="text" id="villageInput" placeholder="Enter your village / area name">
             <button onclick="saveMyVillage()">📍 Save</button>
         </div>
+        <div class="village-bar">
+            <span class="village-link" id="distanceSortLink" onclick="sortSellersByDistance()">📍 Sort by Distance from Me</span>
+        </div>
 
         <p class="sellers-desc" data-i18n="sellersNearYouDesc">Discover verified local shops around you</p>
         <div class="sellers-scroll" id="sellersScroll">
@@ -294,6 +297,7 @@
         import { showToast } from './toast.js';
         import { escapeHtml } from './sanitize.js';
         import { getCart, getWishlist, saveWishlist, migrateLegacyCartData } from './cart-storage.js';
+        import { distanceKm } from './map-utils.js';
 
         let allProducts = [];
         let currentCategory = 'all';
@@ -676,6 +680,8 @@
         const MY_VILLAGE_KEY = 'dm_my_village';
         let myVillage = (localStorage.getItem(MY_VILLAGE_KEY) || '').trim();
         let showAllSellersMode = false;
+        let myLat = null; // set only after the person taps "Sort by Distance" and allows location
+        let myLng = null;
 
         function renderVillageBar() {
             const displayEl = document.getElementById('villageDisplay');
@@ -729,8 +735,48 @@
                     return villages.includes(villageLower) || followedSellerIds.has(s.id);
                 });
             }
+
+            // If the person has opted in to "Sort by Distance", put sellers
+            // who've pinned an exact map location first (nearest first).
+            // Sellers who never pinned a location (most of them, since it's
+            // optional) just stay at the end in their normal order — nothing
+            // breaks or disappears for them, there's just no distance to sort by.
+            if (myLat !== null && myLng !== null) {
+                filtered = [...filtered].sort((a, b) => {
+                    const aHas = typeof a.lat === 'number' && typeof a.lng === 'number';
+                    const bHas = typeof b.lat === 'number' && typeof b.lng === 'number';
+                    if (aHas && !bHas) return -1;
+                    if (!aHas && bHas) return 1;
+                    if (!aHas && !bHas) return 0;
+                    return distanceKm(myLat, myLng, a.lat, a.lng) - distanceKm(myLat, myLng, b.lat, b.lng);
+                });
+            }
+
             renderSellers(filtered);
         }
+
+        window.sortSellersByDistance = function() {
+            if (!navigator.geolocation) {
+                showToast("Your browser/device doesn't support location.", 'error');
+                return;
+            }
+            const link = document.getElementById('distanceSortLink');
+            const originalText = link.textContent;
+            link.textContent = '📍 Getting your location...';
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    myLat = pos.coords.latitude;
+                    myLng = pos.coords.longitude;
+                    link.textContent = '📍 Sorted by distance ✓';
+                    applySellerVillageFilter();
+                },
+                () => {
+                    link.textContent = originalText;
+                    showToast("Couldn't get your location — please allow location access and try again.", 'error');
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        };
 
         function renderSellers(sellers) {
             const scrollEl = document.getElementById('sellersScroll');
@@ -745,11 +791,16 @@
                 const isFollowing = followedSellerIds.has(s.id);
                 const shopName = escapeHtml(s.shopName || 'Local Shop');
                 const city = escapeHtml(s.city || 'Nearby');
+                const hasCoords = typeof s.lat === 'number' && typeof s.lng === 'number';
+                const distanceBadge = (myLat !== null && hasCoords)
+                    ? `<div class="s-city">📏 ${distanceKm(myLat, myLng, s.lat, s.lng).toFixed(1)} km away</div>`
+                    : '';
                 return `
                     <div class="seller-card-mini">
                         <img src="${escapeHtml(s.logo || 'https://via.placeholder.com/56')}" alt="${shopName}" loading="lazy" onerror="this.src='https://via.placeholder.com/56'">
                         <div class="s-name">${shopName}</div>
                         <div class="s-city">📍 ${city}</div>
+                        ${distanceBadge}
                         <a class="s-view-link" href="shop.html?id=${s.id}">${t('viewShop')}</a>
                         <button class="s-follow-btn ${isFollowing ? 'following' : ''}" onclick="toggleSellerFollow('${s.id}', this)">${isFollowing ? '✓ ' + t('following') : '➕ ' + t('follow')}</button>
                     </div>
