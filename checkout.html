@@ -139,14 +139,15 @@
 
     <script type="module">
         import { db, auth } from './firebase-config.js';
-        import { collection, addDoc, doc, getDoc, updateDoc, increment } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { collection, addDoc, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { validateCoupon } from './coupon-logic.js';
+        import { validateCoupon, recordCouponUsage } from './coupon-logic.js';
         import { decrementStockForCart } from './stock-logic.js';
         import { loadAddresses } from './address-logic.js';
         import { showToast } from './toast.js';
         import { escapeHtml } from './sanitize.js';
         import { mountNotificationBell, sendNotification } from './notif-logic.js';
+        import { getCart, clearCart, migrateLegacyCartData } from './cart-storage.js';
 
         let currentBuyerUid = null;
         let currentBuyerUser = null;
@@ -154,6 +155,7 @@
             currentBuyerUid = user ? user.uid : null;
             currentBuyerUser = user;
             if (currentBuyerUid) {
+                migrateLegacyCartData(currentBuyerUid);
                 loadSavedAddresses();
                 mountNotificationBell(db, currentBuyerUid, 'notifBellMount');
             }
@@ -212,7 +214,7 @@
         };
 
         async function setupUpiPayment() {
-            const cart = JSON.parse(localStorage.getItem('cart')) || [];
+            const cart = getCart();
             const noteEl = document.getElementById('upiPayNote');
             const btn = document.getElementById('upiPayBtn');
 
@@ -285,7 +287,7 @@
         };
 
         function renderSummary() {
-            const cart = JSON.parse(localStorage.getItem('cart')) || [];
+            const cart = getCart();
             const listEl = document.getElementById('orderItemsList');
             let total = 0;
             listEl.innerHTML = '';
@@ -323,7 +325,7 @@
         }
 
         window.placeOrder = async function() {
-            const cart = JSON.parse(localStorage.getItem('cart')) || [];
+            const cart = getCart();
             if (cart.length === 0) {
                 showToast('Your cart is empty!');
                 window.location.href = 'index.html';
@@ -358,67 +360,93 @@
             }
 
             try {
-                // Reserve stock first — if any item is out of stock or short, this
-                // throws and we stop before creating any orders (no half-placed orders).
-                await decrementStockForCart(db, cart);
+                // Reserve stock first — this also hands back the LIVE product
+                // facts (price, sellerUid, shopName, returnWindowDays) read
+                // inside the same transaction, so the order is built from
+                // real Firestore data, never from a cart that could have a
+                // stale or tampered price sitting in localStorage. If any
+                // item is out of stock or short, this throws and we stop
+                // before creating any orders (no half-placed orders).
+                const verifiedItems = await decrementStockForCart(db, cart);
+                let couponWasUsed = false;
 
                 const eligibleSubtotal = appliedCoupon
-                    ? cart.filter(item => item.sellerUid === appliedCoupon.sellerUid)
-                          .reduce((sum, item) => sum + (parseInt(item.qty) || 1) * (parseFloat(item.price) || 0), 0)
+                    ? cart.reduce((sum, item, idx) => {
+                          const liveSellerUid = verifiedItems[idx]?.sellerUid ?? item.sellerUid;
+                          if (liveSellerUid !== appliedCoupon.sellerUid) return sum;
+                          const livePrice = verifiedItems[idx]?.price ?? (parseFloat(item.price) || 0);
+                          return sum + (parseInt(item.qty) || 1) * livePrice;
+                      }, 0)
                     : 0;
-                const totalDiscount = appliedCoupon ? computeDiscount(cart, 0) : 0;
 
                 // Each cart item becomes its own order, carrying its own sellerUid,
                 // so it reaches the correct seller's dashboard.
-                for (let item of cart) {
+                for (let idx = 0; idx < cart.length; idx++) {
+                    const item = cart[idx];
+                    const verified = verifiedItems[idx]; // live data read from Firestore during stock reservation
                     const qty = parseInt(item.qty) || 1;
-                    const price = parseFloat(item.price) || 0;
+                    const price = verified ? verified.price : (parseFloat(item.price) || 0);
+                    const sellerUid = verified ? verified.sellerUid : (item.sellerUid || null);
+                    const shopName = verified ? (verified.shopName || 'Local Shop') : (item.shopName || 'Local Shop');
+                    const returnWindowDays = verified && verified.returnWindowDays !== undefined ? verified.returnWindowDays : (item.returnWindowDays !== undefined ? item.returnWindowDays : 7);
+                    const productName = verified ? (verified.name || item.name) : item.name;
                     let lineTotal = price * qty;
 
                     // If this item belongs to the coupon's seller, apply its share of the discount
-                    if (appliedCoupon && item.sellerUid === appliedCoupon.sellerUid && eligibleSubtotal > 0) {
+                    const totalDiscount = appliedCoupon ? Math.min(
+                        appliedCoupon.discountType === 'percent' ? eligibleSubtotal * (appliedCoupon.value / 100) : appliedCoupon.value,
+                        eligibleSubtotal
+                    ) : 0;
+                    if (appliedCoupon && sellerUid === appliedCoupon.sellerUid && eligibleSubtotal > 0) {
                         const shareOfDiscount = (lineTotal / eligibleSubtotal) * totalDiscount;
                         lineTotal = Math.max(0, lineTotal - shareOfDiscount);
                     }
 
                     await addDoc(collection(db, "orders"), {
                         productId: item.id || null,
-                        productName: item.name,
+                        productName: productName,
                         selectedSize: item.selectedSize || null,
                         selectedColor: item.selectedColor || null,
                         price: lineTotal,
                         quantity: qty,
-                        shopName: item.shopName || 'Local Shop',
-                        sellerUid: item.sellerUid || null,
-                        returnWindowDays: item.returnWindowDays !== undefined ? item.returnWindowDays : 7,
+                        shopName: shopName,
+                        sellerUid: sellerUid,
+                        returnWindowDays: returnWindowDays,
                         buyerUid: currentBuyerUid,
                         buyerName: name,
                         buyerPhone: phone,
                         buyerAddress: fullAddress,
                         paymentMethod: selectedPayment,
-                        couponCode: (appliedCoupon && item.sellerUid === appliedCoupon.sellerUid) ? appliedCoupon.code : null,
+                        couponCode: (appliedCoupon && sellerUid === appliedCoupon.sellerUid) ? appliedCoupon.code : null,
                         status: 'Pending',
                         createdAt: new Date()
                     });
 
-                    if (item.sellerUid) {
-                        sendNotification(db, item.sellerUid, {
-                            title: `New order: ${item.name || 'Item'} (Qty ${qty})`,
+                    if (appliedCoupon && sellerUid === appliedCoupon.sellerUid) {
+                        couponWasUsed = true;
+                    }
+
+                    if (sellerUid) {
+                        sendNotification(db, sellerUid, {
+                            title: `New order: ${productName || 'Item'} (Qty ${qty})`,
                             body: `From ${name} — ₹${lineTotal.toFixed(0)}`,
                             type: 'new_order',
                             link: 'seller-dashboard.html'
                         });
                     }
 
-                    // Reduce stock for the purchased quantity so it stays accurate live
-                    if (item.id) {
-                        try {
-                            await updateDoc(doc(db, "vendors", item.id), { stock: increment(-qty) });
-                        } catch (stockErr) {
-                            console.error('Stock update failed for', item.id, stockErr);
-                        }
-                    }
+                    // NOTE: stock was already decremented above by
+                    // decrementStockForCart() — do NOT decrement it again
+                    // here (that was a real bug: stock used to be reduced
+                    // twice per order).
                 }
+
+                // Coupon usage is recorded ONCE per checkout (not per line
+                // item) so the usage-limit count reflects actual orders placed.
+                if (couponWasUsed) {
+                    await recordCouponUsage(db, appliedCoupon.id);
+                }
+
 
                 // Keep a local copy for the buyer's "My Orders" quick view
                 let myOrders = JSON.parse(localStorage.getItem('myOrders')) || [];
@@ -434,7 +462,7 @@
                     });
                 });
                 localStorage.setItem('myOrders', JSON.stringify(myOrders));
-                localStorage.removeItem('cart');
+                clearCart();
 
                 showToast('Order placed successfully! The seller has been notified. 🎉');
                 window.location.href = 'orders.html';
@@ -457,35 +485,29 @@
 
         async function placeOrderViaRazorpay({ name, phone, address, btn }) {
             try {
-                await decrementStockForCart(db, cart);
+                // IMPORTANT: stock is deliberately NOT touched here. It used
+                // to be decremented before the payment popup even opened,
+                // which meant stock was lost forever any time a buyer
+                // cancelled or the payment failed. Stock is now reserved
+                // by the backend, atomically, only after payment is
+                // confirmed captured — see verify-and-place-order.
+                //
+                // Similarly, price/sellerUid/productName are NOT sent as
+                // trusted values — the backend re-reads them from Firestore
+                // itself. We still send our own computed grandTotal so
+                // Razorpay Checkout can show a widget with the right
+                // amount, but the backend independently verifies that
+                // amount against real product prices before creating
+                // any order, and refunds automatically if they don't match.
+                const items = cart.map(item => ({
+                    productId: item.id || null,
+                    selectedSize: item.selectedSize || null,
+                    selectedColor: item.selectedColor || null,
+                    quantity: parseInt(item.qty) || 1
+                }));
 
-                const eligibleSubtotal = appliedCoupon
-                    ? cart.filter(item => item.sellerUid === appliedCoupon.sellerUid)
-                          .reduce((sum, item) => sum + (parseInt(item.qty) || 1) * (parseFloat(item.price) || 0), 0)
-                    : 0;
-                const totalDiscount = appliedCoupon ? computeDiscount(cart, 0) : 0;
-
-                const items = cart.map(item => {
-                    const qty = parseInt(item.qty) || 1;
-                    const price = parseFloat(item.price) || 0;
-                    let lineTotal = price * qty;
-                    if (appliedCoupon && item.sellerUid === appliedCoupon.sellerUid && eligibleSubtotal > 0) {
-                        const shareOfDiscount = (lineTotal / eligibleSubtotal) * totalDiscount;
-                        lineTotal = Math.max(0, lineTotal - shareOfDiscount);
-                    }
-                    return {
-                        productId: item.id || null,
-                        productName: item.name,
-                        shopName: item.shopName || 'Local Shop',
-                        sellerUid: item.sellerUid || null,
-                        returnWindowDays: item.returnWindowDays !== undefined ? item.returnWindowDays : 7,
-                        selectedSize: item.selectedSize || null,
-                        selectedColor: item.selectedColor || null,
-                        price: lineTotal,
-                        quantity: qty
-                    };
-                });
-                const grandTotal = items.reduce((sum, i) => sum + i.price, 0);
+                const { total, discount, finalTotal } = renderSummary();
+                const grandTotal = finalTotal;
 
                 const idToken = await currentBuyerUser.getIdToken();
 
@@ -515,12 +537,13 @@
                                     razorpay_payment_id: response.razorpay_payment_id,
                                     razorpay_signature: response.razorpay_signature,
                                     items,
-                                    delivery: { name, phone, address }
+                                    delivery: { name, phone, address },
+                                    couponCode: appliedCoupon ? appliedCoupon.code : null
                                 })
                             });
                             if (!verifyRes.ok) throw new Error((await verifyRes.json()).error || 'Payment verification failed.');
 
-                            localStorage.removeItem('cart');
+                            clearCart();
                             showToast('Payment successful! Order placed. 🎉');
                             window.location.href = 'orders.html';
                         } catch (verifyErr) {
