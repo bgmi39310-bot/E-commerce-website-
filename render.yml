@@ -21,7 +21,7 @@ services:
         value: "geolocation=(), microphone=(), camera=(), usb=(), interest-cohort=()"
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.googletagmanager.com https://checkout.razorpay.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://vande-market-api.onrender.com https://api.razorpay.com https://lumberjack.razorpay.com https://images.weserv.nl https://www.google-analytics.com https://www.googletagmanager.com; frame-src https://checkout.razorpay.com https://api.razorpay.com; object-src 'none'; base-uri 'self'; form-action 'self'"
+        value: "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.googletagmanager.com https://checkout.razorpay.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' https: data:; font-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://vande-market-api.onrender.com https://api.razorpay.com https://lumberjack.razorpay.com https://images.weserv.nl https://www.google-analytics.com https://www.googletagmanager.com https://nominatim.openstreetmap.org https://*.tile.openstreetmap.org; frame-src https://checkout.razorpay.com https://api.razorpay.com; object-src 'none'; base-uri 'self'; form-action 'self'"
       - path: /*.png
         name: Cache-Control
         value: public, max-age=604800, immutable
