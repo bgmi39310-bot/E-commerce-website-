@@ -241,6 +241,12 @@
                     <span class="upload-status" id="shopLogoStatus"></span>
                 </div>
                 <textarea id="shopAddress" placeholder="Complete Shop Address" class="full-width" rows="2"></textarea>
+                <div class="full-width">
+                    <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">📍 Shop Location (optional — helps buyers find you on the map)</label>
+                    <button type="button" onclick="window.useMyLocationForShop()" class="action-btn" style="margin-bottom:8px;">📍 Use My Current Location</button>
+                    <div id="shopLocationMap" style="height:220px; border-radius:8px; overflow:hidden; margin-bottom:8px;"></div>
+                    <p id="shopLocationStatus" style="font-size:12px; color:#666; margin:0 0 8px;">Tap on the map, or drag the pin, to set your shop's exact location.</p>
+                </div>
                 <button onclick="saveSellerProfileMain()" class="action-btn full-width">Save Shop Profile</button>
             </div>
         </div>
@@ -474,7 +480,7 @@
     <script type="module">
         import { auth, db } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { loadSellerProfileFromFirestore, saveSellerProfile } from './profile-logic.js';
+        import { loadSellerProfileFromFirestore, saveSellerProfile, useMyLocationForShop, refreshShopLocationMap } from './profile-logic.js';
         import { addProductToFirebase, fetchMyListedProducts, saveProductEdits, closeEditProductModal, deleteProduct, stopListeningToMyProducts, generateVariantStockGrid } from './product-logic.js';
         import { fetchDashboardOrders, filterOrders, updateOrderStatus, markAsShipped, confirmDelivery, stopListeningToOrders } from './order-logic.js';
         import { renderAnalyticsFromOrders, downloadSalesReport } from './analytics-logic.js';
@@ -684,7 +690,10 @@
         window.enableEditMode = function() {
             document.getElementById('profileDisplay').style.display = 'none';
             document.getElementById('profileForm').style.display = 'grid';
+            refreshShopLocationMap();
         }
+
+        window.useMyLocationForShop = useMyLocationForShop;
 
         window.copySellerId = function() {
             if (!currentLoggedInUser) return;
