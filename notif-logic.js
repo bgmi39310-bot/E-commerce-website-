@@ -155,7 +155,8 @@ export function mountNotificationBell(db, uid, containerId) {
             const color = TYPE_COLOR[n.type] || TYPE_COLOR.default;
             const when = n.createdAt && n.createdAt.toDate ? timeAgo(n.createdAt.toDate()) : '';
             return `
-                <div onclick="window.__dmNotifClick_${containerId}('${n.id}', '${(n.link || '').replace(/'/g, "\\'")}')"
+                <div data-notif-id="${escapeHtml(n.id)}" data-notif-link="${escapeHtml(n.link || '')}"
+                     onclick="window.__dmNotifClick_${containerId}(this.dataset.notifId, this.dataset.notifLink)"
                      style="display:flex; gap:10px; padding:10px 10px; border-radius:8px; cursor:pointer; margin-bottom:2px; background:${n.read ? 'transparent' : '#f5faff'};">
                     <div style="flex-shrink:0; width:34px; height:34px; border-radius:50%; background:${color}1a; display:flex; align-items:center; justify-content:center; font-size:16px;">${icon}</div>
                     <div style="flex:1; min-width:0;">
