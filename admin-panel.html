@@ -369,13 +369,21 @@
             `;
 
             // If any section failed to load (e.g. a Firestore index that
-            // hasn't been created yet for one of these queries), show a
-            // clear, visible note instead of leaving that section stuck on
-            // "Loading..." with no explanation.
+            // hasn't been created yet for one of these queries), show the
+            // REAL error message right on the page — not just a category
+            // name — since checking the browser console isn't realistic on
+            // a phone. If Firestore's error includes a "create this index"
+            // link, it's turned into a tappable link right here.
             const errorBanner = document.getElementById('dashboardErrorBanner');
             if (data.errors && data.errors.length > 0) {
                 errorBanner.style.display = 'block';
-                errorBanner.innerHTML = `⚠️ Some dashboard data (${data.errors.join(', ')}) couldn't load. This is usually a one-time Firestore index that needs creating — open the browser console (F12) for a direct link to create it.`;
+                errorBanner.innerHTML = data.errors.map(e => {
+                    const linkified = escapeHtml(e.message).replace(
+                        /(https?:\/\/[^\s]+)/g,
+                        '<a href="$1" target="_blank" rel="noopener" style="color:#4da6ff; word-break:break-all;">$1</a>'
+                    );
+                    return `<div style="margin-bottom:6px;">⚠️ <strong>${escapeHtml(e.section)}</strong> failed to load: ${linkified}</div>`;
+                }).join('');
             } else {
                 errorBanner.style.display = 'none';
             }
