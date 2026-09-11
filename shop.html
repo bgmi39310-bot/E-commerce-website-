@@ -150,7 +150,7 @@
             const followerCount = Math.max(0, sellerData.followerCount || 0);
 
             banner.innerHTML = `
-                <img class="shop-logo" src="${sellerData.logo || 'https://via.placeholder.com/76'}" alt="${shopNameSafe}" onerror="this.src='https://via.placeholder.com/76'">
+                <img class="shop-logo" src="${escapeHtml(sellerData.logo || 'https://via.placeholder.com/76')}" alt="${shopNameSafe}" onerror="this.src='https://via.placeholder.com/76'">
                 <div class="shop-info">
                     <h2 class="shop-name">${shopNameSafe} ${sellerData.kycStatus === 'Verified' ? '<span class="verified-tick">✔️ Verified</span>' : ''} ${sellerData.isPremium ? '<span class="premium-tag">🌟 PREMIUM</span>' : ''}</h2>
                     <div class="shop-meta">📍 ${citySafe ? citySafe + ' — ' : ''}${addressSafe}</div>
@@ -207,7 +207,7 @@
             grid.innerHTML = products.map(p => `
                 <div class="product-card" onclick="window.location.href='product.html?id=${p.id}'">
                     <div class="product-img-wrap">
-                        <img src="${p.image || 'https://via.placeholder.com/300'}" alt="${escapeHtml(p.name || 'Product')}" loading="lazy" onerror="this.src='https://via.placeholder.com/300?text=No+Image'">
+                        <img src="${escapeHtml(p.image || 'https://via.placeholder.com/300')}" alt="${escapeHtml(p.name || 'Product')}" loading="lazy" onerror="this.src='https://via.placeholder.com/300?text=No+Image'">
                     </div>
                     <div class="product-body">
                         <div class="product-title">${escapeHtml(p.name || 'Product')}</div>
