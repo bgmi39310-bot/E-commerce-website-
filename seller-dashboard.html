@@ -280,6 +280,8 @@
                 <input type="number" id="pStock" placeholder="Stock Quantity (e.g. 50)" min="0">
                 <input type="text" id="pSizes" placeholder="Sizes (optional, comma-separated: S,M,L,XL)">
                 <input type="text" id="pColors" placeholder="Colors (optional, comma-separated: Red,Blue,Green)">
+                <button type="button" onclick="window.generateVariantStockGrid('p')" class="action-btn" style="grid-column: 1 / -1;">⚙️ Set stock per size/color (optional)</button>
+                <div id="pVariantStockContainer" style="grid-column: 1 / -1;"></div>
                 <div class="file-upload-box full-width">
                     <label>Product Photos (up to 4):</label>
                     <div class="img-upload-row">
@@ -362,6 +364,8 @@
                     <option value="flat">Flat Amount Off (₹)</option>
                 </select>
                 <input type="number" id="couponValue" placeholder="Discount value" min="1">
+                <input type="date" id="couponExpiry" title="Expiry date (optional — leave blank for no expiry)">
+                <input type="number" id="couponUsageLimit" placeholder="Usage limit (blank = unlimited)" min="1">
                 <button onclick="addCouponMain()" class="action-btn">➕ Create Coupon</button>
             </div>
             <div id="couponsContainer"><p>Loading coupons...</p></div>
@@ -436,6 +440,8 @@
                 <input type="number" id="epStock" placeholder="Stock Quantity" min="0">
                 <input type="text" id="epSizes" placeholder="Sizes (comma-separated: S,M,L,XL)">
                 <input type="text" id="epColors" placeholder="Colors (comma-separated: Red,Blue,Green)">
+                <button type="button" onclick="window.generateVariantStockGrid('ep')" class="action-btn" style="grid-column: 1 / -1;">⚙️ Set stock per size/color (optional)</button>
+                <div id="epVariantStockContainer" style="grid-column: 1 / -1;"></div>
                 <div class="file-upload-box full-width">
                     <label>Product Photos (up to 4):</label>
                     <div class="img-upload-row">
@@ -469,7 +475,7 @@
         import { auth, db } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { loadSellerProfileFromFirestore, saveSellerProfile } from './profile-logic.js';
-        import { addProductToFirebase, fetchMyListedProducts, saveProductEdits, closeEditProductModal, deleteProduct, stopListeningToMyProducts } from './product-logic.js';
+        import { addProductToFirebase, fetchMyListedProducts, saveProductEdits, closeEditProductModal, deleteProduct, stopListeningToMyProducts, generateVariantStockGrid } from './product-logic.js';
         import { fetchDashboardOrders, filterOrders, updateOrderStatus, markAsShipped, confirmDelivery, stopListeningToOrders } from './order-logic.js';
         import { renderAnalyticsFromOrders, downloadSalesReport } from './analytics-logic.js';
         import { bulkUploadProducts } from './bulk-upload-logic.js';
@@ -752,14 +758,20 @@
             }
         }
 
+        window.generateVariantStockGrid = generateVariantStockGrid;
+
         window.addCouponMain = function() {
             if (!currentLoggedInUser) return;
             const code = document.getElementById('couponCode').value;
             const type = document.getElementById('couponType').value;
             const value = document.getElementById('couponValue').value;
-            addCoupon(db, currentLoggedInUser.uid, code, type, value).then(() => {
+            const expiry = document.getElementById('couponExpiry').value; // '' if left blank
+            const usageLimit = document.getElementById('couponUsageLimit').value;
+            addCoupon(db, currentLoggedInUser.uid, code, type, value, expiry, usageLimit).then(() => {
                 document.getElementById('couponCode').value = '';
                 document.getElementById('couponValue').value = '';
+                document.getElementById('couponExpiry').value = '';
+                document.getElementById('couponUsageLimit').value = '';
             });
         }
 
