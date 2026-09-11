@@ -213,6 +213,7 @@
 
             <!-- DASHBOARD -->
             <div class="admin-section active" id="section-dashboard">
+                <div id="dashboardErrorBanner" style="display:none; background:#3a2a1a; color:#ffb84d; border:1px solid #5a3d1a; border-radius:8px; padding:10px 14px; font-size:13px; margin-bottom:12px;"></div>
                 <div class="stats-row" id="statsRow">
                     <div class="admin-no-data">Loading stats...</div>
                 </div>
@@ -366,6 +367,18 @@
                 <div class="stat-card"><div class="stat-icon revenue">₹</div><div class="stat-text"><div class="stat-num">₹${data.totalRevenue.toFixed(0)}</div><div class="stat-lbl">Platform Revenue</div></div></div>
                 <div class="stat-card"><div class="stat-icon active">⏳</div><div class="stat-text"><div class="stat-num">${(data.statusCounts.Pending || 0) + (data.statusCounts.Accepted || 0)}</div><div class="stat-lbl">Active Orders</div></div></div>
             `;
+
+            // If any section failed to load (e.g. a Firestore index that
+            // hasn't been created yet for one of these queries), show a
+            // clear, visible note instead of leaving that section stuck on
+            // "Loading..." with no explanation.
+            const errorBanner = document.getElementById('dashboardErrorBanner');
+            if (data.errors && data.errors.length > 0) {
+                errorBanner.style.display = 'block';
+                errorBanner.innerHTML = `⚠️ Some dashboard data (${data.errors.join(', ')}) couldn't load. This is usually a one-time Firestore index that needs creating — open the browser console (F12) for a direct link to create it.`;
+            } else {
+                errorBanner.style.display = 'none';
+            }
 
             // Revenue line chart
             const revCtx = document.getElementById('revenueChart').getContext('2d');
