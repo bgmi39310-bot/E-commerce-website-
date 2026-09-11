@@ -2,6 +2,7 @@ import { collection, onSnapshot, doc, updateDoc, query, where } from "https://ww
 import { sendNotification } from './notif-logic.js';
 import { showToast } from './toast.js';
 import { escapeHtml } from './sanitize.js';
+import { restoreStock, buildVariantKey } from './stock-logic.js';
 
 let allOrders = [];
 let currentStatusFilter = 'Pending';
@@ -107,13 +108,45 @@ const STATUS_MESSAGES = {
     Cancelled: 'Your order was cancelled by the seller.'
 };
 
+// Which status a seller-initiated action is allowed to move an order FROM,
+// keyed by the new status. Anything not listed here (e.g. trying to mark an
+// already-Delivered or already-Cancelled order as something else) is
+// rejected — an order's lifecycle only ever moves forward, never sideways
+// or backward, and never after it's already in a final state.
+const SELLER_ALLOWED_FROM = {
+    Accepted: ['Pending'],
+    Shipped: ['Accepted'],
+    Delivered: ['Shipped'],
+    Cancelled: ['Pending', 'Accepted']
+};
+
+function isValidSellerTransition(currentStatus, newStatus) {
+    const from = currentStatus || 'Pending';
+    const allowedFrom = SELLER_ALLOWED_FROM[newStatus];
+    return Array.isArray(allowedFrom) && allowedFrom.includes(from);
+}
+
 // NOTE: these action functions no longer take/call a "refetch" callback.
 // The onSnapshot listener above already picks up the change automatically.
 export async function updateOrderStatus(db, orderId, newStatus) {
     try {
         const order = findOrderById(orderId);
+
+        // Guard against stale UI state (e.g. two tabs open, or the order was
+        // already updated a moment ago) letting an invalid jump through —
+        // "Delivered" straight to "Pending", or actioning an order twice.
+        if (order && !isValidSellerTransition(order.status, newStatus)) {
+            showToast(`Can't change status from "${order.status || 'Pending'}" to "${newStatus}". The order list will refresh.`, 'error');
+            return;
+        }
+
         const orderRef = doc(db, "orders", orderId);
         await updateDoc(orderRef, { status: newStatus, [newStatus.toLowerCase() + 'At']: new Date() });
+
+        // A cancelled order shouldn't keep its stock reserved forever.
+        if (newStatus === 'Cancelled' && order) {
+            await restoreStock(db, order.productId, order.quantity || 1, buildVariantKey(order.selectedSize, order.selectedColor));
+        }
 
         if (order && order.buyerUid) {
             sendNotification(db, order.buyerUid, {
@@ -132,6 +165,12 @@ export async function updateOrderStatus(db, orderId, newStatus) {
 export async function markAsShipped(db, orderId) {
     try {
         const order = findOrderById(orderId);
+
+        if (order && !isValidSellerTransition(order.status, 'Shipped')) {
+            showToast(`Can't mark as Shipped from "${order.status || 'Pending'}". The order list will refresh.`, 'error');
+            return;
+        }
+
         const otp = Math.floor(1000 + Math.random() * 9000).toString();
         const orderRef = doc(db, "orders", orderId);
         await updateDoc(orderRef, { status: 'Shipped', shippedAt: new Date(), deliveryOTP: otp });
@@ -155,6 +194,11 @@ export async function confirmDelivery(db, orderId) {
     const order = allOrders.find(o => o.id === orderId);
     if (!order) {
         showToast("Order not found. Please try again.", 'error');
+        return;
+    }
+
+    if (!isValidSellerTransition(order.status, 'Delivered')) {
+        showToast(`Can't confirm delivery from "${order.status || 'Pending'}". The order list will refresh.`, 'error');
         return;
     }
 
