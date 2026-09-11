@@ -25,20 +25,25 @@ let cachedReviews = [];
 
 // ---------- DASHBOARD CHARTS DATA ----------
 export async function loadDashboardCharts(db, renderCallback) {
-    try {
-        const now = new Date();
-        const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(now.getDate() - 29); thirtyDaysAgo.setHours(0, 0, 0, 0);
+    const errors = [];
+    const now = new Date();
+    const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(now.getDate() - 29); thirtyDaysAgo.setHours(0, 0, 0, 0);
 
-        // Exact platform-wide counts via Firestore's count() aggregation —
-        // these read ONLY a count, never the underlying documents, so they
-        // stay fast and cheap no matter how large these collections grow.
-        // (This function used to download every single user/product/order
-        // document just to count and sum them — that's the actual "admin
-        // dashboard reads everything" problem being fixed here.)
+    // Each section below is isolated in its OWN try/catch. Previously one
+    // failing query (e.g. a Firestore composite index that hasn't been
+    // created yet for a new query shape) would throw out of a single big
+    // Promise.all and silently abort the ENTIRE dashboard render — every
+    // panel stuck on "Loading..." forever with no visible error. Now a
+    // failure in one section just leaves THAT section showing a clear
+    // error, while everything else that succeeded still renders.
+
+    // ---- Exact platform-wide counts via Firestore's count() aggregation.
+    let totalSellers = 0, totalBuyers = 0, totalProducts = 0, totalOrders = 0;
+    let statusCounts = { Pending: 0, Accepted: 0, Shipped: 0, Delivered: 0, Cancelled: 0 };
+    try {
         const [
             sellersCountSnap, buyersCountSnap, productsCountSnap, ordersCountSnap,
             pendingCountSnap, acceptedCountSnap, shippedCountSnap, deliveredCountSnap, cancelledCountSnap,
-            revenueSnap
         ] = await Promise.all([
             getCountFromServer(query(collection(db, "users"), where("role", "==", "seller"))),
             getCountFromServer(query(collection(db, "users"), where("role", "==", "customer"))),
@@ -49,23 +54,50 @@ export async function loadDashboardCharts(db, renderCallback) {
             getCountFromServer(query(collection(db, "orders"), where("status", "==", "Shipped"))),
             getCountFromServer(query(collection(db, "orders"), where("status", "==", "Delivered"))),
             getCountFromServer(query(collection(db, "orders"), where("status", "==", "Cancelled"))),
-            getAggregateFromServer(query(collection(db, "orders"), where("status", "!=", "Cancelled")), { totalRevenue: sum("price") }),
         ]);
-
-        const statusCounts = {
+        totalSellers = sellersCountSnap.data().count;
+        totalBuyers = buyersCountSnap.data().count;
+        totalProducts = productsCountSnap.data().count;
+        totalOrders = ordersCountSnap.data().count;
+        statusCounts = {
             Pending: pendingCountSnap.data().count,
             Accepted: acceptedCountSnap.data().count,
             Shipped: shippedCountSnap.data().count,
             Delivered: deliveredCountSnap.data().count,
             Cancelled: cancelledCountSnap.data().count,
         };
-        const totalRevenue = revenueSnap.data().totalRevenue || 0;
+    } catch (error) {
+        console.error("Dashboard: count queries failed —", error);
+        errors.push('counts');
+    }
 
-        // The 7-day revenue chart and "Top Sellers" panel are inherently
-        // recent-activity views, not full history — one bounded query
-        // (last 30 days, capped at 1000 orders as a hard safety limit)
-        // covers both, instead of ever pulling the platform's ENTIRE order
-        // history into the browser just to compute them.
+    // ---- Lifetime revenue via sum() aggregation. Isolated separately from
+    // the counts above because it's the query most likely to need a
+    // Firestore composite index (an inequality filter + an aggregation
+    // together) — if Firestore hasn't been asked to create that index yet,
+    // this specific query throws an error that INCLUDES A DIRECT LINK to
+    // create it. That link only shows up in the browser console.
+    let totalRevenue = 0;
+    try {
+        const revenueSnap = await getAggregateFromServer(
+            query(collection(db, "orders"), where("status", "!=", "Cancelled")),
+            { totalRevenue: sum("price") }
+        );
+        totalRevenue = revenueSnap.data().totalRevenue || 0;
+    } catch (error) {
+        console.error("Dashboard: revenue sum query failed — if this says 'requires an index', open the link Firestore printed right above this line in the console to create it:", error);
+        errors.push('revenue');
+    }
+
+    // ---- 7-day revenue chart + "Top Sellers" (last 30 days).
+    let dayLabels = [], dayTotals = [], topSellers = [];
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        dayLabels.push(d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }));
+        dayTotals.push(0);
+    }
+    try {
         const recentSnap = await getDocs(query(
             collection(db, "orders"),
             where("createdAt", ">=", thirtyDaysAgo),
@@ -74,14 +106,6 @@ export async function loadDashboardCharts(db, renderCallback) {
         let recentOrdersAll = [];
         recentSnap.forEach(d => recentOrdersAll.push({ id: d.id, ...d.data() }));
 
-        const dayLabels = [];
-        const dayTotals = [];
-        for (let i = 6; i >= 0; i--) {
-            const d = new Date();
-            d.setDate(d.getDate() - i);
-            dayLabels.push(d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }));
-            dayTotals.push(0);
-        }
         recentOrdersAll.forEach(o => {
             if (o.status === 'Cancelled') return;
             const created = o.createdAt && o.createdAt.toDate ? o.createdAt.toDate() : null;
@@ -98,25 +122,27 @@ export async function loadDashboardCharts(db, renderCallback) {
             const shop = o.shopName || 'Unknown Shop';
             sellerRevenue[shop] = (sellerRevenue[shop] || 0) + (Number(o.price) || 0);
         });
-        const topSellers = Object.entries(sellerRevenue).sort((a, b) => b[1] - a[1]).slice(0, 5); // last 30 days
-
-        // Its own small, precise query — rather than being sliced out of the
-        // 30-day batch above — so "Recent Orders" is always genuinely the
-        // most recent orders, even on a day with zero orders in the last 30.
-        const latestSnap = await getDocs(query(collection(db, "orders"), orderBy("createdAt", "desc"), limit(6)));
-        const recentOrders = [];
-        latestSnap.forEach(d => recentOrders.push({ id: d.id, ...d.data() }));
-
-        renderCallback({
-            totalSellers: sellersCountSnap.data().count,
-            totalBuyers: buyersCountSnap.data().count,
-            totalProducts: productsCountSnap.data().count,
-            totalOrders: ordersCountSnap.data().count,
-            totalRevenue, dayLabels, dayTotals, statusCounts, topSellers, recentOrders
-        });
+        topSellers = Object.entries(sellerRevenue).sort((a, b) => b[1] - a[1]).slice(0, 5);
     } catch (error) {
-        console.error("Error loading dashboard charts:", error);
+        console.error("Dashboard: 30-day orders query failed —", error);
+        errors.push('recentActivity');
     }
+
+    // ---- "Recent Orders" — its own small, precise query.
+    let recentOrders = [];
+    try {
+        const latestSnap = await getDocs(query(collection(db, "orders"), orderBy("createdAt", "desc"), limit(6)));
+        latestSnap.forEach(d => recentOrders.push({ id: d.id, ...d.data() }));
+    } catch (error) {
+        console.error("Dashboard: recent orders query failed —", error);
+        errors.push('recentOrders');
+    }
+
+    renderCallback({
+        totalSellers, totalBuyers, totalProducts, totalOrders,
+        totalRevenue, dayLabels, dayTotals, statusCounts, topSellers, recentOrders,
+        errors // non-empty = some section(s) failed; check the console for details/index links
+    });
 }
 
 // ---------- REVIEW MODERATION ----------
