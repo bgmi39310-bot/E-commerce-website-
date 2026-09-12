@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Google Analytics (GA4) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-SKX86X8V6K"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-SKX86X8V6K');
+    </script>
+    <title>Delivery Partner Hub - DesiMarket</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#232f3e">
+    <link rel="icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="stylesheet" href="shared-ui.css">
+    <script src="pwa-init.js" defer></script>
+    <script src="click-guard.js" defer></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
+        header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 998; }
+        .header-title { font-size: 18px; font-weight: bold; }
+        .header-actions { display: flex; align-items: center; gap: 12px; }
+        .header-actions a, .header-actions button { color: white; text-decoration: none; font-size: 13px; background: none; border: 1px solid rgba(255,255,255,.4); padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+        .container { max-width: 700px; margin: 0 auto; padding: 16px; }
+        .card { background: white; border-radius: 10px; padding: 18px; margin-bottom: 16px; }
+        .card h2 { font-size: 16px; margin: 0 0 14px; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .form-grid input, .form-grid select { padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+        .full-width { grid-column: 1 / -1; }
+        .action-btn { background: #232f3e; color: white; border: none; padding: 11px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 14px; min-height: 42px; }
+        .action-btn.secondary { background: #f0f2f2; color: #111; border: 1px solid #ccc; }
+        .availability-banner { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-radius: 10px; margin-bottom: 16px; font-weight: 600; }
+        .availability-banner.available { background: #eafaf1; color: #1a7f4b; }
+        .availability-banner.busy { background: #fdecea; color: #c0392b; }
+        .availability-banner button { border: none; padding: 8px 14px; border-radius: 6px; font-weight: 700; cursor: pointer; }
+        .job-card, .delivery-card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+        .job-card h4, .delivery-card h4 { margin: 0 0 4px; font-size: 14.5px; }
+        .job-card p, .delivery-card p { margin: 2px 0; font-size: 13px; color: #555; }
+        .job-card .btn-row, .delivery-card .btn-row { display: flex; gap: 8px; margin-top: 10px; }
+        .btn-claim { background: #ff9900; color: #111; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 13px; }
+        .btn-decline { background: #fdecea; color: #c0392b; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 13px; }
+        .btn-pickup { background: #007185; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 13px; }
+        .btn-deliver { background: #1a7f4b; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 13px; }
+        .status-tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: #eee; color: #555; }
+        .no-data { text-align: center; color: #888; padding: 20px; font-size: 14px; }
+        .error-box { background: #fdecea; color: #c0392b; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; word-break: break-word; }
+        .error-box a { color: #a02;}
+        .login-prompt { text-align: center; padding: 50px 20px; background: white; border-radius: 8px; }
+        .login-prompt a { display: inline-block; margin-top: 12px; background: #ffd814; padding: 10px 22px; border-radius: 5px; text-decoration: none; color: #111; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <span class="header-title">🚚 Delivery Partner Hub</span>
+        <div class="header-actions">
+            <div id="notifBellMount"></div>
+            <button onclick="handleLogout()">Logout</button>
+        </div>
+    </header>
+
+    <div class="container" id="pageContent">
+        <div class="no-data">Loading...</div>
+    </div>
+
+<script type="module">
+    import { auth, db } from './firebase-config.js';
+    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { showToast } from './toast.js';
+    import { escapeHtml } from './sanitize.js';
+    import { mountNotificationBell } from './notif-logic.js';
+    import { markAsShipped, confirmDelivery } from './order-logic.js';
+    import {
+        loadDeliveryProfile, saveDeliveryProfile, setDeliveryAvailability,
+        loadJobBoard, claimDeliveryJob, loadMyDeliveries, declineDeliveryAssignment,
+        useMyLocationForDelivery, refreshDeliveryLocationMap
+    } from './delivery-logic.js';
+
+    let currentUser = null;
+    let myProfile = null;
+
+    window.handleLogout = () => signOut(auth).then(() => window.location.href = 'login.html');
+    window.useMyLocationForDelivery = useMyLocationForDelivery;
+
+    onAuthStateChanged(auth, async (user) => {
+        const content = document.getElementById('pageContent');
+        if (!user) {
+            content.innerHTML = `<div class="login-prompt"><p>Please login as a Delivery Partner to view this page.</p><a href="login.html">Login</a></div>`;
+            return;
+        }
+
+        // Anyone with an account can technically open this URL — but only
+        // someone who signed up (or was switched) to the "delivery" role
+        // should be able to use it. Firestore rules enforce the real data
+        // access; this is just the friendly on-page message.
+        const userSnap = await getDoc(doc(db, "users", user.uid));
+        const role = userSnap.exists() ? userSnap.data().role : null;
+        if (role !== 'delivery') {
+            content.innerHTML = `<div class="login-prompt"><p>This page is for Delivery Partner accounts only.</p><a href="signup.html?role=delivery">Register as a Delivery Partner</a></div>`;
+            return;
+        }
+
+        currentUser = user;
+        mountNotificationBell(db, user.uid, 'notifBellMount');
+        await loadAndRenderProfile();
+    });
+
+    async function loadAndRenderProfile() {
+        try {
+            myProfile = await loadDeliveryProfile(db, currentUser.uid);
+        } catch (error) {
+            console.error(error);
+        }
+
+        if (!myProfile) {
+            renderProfileForm();
+        } else {
+            renderDashboard();
+        }
+    }
+
+    function renderProfileForm() {
+        const content = document.getElementById('pageContent');
+        content.innerHTML = `
+            <div class="card">
+                <h2>🚚 Set up your Delivery Partner profile</h2>
+                <p style="font-size:13px; color:#666; margin-top:-6px;">This is shown to sellers when they look for someone to deliver their orders.</p>
+                <div class="form-grid">
+                    <input type="text" id="dName" placeholder="Your Full Name" value="${escapeHtml((currentUser.displayName) || '')}">
+                    <input type="tel" id="dPhone" placeholder="Phone Number">
+                    <input type="text" id="dVillage" placeholder="Village / Area you serve" class="full-width">
+                    <select id="dVehicle" class="full-width">
+                        <option value="bike">🏍️ Bike</option>
+                        <option value="cycle">🚲 Cycle</option>
+                        <option value="van">🚐 Van / Tempo</option>
+                        <option value="on_foot">🚶 On Foot</option>
+                    </select>
+                    <div class="full-width">
+                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">📍 Base Location (optional — helps sellers see how far you are)</label>
+                        <button type="button" onclick="window.useMyLocationForDelivery()" class="action-btn secondary full-width" style="margin-bottom:8px;">📍 Use My Current Location</button>
+                        <div id="deliveryLocationMap" style="height:200px; border-radius:8px; overflow:hidden; margin-bottom:6px;"></div>
+                        <p id="deliveryLocationStatus" style="font-size:12px; color:#666; margin:0;">Tap the map, or drag the pin, to set it.</p>
+                    </div>
+                    <button class="action-btn full-width" onclick="window.saveProfileMain()">Save Profile & Continue</button>
+                </div>
+            </div>
+        `;
+        refreshDeliveryLocationMap();
+    }
+
+    window.saveProfileMain = async function() {
+        const ok = await saveDeliveryProfile(db, currentUser.uid, {
+            name: document.getElementById('dName').value.trim(),
+            phone: document.getElementById('dPhone').value.trim(),
+            village: document.getElementById('dVillage').value.trim(),
+            vehicleType: document.getElementById('dVehicle').value
+        });
+        if (ok) await loadAndRenderProfile();
+    };
+
+    async function renderDashboard() {
+        const content = document.getElementById('pageContent');
+        content.innerHTML = `
+            <div class="availability-banner ${myProfile.isAvailable ? 'available' : 'busy'}" id="availBanner">
+                <span>${myProfile.isAvailable ? '🟢 You are Available for deliveries' : '🔴 You are marked Busy'}</span>
+                <button onclick="window.toggleAvailMain()">${myProfile.isAvailable ? 'Go Busy' : 'Go Available'}</button>
+            </div>
+
+            <div class="card">
+                <h2>📋 Job Board — open deliveries in <strong>${escapeHtml(myProfile.village)}</strong></h2>
+                <div id="jobBoardContainer"><p>Loading...</p></div>
+            </div>
+
+            <div class="card">
+                <h2>🚚 My Deliveries</h2>
+                <div id="myDeliveriesContainer"><p>Loading...</p></div>
+            </div>
+
+            <div class="card">
+                <h2>⚙️ Profile</h2>
+                <p style="font-size:13px; color:#666;">${escapeHtml(myProfile.name)} · ${escapeHtml(myProfile.phone)} · ${escapeHtml(myProfile.village)}</p>
+                <button class="action-btn secondary" onclick="window.editProfileMain()">✏️ Edit Profile</button>
+            </div>
+        `;
+        loadAndRenderJobBoard();
+        loadAndRenderMyDeliveries();
+    }
+
+    window.toggleAvailMain = async function() {
+        await setDeliveryAvailability(db, currentUser.uid, !myProfile.isAvailable);
+        myProfile.isAvailable = !myProfile.isAvailable;
+        const banner = document.getElementById('availBanner');
+        banner.className = `availability-banner ${myProfile.isAvailable ? 'available' : 'busy'}`;
+        banner.innerHTML = `
+            <span>${myProfile.isAvailable ? '🟢 You are Available for deliveries' : '🔴 You are marked Busy'}</span>
+            <button onclick="window.toggleAvailMain()">${myProfile.isAvailable ? 'Go Busy' : 'Go Available'}</button>
+        `;
+    };
+
+    window.editProfileMain = function() {
+        renderProfileForm();
+        // Pre-fill with existing values
+        document.getElementById('dName').value = myProfile.name || '';
+        document.getElementById('dPhone').value = myProfile.phone || '';
+        document.getElementById('dVillage').value = myProfile.village || '';
+        document.getElementById('dVehicle').value = myProfile.vehicleType || 'bike';
+    };
+
+    async function loadAndRenderJobBoard() {
+        const container = document.getElementById('jobBoardContainer');
+        try {
+            const jobs = await loadJobBoard(db, myProfile.village);
+            if (jobs.length === 0) {
+                container.innerHTML = `<div class="no-data">No open deliveries in your area right now. Check back later!</div>`;
+                return;
+            }
+            container.innerHTML = jobs.map(j => `
+                <div class="job-card">
+                    <h4>📦 ${escapeHtml(j.productName || 'Item')} (Qty ${j.quantity || 1})</h4>
+                    <p>🏪 From: ${escapeHtml(j.shopName || 'N/A')}</p>
+                    <p>📍 To: ${escapeHtml(j.buyerAddress || 'N/A')}</p>
+                    <div class="btn-row">
+                        <button class="btn-claim" onclick="window.claimJobMain('${j.id}')">✅ Claim this delivery</button>
+                    </div>
+                </div>
+            `).join('');
+        } catch (error) {
+            container.innerHTML = `<div class="error-box">⚠️ Unable to load the job board: ${escapeHtml(error.message || String(error))}</div>`;
+        }
+    }
+
+    window.claimJobMain = async function(orderId) {
+        const ok = await claimDeliveryJob(db, orderId, { uid: currentUser.uid, name: myProfile.name, phone: myProfile.phone });
+        if (ok) { loadAndRenderJobBoard(); loadAndRenderMyDeliveries(); }
+    };
+
+    async function loadAndRenderMyDeliveries() {
+        const container = document.getElementById('myDeliveriesContainer');
+        try {
+            const deliveries = await loadMyDeliveries(db, currentUser.uid);
+            if (deliveries.length === 0) {
+                container.innerHTML = `<div class="no-data">No active deliveries assigned to you right now.</div>`;
+                return;
+            }
+            container.innerHTML = deliveries.map(o => {
+                const statusTag = `<span class="status-tag">${escapeHtml(o.status)}</span>`;
+                let actionBtns = '';
+                if (o.status === 'Accepted') {
+                    actionBtns = `
+                        <button class="btn-pickup" onclick="window.pickupMain('${o.id}')">📦 Mark Picked Up</button>
+                        <button class="btn-decline" onclick="window.declineMain('${o.id}')">✖ Decline</button>
+                    `;
+                } else if (o.status === 'Shipped') {
+                    actionBtns = `<button class="btn-deliver" onclick="window.deliverMain('${o.id}')">✅ Confirm Delivery (OTP)</button>`;
+                }
+                return `
+                    <div class="delivery-card">
+                        <h4>📦 ${escapeHtml(o.productName || 'Item')} (Qty ${o.quantity || 1}) ${statusTag}</h4>
+                        <p>🏪 From: ${escapeHtml(o.shopName || 'N/A')}</p>
+                        <p>📍 To: ${escapeHtml(o.buyerAddress || 'N/A')}</p>
+                        <p>📞 Buyer: ${escapeHtml(o.buyerPhone || 'N/A')}</p>
+                        <div class="btn-row">${actionBtns}</div>
+                    </div>
+                `;
+            }).join('');
+        } catch (error) {
+            container.innerHTML = `<div class="error-box">⚠️ Unable to load your deliveries: ${escapeHtml(error.message || String(error))}</div>`;
+        }
+    }
+
+    window.declineMain = async function(orderId) {
+        if (!confirm("Back out of this delivery? It'll go back on the job board for someone else.")) return;
+        await declineDeliveryAssignment(db, orderId);
+        loadAndRenderMyDeliveries();
+        loadAndRenderJobBoard();
+    };
+
+    window.pickupMain = async function(orderId) {
+        await markAsShipped(db, orderId);
+        loadAndRenderMyDeliveries();
+    };
+
+    window.deliverMain = async function(orderId) {
+        await confirmDelivery(db, orderId);
+        loadAndRenderMyDeliveries();
+    };
+</script>
+</body>
+</html>
+
