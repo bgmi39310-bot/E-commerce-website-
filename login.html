@@ -111,6 +111,7 @@
         <button id="guestBtn" style="width:100%; background:none; border:none; color:#007185; font-size:13px; font-weight:600; cursor:pointer; padding:8px; margin-top:2px;">Continue browsing as Guest →</button>
 
         <p class="role-note">Want to sell on DesiMarket? <a href="signup.html?role=seller">Register as a Seller</a></p>
+        <p class="role-note">Want to deliver orders? <a href="signup.html?role=delivery">Register as a Delivery Partner</a></p>
     </div>
 </div>
 
@@ -159,7 +160,9 @@
         try {
             const snap = await getDoc(doc(db, "users", uid));
             const role = snap.exists() ? snap.data().role : 'customer';
-            window.location.href = role === 'seller' ? 'seller-dashboard.html' : 'index.html';
+            if (role === 'seller') { window.location.href = 'seller-dashboard.html'; return; }
+            if (role === 'delivery') { window.location.href = 'delivery-dashboard.html'; return; }
+            window.location.href = 'index.html';
         } catch (e) {
             window.location.href = 'index.html';
         }
