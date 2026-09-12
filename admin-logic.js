@@ -16,6 +16,18 @@ import {
 // every visit — which is what it used to do.
 const LIST_FETCH_LIMIT = 300;
 
+// Sorts newest-first using createdAt when present, WITHOUT excluding
+// documents that don't have it (unlike a Firestore orderBy, which would
+// silently drop them from the results entirely). Docs missing createdAt
+// just sink to the bottom instead of disappearing.
+function sortByCreatedAtDesc(list) {
+    return [...list].sort((a, b) => {
+        const ta = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate().getTime() : 0;
+        const tb = b.createdAt && b.createdAt.toDate ? b.createdAt.toDate().getTime() : 0;
+        return tb - ta;
+    });
+}
+
 let cachedSellers = [];
 let cachedBuyers = [];
 let cachedProducts = [];
@@ -359,7 +371,13 @@ export async function loadSellers(db) {
     const container = document.getElementById('sellersContainer');
     container.innerHTML = "<p>Loading sellers...</p>";
     try {
-        const q = query(collection(db, "users"), where("role", "==", "seller"), orderBy("createdAt", "desc"), limit(LIST_FETCH_LIMIT));
+        // Deliberately NOT using orderBy("createdAt") here: Firestore
+        // silently EXCLUDES any document that doesn't have the sorted
+        // field at all — so older/manually-added user docs without a
+        // createdAt field would just vanish from this list entirely, even
+        // though they still match role == "seller". Sorting after fetching
+        // (with a safe fallback below) shows every matching seller.
+        const q = query(collection(db, "users"), where("role", "==", "seller"), limit(LIST_FETCH_LIMIT));
         const snap = await getDocs(q);
 
         const sellerDocs = snap.docs;
@@ -371,6 +389,7 @@ export async function loadSellers(db) {
             const profile = profileSnaps[i].exists() ? profileSnaps[i].data() : {};
             return { id: d.id, ...d.data(), isPremium: profile.isPremium === true };
         });
+        cachedSellers = sortByCreatedAtDesc(cachedSellers);
 
         renderSellers();
     } catch (error) {
@@ -409,10 +428,12 @@ export async function loadBuyers(db) {
     const container = document.getElementById('buyersContainer');
     container.innerHTML = "<p>Loading buyers...</p>";
     try {
-        const q = query(collection(db, "users"), where("role", "==", "customer"), orderBy("createdAt", "desc"), limit(LIST_FETCH_LIMIT));
+        // Same reasoning as loadSellers() above — no orderBy, sort after fetching.
+        const q = query(collection(db, "users"), where("role", "==", "customer"), limit(LIST_FETCH_LIMIT));
         const snap = await getDocs(q);
         cachedBuyers = [];
         snap.forEach(d => cachedBuyers.push({ id: d.id, ...d.data() }));
+        cachedBuyers = sortByCreatedAtDesc(cachedBuyers);
         renderBuyers();
     } catch (error) {
         console.error(error);
