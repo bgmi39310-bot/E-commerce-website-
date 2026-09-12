@@ -1,4 +1,4 @@
-import { collection, onSnapshot, doc, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, onSnapshot, doc, updateDoc, getDoc, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { sendNotification } from './notif-logic.js';
 import { showToast } from './toast.js';
 import { escapeHtml } from './sanitize.js';
@@ -69,6 +69,17 @@ function displayDashboardOrders() {
         const buyerNameSafe = escapeHtml(order.buyerName || 'Customer');
         const buyerPhoneSafe = escapeHtml(order.buyerPhone || 'N/A');
         const buyerAddressSafe = escapeHtml(order.buyerAddress || 'N/A');
+
+        // Delivery-partner status line — only relevant once the order is
+        // Accepted and the seller has either posted it to the job board or
+        // assigned it directly. Self-delivering sellers never see this.
+        let deliveryLine = '';
+        if (order.deliveryRequestStatus === 'open') {
+            deliveryLine = `<p style="color:#b8860b; font-size:13px;"><strong>📋 On delivery job board</strong> — waiting for a delivery partner to claim it.</p>`;
+        } else if (order.deliveryRequestStatus === 'assigned' && order.deliveryBoyName) {
+            deliveryLine = `<p style="color:#007185; font-size:13px;"><strong>🚚 Assigned to:</strong> ${escapeHtml(order.deliveryBoyName)} (${escapeHtml(order.deliveryBoyPhone || 'N/A')})</p>`;
+        }
+
         html += `
             <div class="order-card">
                 <div class="order-info">
@@ -79,12 +90,15 @@ function displayDashboardOrders() {
                     <p><strong>Address:</strong> ${buyerAddressSafe}</p>
                     <p><strong>Amount:</strong> ₹${order.price || 0}</p>
                     <p><strong>Status:</strong> <span style="font-weight:bold; color:#007600;">${order.status || 'Pending'}</span></p>
-                    ${currentStatusFilter === 'Shipped' ? `<p style="color:#6f42c1; font-size:13px;"><strong>🔐 Ask the buyer for their Delivery OTP to confirm handover.</strong></p>` : ''}
+                    ${deliveryLine}
+                    ${currentStatusFilter === 'Shipped' ? `<p style="color:#6f42c1; font-size:13px;"><strong>🔐 Ask whoever hands it over (you or your delivery partner) to get the buyer's Delivery OTP to confirm handover.</strong></p>` : ''}
 
                     <div class="btn-group">
                         <a href="tel:${encodeURIComponent(order.buyerPhone || '')}" class="call-btn">📞 Call Buyer</a>
                         ${currentStatusFilter === 'Pending' ? `<button class="dash-action-btn btn-accept" onclick="updateOrderStatus('${order.id}', 'Accepted')">Accept</button>` : ''}
-                        ${currentStatusFilter === 'Accepted' ? `<button class="dash-action-btn btn-ship" onclick="markShippedMain('${order.id}')">Mark Shipped</button>` : ''}
+                        ${currentStatusFilter === 'Accepted' && !order.deliveryRequestStatus ? `<button class="dash-action-btn btn-ship" onclick="markShippedMain('${order.id}')">Mark Shipped (Self-Deliver)</button>` : ''}
+                        ${currentStatusFilter === 'Accepted' && !order.deliveryRequestStatus ? `<button class="dash-action-btn" style="background:#007185; color:white;" data-order-id="${order.id}" data-buyer-city="${escapeHtml(order.buyerCity || '')}" onclick="window.openDeliveryOptions(this.dataset.orderId, this.dataset.buyerCity)">🚚 Get Delivery Help</button>` : ''}
+                        ${currentStatusFilter === 'Accepted' && order.deliveryRequestStatus ? `<button class="dash-action-btn btn-cancel" onclick="window.cancelDeliveryMain('${order.id}')">Cancel Delivery Request</button>` : ''}
                         ${currentStatusFilter === 'Shipped' ? `<button class="dash-action-btn btn-delivered" onclick="confirmDeliveryMain('${order.id}')">✅ Confirm Delivery (Enter OTP)</button>` : ''}
                         ${(currentStatusFilter === 'Pending' || currentStatusFilter === 'Accepted') ? `<button class="dash-action-btn btn-cancel" onclick="updateOrderStatus('${order.id}', 'Cancelled')">Cancel</button>` : ''}
                     </div>
@@ -95,10 +109,16 @@ function displayDashboardOrders() {
     container.innerHTML = html;
 }
 
-// Looks up the order from the already-loaded live list so we know who the
-// buyer is and what they ordered, without an extra Firestore read.
-function findOrderById(orderId) {
-    return allOrders.find(o => o.id === orderId) || null;
+// Looks up the order from the already-loaded live list first (no extra
+// Firestore read, for the common seller-dashboard case). Falls back to a
+// direct read for any caller that doesn't have that list populated at all
+// — e.g. delivery-dashboard.html, which manages orders from many different
+// sellers and never builds this particular cache.
+async function findOrderById(db, orderId) {
+    const cached = allOrders.find(o => o.id === orderId);
+    if (cached) return cached;
+    const snap = await getDoc(doc(db, "orders", orderId));
+    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
 const STATUS_MESSAGES = {
@@ -130,7 +150,7 @@ function isValidSellerTransition(currentStatus, newStatus) {
 // The onSnapshot listener above already picks up the change automatically.
 export async function updateOrderStatus(db, orderId, newStatus) {
     try {
-        const order = findOrderById(orderId);
+        const order = await findOrderById(db, orderId);
 
         // Guard against stale UI state (e.g. two tabs open, or the order was
         // already updated a moment ago) letting an invalid jump through —
@@ -164,7 +184,7 @@ export async function updateOrderStatus(db, orderId, newStatus) {
 
 export async function markAsShipped(db, orderId) {
     try {
-        const order = findOrderById(orderId);
+        const order = await findOrderById(db, orderId);
 
         if (order && !isValidSellerTransition(order.status, 'Shipped')) {
             showToast(`Can't mark as Shipped from "${order.status || 'Pending'}". The order list will refresh.`, 'error');
@@ -191,7 +211,7 @@ export async function markAsShipped(db, orderId) {
 }
 
 export async function confirmDelivery(db, orderId) {
-    const order = allOrders.find(o => o.id === orderId);
+    const order = await findOrderById(db, orderId);
     if (!order) {
         showToast("Order not found. Please try again.", 'error');
         return;
