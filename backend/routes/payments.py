@@ -341,6 +341,7 @@ def verify_and_place_order():
             "buyerName": delivery.get("name"),
             "buyerPhone": delivery.get("phone"),
             "buyerAddress": delivery.get("address"),
+            "buyerCity": delivery.get("city"),
             "paymentMethod": "Razorpay",
             "paymentVerified": True,
             "razorpayOrderId": razorpay_order_id,
