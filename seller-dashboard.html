@@ -477,6 +477,18 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="deliveryOptionsModal">
+        <div class="modal-box">
+            <span class="modal-close" onclick="window.closeDeliveryOptions()">&times;</span>
+            <h3>🚚 Get Delivery Help</h3>
+            <p class="modal-sub" style="font-size:12.5px; color:#767676;">Post this order for any delivery partner nearby to pick up, or assign it directly to someone specific.</p>
+            <input type="hidden" id="deliveryOrderId">
+            <button class="action-btn full-width" style="margin-bottom:14px;" onclick="window.postToJobBoardMain()">📋 Post to Job Board (anyone nearby can claim it)</button>
+            <h4 style="font-size:13.5px; margin:0 0 8px;">Or assign directly:</h4>
+            <div id="deliveryBoysListContainer"><p style="font-size:13px; color:#888;">Loading available delivery partners...</p></div>
+        </div>
+    </div>
+
     <script type="module">
         import { auth, db } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -496,6 +508,7 @@
         import { loadSellerQuestions, submitAnswer } from './qa-logic.js';
         import { getFollowerCount } from './follow-logic.js';
         import { showToast } from './toast.js';
+        import { findAvailableDeliveryBoys, postOrderToJobBoard, assignOrderToDeliveryBoy, cancelDeliveryRequest } from './delivery-logic.js';
 
         wireImageUpload('shopLogoFileUpload', 'shopLogoFile', 'shopLogoStatus');
         wireImageUpload('pImageFileUpload', 'pImageFile', 'pImageStatus');
@@ -766,6 +779,61 @@
                 confirmDelivery(db, orderId);
             }
         }
+
+        // ---------- Delivery-partner matching (seller side) ----------
+        let currentDeliveryVillage = '';
+
+        window.openDeliveryOptions = async function(orderId, buyerCity) {
+            document.getElementById('deliveryOrderId').value = orderId;
+            currentDeliveryVillage = buyerCity || '';
+            document.getElementById('deliveryOptionsModal').classList.add('active');
+
+            const listEl = document.getElementById('deliveryBoysListContainer');
+            if (!currentDeliveryVillage) {
+                listEl.innerHTML = `<p style="font-size:13px; color:#888;">This order doesn't have a delivery village on file, so nearby delivery partners can't be matched automatically. You can still post it to the job board above.</p>`;
+                return;
+            }
+            listEl.innerHTML = `<p style="font-size:13px; color:#888;">Loading available delivery partners in ${escapeHtml(currentDeliveryVillage)}...</p>`;
+            try {
+                const boys = await findAvailableDeliveryBoys(db, currentDeliveryVillage);
+                if (boys.length === 0) {
+                    listEl.innerHTML = `<p style="font-size:13px; color:#888;">No available delivery partners found in ${escapeHtml(currentDeliveryVillage)} right now. Try posting to the job board instead.</p>`;
+                    return;
+                }
+                listEl.innerHTML = boys.map(b => `
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding:10px; border:1px solid #eee; border-radius:8px; margin-bottom:8px;">
+                        <div>
+                            <strong style="font-size:13.5px;">${escapeHtml(b.name)}</strong><br>
+                            <span style="font-size:12px; color:#666;">📞 ${escapeHtml(b.phone)} · ${escapeHtml(b.vehicleType || 'bike')}</span>
+                        </div>
+                        <button class="dash-action-btn btn-accept" onclick='window.assignDeliveryBoyMain(${JSON.stringify({ id: b.id, name: b.name, phone: b.phone, vehicleType: b.vehicleType, village: b.village }).replace(/'/g, "&#39;")})'>Assign</button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                listEl.innerHTML = `<p style="font-size:13px; color:#c0392b;">⚠️ Unable to load delivery partners: ${escapeHtml(error.message || String(error))}</p>`;
+            }
+        };
+
+        window.closeDeliveryOptions = function() {
+            document.getElementById('deliveryOptionsModal').classList.remove('active');
+        };
+
+        window.postToJobBoardMain = async function() {
+            const orderId = document.getElementById('deliveryOrderId').value;
+            await postOrderToJobBoard(db, orderId);
+            window.closeDeliveryOptions();
+        };
+
+        window.assignDeliveryBoyMain = async function(deliveryBoy) {
+            const orderId = document.getElementById('deliveryOrderId').value;
+            await assignOrderToDeliveryBoy(db, orderId, deliveryBoy);
+            window.closeDeliveryOptions();
+        };
+
+        window.cancelDeliveryMain = async function(orderId) {
+            if (!confirm("Cancel this delivery request? The order will go back to self-delivery.")) return;
+            await cancelDeliveryRequest(db, orderId);
+        };
 
         window.generateVariantStockGrid = generateVariantStockGrid;
 
