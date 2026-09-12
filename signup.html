@@ -92,6 +92,10 @@
                 <span class="emoji">🏪</span>
                 <span class="label">Seller</span>
             </div>
+            <div class="role-card" id="roleDelivery" onclick="selectRole('delivery')">
+                <span class="emoji">🚚</span>
+                <span class="label">Delivery Partner</span>
+            </div>
         </div>
 
         <div class="form-group">
@@ -144,13 +148,21 @@
     // Pre-select role from URL, e.g. signup.html?role=seller
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('role') === 'seller') selectedRole = 'seller';
+    if (urlParams.get('role') === 'delivery') selectedRole = 'delivery';
 
     window.selectRole = function(role) {
         selectedRole = role;
         document.getElementById('roleCustomer').classList.toggle('active', role === 'customer');
         document.getElementById('roleSeller').classList.toggle('active', role === 'seller');
+        document.getElementById('roleDelivery').classList.toggle('active', role === 'delivery');
     };
     selectRole(selectedRole);
+
+    function redirectAfterSignup() {
+        if (selectedRole === 'seller') return 'seller-dashboard.html';
+        if (selectedRole === 'delivery') return 'delivery-dashboard.html';
+        return 'index.html';
+    }
 
     document.getElementById('togglePass').addEventListener('click', () => {
         const passInput = document.getElementById('password');
@@ -219,7 +231,7 @@
                 createdAt: new Date()
             });
 
-            window.location.href = selectedRole === 'seller' ? 'seller-dashboard.html' : 'index.html';
+            window.location.href = redirectAfterSignup();
         } catch (error) {
             console.error(error);
             showError(friendlyError(error.code));
@@ -245,7 +257,7 @@
                 createdAt: new Date()
             }, { merge: true });
 
-            window.location.href = selectedRole === 'seller' ? 'seller-dashboard.html' : 'index.html';
+            window.location.href = redirectAfterSignup();
         } catch (error) {
             console.error(error);
             if (error.code !== 'auth/popup-closed-by-user') {
