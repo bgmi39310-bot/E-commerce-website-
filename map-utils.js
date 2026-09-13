@@ -39,11 +39,31 @@ export function loadMapLibrary() {
 const DEFAULT_CENTER = [22.9734, 78.6569]; // roughly the geographic centre of India
 const DEFAULT_ZOOM = 5;
 
-function addOsmTileLayer(L, map) {
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+function addBaseLayers(L, map) {
+    const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
-    }).addTo(map);
+    });
+    // Free, no API key needed — Esri's World Imagery satellite basemap.
+    const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19,
+        attribution: 'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics'
+    });
+
+    // Satellite is the DEFAULT view: in villages and rural areas,
+    // OpenStreetMap's street map is often sparse (few roads or buildings
+    // actually mapped by anyone yet), which makes it hard to tell where
+    // your own house actually is. An aerial photo shows the real rooftop
+    // regardless of how well-mapped an area is on OSM — a much clearer
+    // starting point for pinning "this is my house". Street Map is one tap
+    // away via the layer switcher (top-right) if that's more useful for a
+    // given area.
+    satelliteLayer.addTo(map);
+    L.control.layers(
+        { '🛰️ Satellite': satelliteLayer, '🗺️ Street Map': streetLayer },
+        null,
+        { position: 'topright', collapsed: true }
+    ).addTo(map);
 }
 
 // Interactive picker: shows a map the person can click/drag a pin on to
@@ -55,10 +75,13 @@ export async function initPickerMap(containerId, onPick, initialLat, initialLng)
     const L = await loadMapLibrary();
     const hasInitial = typeof initialLat === 'number' && typeof initialLng === 'number';
     const center = hasInitial ? [initialLat, initialLng] : DEFAULT_CENTER;
-    const zoom = hasInitial ? 16 : DEFAULT_ZOOM;
+    // Zoomed in close (18) whenever there's an actual point to show, so
+    // individual rooftops are distinguishable on the satellite layer —
+    // rather than a wide view where every house in the village looks the same.
+    const zoom = hasInitial ? 18 : DEFAULT_ZOOM;
 
     const map = L.map(containerId).setView(center, zoom);
-    addOsmTileLayer(L, map);
+    addBaseLayers(L, map);
 
     let marker = hasInitial ? L.marker(center, { draggable: true }).addTo(map) : null;
 
@@ -83,7 +106,7 @@ export async function initPickerMap(containerId, onPick, initialLat, initialLng)
                 navigator.geolocation.getCurrentPosition(
                     (pos) => {
                         const latlng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                        map.setView(latlng, 16);
+                        map.setView(latlng, 18);
                         placeMarker(latlng);
                         resolve(latlng);
                     },
@@ -98,7 +121,7 @@ export async function initPickerMap(containerId, onPick, initialLat, initialLng)
         // reset for "Add New".
         setPosition(lat, lng) {
             if (typeof lat !== 'number' || typeof lng !== 'number') return;
-            map.setView([lat, lng], 16);
+            map.setView([lat, lng], 18);
             placeMarker({ lat, lng });
         },
         // Removes the pin and re-centers on India — used when reopening a
@@ -119,8 +142,8 @@ export async function initPickerMap(containerId, onPick, initialLat, initialLng)
 // address's location without letting it be moved.
 export async function initViewMap(containerId, lat, lng, popupText) {
     const L = await loadMapLibrary();
-    const map = L.map(containerId, { zoomControl: true, dragging: true, scrollWheelZoom: false }).setView([lat, lng], 15);
-    addOsmTileLayer(L, map);
+    const map = L.map(containerId, { zoomControl: true, dragging: true, scrollWheelZoom: false }).setView([lat, lng], 17);
+    addBaseLayers(L, map);
     const marker = L.marker([lat, lng]).addTo(map);
     if (popupText) marker.bindPopup(popupText).openPopup();
     return { map, invalidateSize() { map.invalidateSize(); } };
