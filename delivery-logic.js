@@ -51,6 +51,14 @@ export function refreshDeliveryLocationMap() {
     ensureDeliveryLocationMap(lastLoadedDeliveryLat, lastLoadedDeliveryLng);
 }
 
+// Whatever location is currently pinned on the (already-open) location
+// picker map — used by the "find nearby villages" button, which needs to
+// know where to search from before the profile is even saved.
+export function getCurrentPinLatLng() {
+    if (typeof pickedDeliveryLat !== 'number' || typeof pickedDeliveryLng !== 'number') return null;
+    return { lat: pickedDeliveryLat, lng: pickedDeliveryLng };
+}
+
 // Normalizes a profile doc so callers never have to think about the old
 // single-`village` shape from before multi-village support existed —
 // everything downstream just uses `villages` (an array).
@@ -61,10 +69,40 @@ function normalizeProfile(profile) {
     return {
         ...profile,
         villages,
-        feeType: profile.feeType || 'fixed',
+        feeType: profile.feeType || 'per_order',
         feeAmount: typeof profile.feeAmount === 'number' ? profile.feeAmount : 0,
         maxDistanceKm: typeof profile.maxDistanceKm === 'number' ? profile.maxDistanceKm : null
     };
+}
+
+// Looks at shops that have already pinned their location (sellers_profiles
+// with lat/lng set) and suggests village/city names within `radiusKm` of
+// the delivery partner's own pinned location — a one-click way to add
+// nearby areas instead of typing them all out. There's no separate
+// geocoded village database in this app; shop locations already entered by
+// sellers are the best available source of "known villages with coordinates".
+export async function suggestNearbyVillages(db, lat, lng, radiusKm = 5) {
+    if (typeof lat !== 'number' || typeof lng !== 'number') return [];
+    try {
+        const snap = await getDocs(query(collection(db, "sellers_profiles"), limit(300)));
+        const seen = new Map(); // village name (lowercased) -> {name, distanceKm}
+        snap.forEach(d => {
+            const s = d.data();
+            if (typeof s.lat !== 'number' || typeof s.lng !== 'number' || !s.city) return;
+            const dist = distanceKm(lat, lng, s.lat, s.lng);
+            if (dist > radiusKm) return;
+            const key = s.city.trim().toLowerCase();
+            if (!key) return;
+            const existing = seen.get(key);
+            if (!existing || dist < existing.distanceKm) {
+                seen.set(key, { name: s.city.trim(), distanceKm: dist });
+            }
+        });
+        return [...seen.values()].sort((a, b) => a.distanceKm - b.distanceKm);
+    } catch (error) {
+        console.error("Error suggesting nearby villages:", error);
+        return [];
+    }
 }
 
 export async function loadDeliveryProfile(db, uid) {
@@ -80,10 +118,15 @@ export async function loadDeliveryProfile(db, uid) {
 
 // `villages` here is an ARRAY (a delivery partner can serve more than one
 // village/area — they're not locked into just one like before).
-// `feeType` is 'fixed' (flat ₹ per delivery) or 'per_km' (₹ per km,
-// multiplied against the actual distance at delivery time by whoever's
-// arranging it — DesiMarket doesn't compute distance-based pricing
-// automatically, it's shown so sellers/buyers know the rate to expect).
+// `feeType` is how they charge for a delivery:
+//   'per_order' — a flat ₹ amount for EACH order/parcel delivered
+//   'per_trip'  — a flat ₹ amount for a whole trip, no matter how many
+//                 orders (possibly from different shops going to the same
+//                 area) are bundled into it
+//   'per_km'    — a ₹ rate per kilometre travelled
+// DesiMarket doesn't compute per-km pricing automatically — it's shown so
+// sellers/buyers know the rate to expect and agree the actual amount with
+// the delivery partner directly.
 export async function saveDeliveryProfile(db, uid, { name, phone, villages, vehicleType, feeType, feeAmount, maxDistanceKm }) {
     const cleanVillages = (villages || []).map(v => v.trim()).filter(Boolean);
     if (!name || !phone || cleanVillages.length === 0) {
@@ -94,13 +137,14 @@ export async function saveDeliveryProfile(db, uid, { name, phone, villages, vehi
         showToast("Please list 25 villages/areas or fewer.", 'error');
         return false;
     }
+    const validFeeTypes = ['per_order', 'per_trip', 'per_km'];
     try {
         await setDoc(doc(db, "delivery_profiles", uid), {
             uid, name, phone,
             villages: cleanVillages,
             village: cleanVillages[0], // kept in sync for any old code path that still reads the singular field
             vehicleType: vehicleType || 'bike',
-            feeType: feeType === 'per_km' ? 'per_km' : 'fixed',
+            feeType: validFeeTypes.includes(feeType) ? feeType : 'per_order',
             feeAmount: Number(feeAmount) || 0,
             maxDistanceKm: maxDistanceKm ? Number(maxDistanceKm) : null,
             lat: pickedDeliveryLat,
@@ -170,7 +214,7 @@ export async function claimDeliveryJob(db, orderId, deliveryBoy) {
             deliveryBoyName: deliveryBoy.name,
             deliveryBoyPhone: deliveryBoy.phone,
             deliveryRequestStatus: 'assigned',
-            deliveryFeeType: deliveryBoy.feeType || 'fixed',
+            deliveryFeeType: deliveryBoy.feeType || 'per_order',
             deliveryFeeAmount: deliveryBoy.feeAmount || 0
         });
         const order = snap.data();
@@ -370,7 +414,7 @@ export async function assignOrderToDeliveryBoy(db, orderId, deliveryBoy) {
             deliveryBoyName: deliveryBoy.name,
             deliveryBoyPhone: deliveryBoy.phone,
             deliveryRequestStatus: 'assigned',
-            deliveryFeeType: deliveryBoy.feeType || 'fixed',
+            deliveryFeeType: deliveryBoy.feeType || 'per_order',
             deliveryFeeAmount: deliveryBoy.feeAmount || 0
         });
         sendNotification(db, deliveryBoy.id, {
