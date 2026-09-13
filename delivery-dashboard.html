@@ -56,6 +56,13 @@
         .fee-tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: #eafaf1; color: #1a7f4b; }
         .no-data { text-align: center; color: #888; padding: 20px; font-size: 14px; }
         .error-box { background: #fdecea; color: #c0392b; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; word-break: break-word; }
+        .fee-type-options { display: flex; flex-direction: column; gap: 8px; }
+        .fee-type-option { display: flex; flex-direction: column; gap: 2px; border: 1.5px solid #ddd; border-radius: 8px; padding: 10px 12px; cursor: pointer; font-size: 12.5px; color: #555; }
+        .fee-type-option input { margin-right: 6px; }
+        .fee-type-option strong { font-size: 13.5px; color: #232f3e; }
+        .fee-type-option.selected { border-color: #232f3e; background: #f5f6f8; }
+        .village-chip { background: #eafaf1; color: #1a7f4b; border: 1px solid #b6e3c8; border-radius: 14px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
+        .village-chip:disabled { opacity: .5; cursor: default; }
         .login-prompt { text-align: center; padding: 50px 20px; background: white; border-radius: 8px; }
         .login-prompt a { display: inline-block; margin-top: 12px; background: #ffd814; padding: 10px 22px; border-radius: 5px; text-decoration: none; color: #111; font-weight: bold; }
     </style>
@@ -84,8 +91,8 @@
     import {
         loadDeliveryProfile, saveDeliveryProfile, setDeliveryAvailability,
         loadJobBoard, claimDeliveryJob, loadMyDeliveries, declineDeliveryAssignment,
-        useMyLocationForDelivery, refreshDeliveryLocationMap,
-        getDeliveryStats, loadDeliveryHistory
+        useMyLocationForDelivery, refreshDeliveryLocationMap, getCurrentPinLatLng,
+        suggestNearbyVillages, getDeliveryStats, loadDeliveryHistory
     } from './delivery-logic.js';
 
     let currentUser = null;
@@ -130,6 +137,7 @@
     function renderProfileForm() {
         const content = document.getElementById('pageContent');
         const p = myProfile || {};
+        const feeType = p.feeType || 'per_order';
         content.innerHTML = `
             <div class="card">
                 <h2>🚚 ${myProfile ? 'Edit your' : 'Set up your'} Delivery Partner profile</h2>
@@ -139,23 +147,41 @@
                     <input type="tel" id="dPhone" placeholder="Phone Number" value="${escapeHtml(p.phone || '')}">
                     <input type="text" id="dVillages" placeholder="Villages / areas you serve (comma-separated)" class="full-width" value="${escapeHtml((p.villages || []).join(', '))}">
                     <input type="number" id="dMaxDistance" placeholder="Max distance you'll travel (km, optional)" min="0" value="${p.maxDistanceKm || ''}">
-                    <select id="dVehicle">
+                    <select id="dVehicle" class="full-width">
                         <option value="bike" ${p.vehicleType === 'bike' ? 'selected' : ''}>🏍️ Bike</option>
                         <option value="cycle" ${p.vehicleType === 'cycle' ? 'selected' : ''}>🚲 Cycle</option>
                         <option value="van" ${p.vehicleType === 'van' ? 'selected' : ''}>🚐 Van / Tempo</option>
                         <option value="on_foot" ${p.vehicleType === 'on_foot' ? 'selected' : ''}>🚶 On Foot</option>
                     </select>
-                    <select id="dFeeType">
-                        <option value="fixed" ${p.feeType !== 'per_km' ? 'selected' : ''}>₹ Fixed per delivery</option>
-                        <option value="per_km" ${p.feeType === 'per_km' ? 'selected' : ''}>₹ Per kilometre</option>
-                    </select>
-                    <input type="number" id="dFeeAmount" placeholder="Your rate (₹)" min="0" value="${p.feeAmount || ''}">
+
                     <div class="full-width">
                         <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">📍 Base Location (optional — helps sellers see how far you are)</label>
                         <button type="button" onclick="window.useMyLocationForDelivery()" class="action-btn secondary full-width" style="margin-bottom:8px;">📍 Use My Current Location</button>
                         <div id="deliveryLocationMap" style="height:200px; border-radius:8px; overflow:hidden; margin-bottom:6px;"></div>
-                        <p id="deliveryLocationStatus" style="font-size:12px; color:#666; margin:0;">Tap the map, or drag the pin, to set it.</p>
+                        <p id="deliveryLocationStatus" style="font-size:12px; color:#666; margin:0 0 8px;">Tap the map, or drag the pin, to set it.</p>
+                        <button type="button" class="action-btn secondary full-width" onclick="window.suggestVillagesMain()">🔍 Find villages near my pin (within 5 km)</button>
+                        <div id="suggestedVillagesBox" style="margin-top:8px;"></div>
                     </div>
+
+                    <div class="full-width">
+                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">💰 How do you charge?</label>
+                        <div class="fee-type-options">
+                            <label class="fee-type-option ${feeType === 'per_order' ? 'selected' : ''}">
+                                <input type="radio" name="dFeeType" value="per_order" ${feeType === 'per_order' ? 'checked' : ''} onchange="window.updateFeeTypeUI()">
+                                <strong>Per order</strong><span>A flat ₹ amount for each order you deliver, one at a time.</span>
+                            </label>
+                            <label class="fee-type-option ${feeType === 'per_trip' ? 'selected' : ''}">
+                                <input type="radio" name="dFeeType" value="per_trip" ${feeType === 'per_trip' ? 'checked' : ''} onchange="window.updateFeeTypeUI()">
+                                <strong>Per trip</strong><span>A flat ₹ amount for a whole trip, no matter how many orders (even from different shops) you carry together.</span>
+                            </label>
+                            <label class="fee-type-option ${feeType === 'per_km' ? 'selected' : ''}">
+                                <input type="radio" name="dFeeType" value="per_km" ${feeType === 'per_km' ? 'checked' : ''} onchange="window.updateFeeTypeUI()">
+                                <strong>Per kilometre</strong><span>A ₹ rate for every km you travel — agreed with the seller/buyer based on the actual distance.</span>
+                            </label>
+                        </div>
+                    </div>
+                    <input type="number" id="dFeeAmount" placeholder="Your rate (₹)" min="0" value="${p.feeAmount || ''}" class="full-width">
+
                     <button class="action-btn full-width" onclick="window.saveProfileMain()">Save Profile & Continue</button>
                     ${myProfile ? `<button class="action-btn secondary full-width" onclick="window.cancelEditMain()">Cancel</button>` : ''}
                 </div>
@@ -164,16 +190,56 @@
         refreshDeliveryLocationMap();
     }
 
+    window.updateFeeTypeUI = function() {
+        document.querySelectorAll('.fee-type-option').forEach(el => {
+            el.classList.toggle('selected', el.querySelector('input').checked);
+        });
+    };
+
+    window.suggestVillagesMain = async function() {
+        const box = document.getElementById('suggestedVillagesBox');
+        box.innerHTML = `<p style="font-size:12px; color:#888;">Looking for villages near your pin...</p>`;
+        const latlng = getCurrentPinLatLng();
+        if (!latlng) {
+            box.innerHTML = `<p style="font-size:12px; color:#c0392b;">Set your base location on the map above first, then try again.</p>`;
+            return;
+        }
+        const suggestions = await suggestNearbyVillages(db, latlng.lat, latlng.lng, 5);
+        if (suggestions.length === 0) {
+            box.innerHTML = `<p style="font-size:12px; color:#888;">No known villages found within 5 km of your pin yet — this looks at shops that have already set their location, so it fills in as more shops do. You can still type villages manually above.</p>`;
+            return;
+        }
+        box.innerHTML = `
+            <p style="font-size:12px; color:#666; margin-bottom:6px;">Tap to add:</p>
+            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                ${suggestions.map(s => `<button type="button" class="village-chip" data-village="${escapeHtml(s.name)}" onclick="window.addSuggestedVillage(this)">➕ ${escapeHtml(s.name)} (${s.distanceKm.toFixed(1)} km)</button>`).join('')}
+            </div>
+        `;
+    };
+
+    window.addSuggestedVillage = function(btn) {
+        const village = btn.dataset.village;
+        const input = document.getElementById('dVillages');
+        const current = input.value.split(',').map(v => v.trim()).filter(Boolean);
+        if (!current.some(v => v.toLowerCase() === village.toLowerCase())) {
+            current.push(village);
+            input.value = current.join(', ');
+        }
+        btn.disabled = true;
+        btn.textContent = `✓ ${village} added`;
+    };
+
     window.cancelEditMain = function() { renderDashboard(); };
 
     window.saveProfileMain = async function() {
         const villages = document.getElementById('dVillages').value.split(',').map(v => v.trim()).filter(Boolean);
+        const feeTypeInput = document.querySelector('input[name="dFeeType"]:checked');
         const ok = await saveDeliveryProfile(db, currentUser.uid, {
             name: document.getElementById('dName').value.trim(),
             phone: document.getElementById('dPhone').value.trim(),
             villages,
             vehicleType: document.getElementById('dVehicle').value,
-            feeType: document.getElementById('dFeeType').value,
+            feeType: feeTypeInput ? feeTypeInput.value : 'per_order',
             feeAmount: document.getElementById('dFeeAmount').value,
             maxDistanceKm: document.getElementById('dMaxDistance').value
         });
@@ -292,7 +358,9 @@
 
     function feeLabel(feeType, feeAmount) {
         if (!feeAmount) return '';
-        return feeType === 'per_km' ? `₹${feeAmount}/km` : `₹${feeAmount} flat`;
+        if (feeType === 'per_km') return `₹${feeAmount}/km`;
+        if (feeType === 'per_trip') return `₹${feeAmount}/trip`;
+        return `₹${feeAmount}/order`;
     }
 
     async function loadAndRenderMyDeliveries() {
@@ -339,9 +407,16 @@
                 container.innerHTML = `<div class="no-data">No completed deliveries yet.</div>`;
                 return;
             }
-            const totalEarned = history.reduce((sum, o) => sum + (o.deliveryFeeType !== 'per_km' ? (o.deliveryFeeAmount || 0) : 0), 0);
+            // Only "per order" fees are safely summable — each one is a
+            // separate, unambiguous charge. "Per trip" fees are deliberately
+            // NOT auto-totalled here: if several orders (possibly from
+            // different shops) were bundled into the same trip, each of
+            // those orders carries a COPY of that trip's fee, and summing
+            // them would count the same trip's earnings multiple times.
+            const perOrderEarned = history.reduce((sum, o) => sum + (o.deliveryFeeType === 'per_order' ? (o.deliveryFeeAmount || 0) : 0), 0);
+            const hasTripOrKm = history.some(o => o.deliveryFeeType === 'per_trip' || o.deliveryFeeType === 'per_km');
             container.innerHTML = `
-                <p style="font-size:13px; color:#666; margin-bottom:10px;"><strong>${history.length}</strong> completed deliveries shown${totalEarned > 0 ? ` · Fixed-rate earnings: <strong>₹${totalEarned}</strong> (per-km deliveries aren't totalled automatically)` : ''}</p>
+                <p style="font-size:13px; color:#666; margin-bottom:10px;"><strong>${history.length}</strong> completed deliveries shown${perOrderEarned > 0 ? ` · Per-order earnings: <strong>₹${perOrderEarned}</strong>` : ''}${hasTripOrKm ? ' (per-trip and per-km deliveries aren\'t totalled automatically — see each entry below)' : ''}</p>
                 ${history.map(o => {
                     const deliveredDate = o.deliveredAt && o.deliveredAt.toDate ? o.deliveredAt.toDate().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
                     const fee = feeLabel(o.deliveryFeeType, o.deliveryFeeAmount);
