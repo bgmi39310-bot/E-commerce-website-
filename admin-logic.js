@@ -458,7 +458,8 @@ function renderDeliveryPartners() {
     container.innerHTML = cachedDeliveryPartners.map(d => {
         const blocked = d.blocked === true;
         const available = d.isAvailable === true;
-        const feeLabel = d.feeAmount ? (d.feeType === 'per_km' ? `₹${d.feeAmount}/km` : `₹${d.feeAmount} flat`) : 'rate not set';
+        const feeUnit = d.feeType === 'per_km' ? '/km' : (d.feeType === 'per_trip' ? '/trip' : '/order');
+        const feeLabel = d.feeAmount ? `₹${d.feeAmount}${feeUnit}` : 'rate not set';
         return `
             <div class="admin-row-card ${blocked ? 'is-blocked' : ''}">
                 <div class="arc-info">
