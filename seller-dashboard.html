@@ -788,7 +788,9 @@
 
         function feeLabelMain(feeType, feeAmount) {
             if (!feeAmount) return 'rate not set';
-            return feeType === 'per_km' ? `₹${feeAmount}/km` : `₹${feeAmount} flat`;
+            if (feeType === 'per_km') return `₹${feeAmount}/km`;
+            if (feeType === 'per_trip') return `₹${feeAmount}/trip`;
+            return `₹${feeAmount}/order`;
         }
 
         function renderDeliveryBoyList(boys) {
