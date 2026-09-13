@@ -192,6 +192,8 @@
         <a href="account.html"><i class="fas fa-user-circle"></i> My Account</a>
         <a href="seller-dashboard.html" id="menuSellerHub"><i class="fas fa-store"></i> <span data-i18n="sellerHub">Seller Hub (डैशबोर्ड)</span></a>
         <a href="signup.html?role=seller" id="menuBecomeSeller"><i class="fas fa-rocket"></i> <span data-i18n="becomeSeller">Become a Seller</span></a>
+        <a href="delivery-dashboard.html" id="menuDeliveryHub"><i class="fas fa-truck"></i> Delivery Partner Hub</a>
+        <a href="delivery-dashboard.html" id="menuBecomeDelivery"><i class="fas fa-motorcycle"></i> Become a Delivery Partner</a>
         <hr style="border: 0.5px solid #444;">
         <a href="terms.html"><i class="fas fa-file-contract"></i> <span data-i18n="termsPrivacy">Terms & Privacy</span></a>
     </div>
@@ -333,21 +335,27 @@
             updateSellerMenuLinks(currentBuyerUid);
         });
 
-        // Show "Become a Seller" only when this account doesn't already have a
-        // shop; "Seller Hub" stays visible either way (it's harmless to click
-        // even before login — it just sends them to login.html).
+        // Show "Become a Seller"/"Become a Delivery Partner" only when this
+        // account doesn't already have that profile; the "Hub" links stay
+        // visible either way (harmless to click even before login — they
+        // just send the person to login.html).
         async function updateSellerMenuLinks(uid) {
             const becomeSellerLink = document.getElementById('menuBecomeSeller');
-            if (!becomeSellerLink) return;
+            const becomeDeliveryLink = document.getElementById('menuBecomeDelivery');
             if (!uid) {
-                becomeSellerLink.style.display = ''; // logged out — default to showing it
+                if (becomeSellerLink) becomeSellerLink.style.display = ''; // logged out — default to showing it
+                if (becomeDeliveryLink) becomeDeliveryLink.style.display = '';
                 return;
             }
             try {
-                const snap = await getDoc(doc(db, "sellers_profiles", uid));
-                becomeSellerLink.style.display = snap.exists() ? 'none' : '';
+                const [sellerSnap, deliverySnap] = await Promise.all([
+                    getDoc(doc(db, "sellers_profiles", uid)),
+                    getDoc(doc(db, "delivery_profiles", uid))
+                ]);
+                if (becomeSellerLink) becomeSellerLink.style.display = sellerSnap.exists() ? 'none' : '';
+                if (becomeDeliveryLink) becomeDeliveryLink.style.display = deliverySnap.exists() ? 'none' : '';
             } catch (e) {
-                console.error('Error checking seller profile:', e);
+                console.error('Error checking seller/delivery profile:', e);
             }
         }
 
