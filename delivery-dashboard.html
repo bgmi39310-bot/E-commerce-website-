@@ -70,7 +70,6 @@
 <script type="module">
     import { auth, db } from './firebase-config.js';
     import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-    import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     import { showToast } from './toast.js';
     import { escapeHtml } from './sanitize.js';
     import { mountNotificationBell } from './notif-logic.js';
@@ -90,21 +89,16 @@
     onAuthStateChanged(auth, async (user) => {
         const content = document.getElementById('pageContent');
         if (!user) {
-            content.innerHTML = `<div class="login-prompt"><p>Please login as a Delivery Partner to view this page.</p><a href="login.html">Login</a></div>`;
+            content.innerHTML = `<div class="login-prompt"><p>Please login to become a Delivery Partner.</p><a href="login.html">Login</a></div>`;
             return;
         }
 
-        // Anyone with an account can technically open this URL — but only
-        // someone who signed up (or was switched) to the "delivery" role
-        // should be able to use it. Firestore rules enforce the real data
-        // access; this is just the friendly on-page message.
-        const userSnap = await getDoc(doc(db, "users", user.uid));
-        const role = userSnap.exists() ? userSnap.data().role : null;
-        if (role !== 'delivery') {
-            content.innerHTML = `<div class="login-prompt"><p>This page is for Delivery Partner accounts only.</p><a href="signup.html?role=delivery">Register as a Delivery Partner</a></div>`;
-            return;
-        }
-
+        // No role check here on purpose — any logged-in account (buyer,
+        // seller, whoever) can open this page and set up a delivery
+        // profile, the same way anyone can open seller-dashboard.html and
+        // set up a shop. Setting up a profile below is what actually makes
+        // someone a delivery partner; it doesn't require switching their
+        // account's primary role first.
         currentUser = user;
         mountNotificationBell(db, user.uid, 'notifBellMount');
         await loadAndRenderProfile();
@@ -292,4 +286,3 @@
 </script>
 </body>
 </html>
-
