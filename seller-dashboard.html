@@ -484,7 +484,10 @@
             <p class="modal-sub" style="font-size:12.5px; color:#767676;">Post this order for any delivery partner nearby to pick up, or assign it directly to someone specific.</p>
             <input type="hidden" id="deliveryOrderId">
             <button class="action-btn full-width" style="margin-bottom:14px;" onclick="window.postToJobBoardMain()">📋 Post to Job Board (anyone nearby can claim it)</button>
-            <h4 style="font-size:13.5px; margin:0 0 8px;">Or assign directly:</h4>
+            <div style="display:flex; gap:8px; margin-bottom:8px;">
+                <h4 style="font-size:13.5px; margin:0; flex:1;">Or assign directly:</h4>
+                <button type="button" style="font-size:12px; background:none; border:none; color:#007185; font-weight:600; cursor:pointer;" onclick="window.showAllDeliveryBoysMain()">🌐 Browse all live partners</button>
+            </div>
             <div id="deliveryBoysListContainer"><p style="font-size:13px; color:#888;">Loading available delivery partners...</p></div>
         </div>
     </div>
@@ -508,7 +511,7 @@
         import { loadSellerQuestions, submitAnswer } from './qa-logic.js';
         import { getFollowerCount } from './follow-logic.js';
         import { showToast } from './toast.js';
-        import { findAvailableDeliveryBoys, postOrderToJobBoard, assignOrderToDeliveryBoy, cancelDeliveryRequest } from './delivery-logic.js';
+        import { findAvailableDeliveryBoys, postOrderToJobBoard, assignOrderToDeliveryBoy, cancelDeliveryRequest, loadAllAvailableDeliveryPartners } from './delivery-logic.js';
 
         wireImageUpload('shopLogoFileUpload', 'shopLogoFile', 'shopLogoStatus');
         wireImageUpload('pImageFileUpload', 'pImageFile', 'pImageStatus');
@@ -783,6 +786,29 @@
         // ---------- Delivery-partner matching (seller side) ----------
         let currentDeliveryVillage = '';
 
+        function feeLabelMain(feeType, feeAmount) {
+            if (!feeAmount) return 'rate not set';
+            return feeType === 'per_km' ? `₹${feeAmount}/km` : `₹${feeAmount} flat`;
+        }
+
+        function renderDeliveryBoyList(boys) {
+            const listEl = document.getElementById('deliveryBoysListContainer');
+            if (boys.length === 0) {
+                listEl.innerHTML = `<p style="font-size:13px; color:#888;">No available delivery partners found. Try posting to the job board instead.</p>`;
+                return;
+            }
+            listEl.innerHTML = boys.map(b => `
+                <div style="display:flex; align-items:center; justify-content:space-between; padding:10px; border:1px solid #eee; border-radius:8px; margin-bottom:8px;">
+                    <div>
+                        <strong style="font-size:13.5px;">${escapeHtml(b.name)}</strong>
+                        <span style="font-size:11px; background:#eafaf1; color:#1a7f4b; padding:1px 6px; border-radius:8px; margin-left:4px;">${escapeHtml(feeLabelMain(b.feeType, b.feeAmount))}</span><br>
+                        <span style="font-size:12px; color:#666;">📞 ${escapeHtml(b.phone)} · ${escapeHtml(b.vehicleType || 'bike')} · ${escapeHtml((b.villages || []).join(', '))}${typeof b.distanceKm === 'number' ? ` · 📏 ${b.distanceKm.toFixed(1)} km away` : ''}</span>
+                    </div>
+                    <button class="dash-action-btn btn-accept" onclick='window.assignDeliveryBoyMain(${JSON.stringify({ id: b.id, name: b.name, phone: b.phone, vehicleType: b.vehicleType, villages: b.villages, feeType: b.feeType, feeAmount: b.feeAmount }).replace(/'/g, "&#39;")})'>Assign</button>
+                </div>
+            `).join('');
+        }
+
         window.openDeliveryOptions = async function(orderId, buyerCity) {
             document.getElementById('deliveryOrderId').value = orderId;
             currentDeliveryVillage = buyerCity || '';
@@ -790,25 +816,29 @@
 
             const listEl = document.getElementById('deliveryBoysListContainer');
             if (!currentDeliveryVillage) {
-                listEl.innerHTML = `<p style="font-size:13px; color:#888;">This order doesn't have a delivery village on file, so nearby delivery partners can't be matched automatically. You can still post it to the job board above.</p>`;
+                listEl.innerHTML = `<p style="font-size:13px; color:#888;">This order doesn't have a delivery village on file, so nearby delivery partners can't be matched automatically. Try "Browse all live partners" above, or post it to the job board.</p>`;
                 return;
             }
             listEl.innerHTML = `<p style="font-size:13px; color:#888;">Loading available delivery partners in ${escapeHtml(currentDeliveryVillage)}...</p>`;
             try {
                 const boys = await findAvailableDeliveryBoys(db, currentDeliveryVillage);
-                if (boys.length === 0) {
-                    listEl.innerHTML = `<p style="font-size:13px; color:#888;">No available delivery partners found in ${escapeHtml(currentDeliveryVillage)} right now. Try posting to the job board instead.</p>`;
-                    return;
-                }
-                listEl.innerHTML = boys.map(b => `
-                    <div style="display:flex; align-items:center; justify-content:space-between; padding:10px; border:1px solid #eee; border-radius:8px; margin-bottom:8px;">
-                        <div>
-                            <strong style="font-size:13.5px;">${escapeHtml(b.name)}</strong><br>
-                            <span style="font-size:12px; color:#666;">📞 ${escapeHtml(b.phone)} · ${escapeHtml(b.vehicleType || 'bike')}</span>
-                        </div>
-                        <button class="dash-action-btn btn-accept" onclick='window.assignDeliveryBoyMain(${JSON.stringify({ id: b.id, name: b.name, phone: b.phone, vehicleType: b.vehicleType, village: b.village }).replace(/'/g, "&#39;")})'>Assign</button>
-                    </div>
-                `).join('');
+                renderDeliveryBoyList(boys);
+            } catch (error) {
+                listEl.innerHTML = `<p style="font-size:13px; color:#c0392b;">⚠️ Unable to load delivery partners: ${escapeHtml(error.message || String(error))}</p>`;
+            }
+        };
+
+        // "Browse all live partners" — every available delivery partner
+        // platform-wide, not filtered to this order's exact destination
+        // village. Useful when the village-text match comes up empty (typos,
+        // slightly different spelling, etc.) or the seller just wants to see
+        // who's around.
+        window.showAllDeliveryBoysMain = async function() {
+            const listEl = document.getElementById('deliveryBoysListContainer');
+            listEl.innerHTML = `<p style="font-size:13px; color:#888;">Loading every available delivery partner...</p>`;
+            try {
+                const boys = await loadAllAvailableDeliveryPartners(db);
+                renderDeliveryBoyList(boys);
             } catch (error) {
                 listEl.innerHTML = `<p style="font-size:13px; color:#c0392b;">⚠️ Unable to load delivery partners: ${escapeHtml(error.message || String(error))}</p>`;
             }
