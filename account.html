@@ -68,7 +68,10 @@
 <body>
 
     <header>
-        <h2 style="color: white; margin:0; font-size: 18px;">DesiMarket</h2>
+        <div style="display:flex; align-items:center; gap:12px;">
+            <span onclick="history.back()" style="cursor:pointer; font-size:20px;">⬅️</span>
+            <h2 style="color: white; margin:0; font-size: 18px;">DesiMarket</h2>
+        </div>
         <div style="display:flex; align-items:center; gap:16px;">
             <div id="notifBellMount"></div>
             <div class="menu-icon" onclick="toggleMenu()">
@@ -139,12 +142,9 @@
             </div>
 
             <div class="quick-links">
-                <a href="orders.html" class="quick-link">📦 My Orders</a>
-                <a href="cart.html" class="quick-link">🛍️ My Cart</a>
                 <a href="addresses.html" class="quick-link">📍 My Addresses</a>
                 <a href="seller-dashboard.html" class="quick-link">🏪 Seller Hub</a>
                 <a href="delivery-dashboard.html" class="quick-link">🚚 Delivery Partner Hub</a>
-                <a href="terms.html" class="quick-link">📄 Terms & Privacy</a>
             </div>
         </div>
 
