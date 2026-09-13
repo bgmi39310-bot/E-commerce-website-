@@ -1,9 +1,10 @@
 import {
-    doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, limit, orderBy
+    doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, limit, orderBy,
+    getCountFromServer
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { showToast } from './toast.js';
 import { sendNotification } from './notif-logic.js';
-import { initPickerMap } from './map-utils.js';
+import { initPickerMap, distanceKm } from './map-utils.js';
 
 // ============================================================================
 // PROFILE
@@ -50,10 +51,26 @@ export function refreshDeliveryLocationMap() {
     ensureDeliveryLocationMap(lastLoadedDeliveryLat, lastLoadedDeliveryLng);
 }
 
+// Normalizes a profile doc so callers never have to think about the old
+// single-`village` shape from before multi-village support existed —
+// everything downstream just uses `villages` (an array).
+function normalizeProfile(profile) {
+    if (!profile) return null;
+    let villages = Array.isArray(profile.villages) ? profile.villages : [];
+    if (villages.length === 0 && profile.village) villages = [profile.village]; // migrate old single-village profiles
+    return {
+        ...profile,
+        villages,
+        feeType: profile.feeType || 'fixed',
+        feeAmount: typeof profile.feeAmount === 'number' ? profile.feeAmount : 0,
+        maxDistanceKm: typeof profile.maxDistanceKm === 'number' ? profile.maxDistanceKm : null
+    };
+}
+
 export async function loadDeliveryProfile(db, uid) {
     const docSnap = await getDoc(doc(db, "delivery_profiles", uid));
     if (docSnap.exists()) {
-        const profile = docSnap.data();
+        const profile = normalizeProfile(docSnap.data());
         lastLoadedDeliveryLat = typeof profile.lat === 'number' ? profile.lat : null;
         lastLoadedDeliveryLng = typeof profile.lng === 'number' ? profile.lng : null;
         return profile;
@@ -61,14 +78,31 @@ export async function loadDeliveryProfile(db, uid) {
     return null;
 }
 
-export async function saveDeliveryProfile(db, uid, { name, phone, village, vehicleType }) {
-    if (!name || !phone || !village) {
-        showToast("Please fill in your name, phone, and service village/area.", 'error');
+// `villages` here is an ARRAY (a delivery partner can serve more than one
+// village/area — they're not locked into just one like before).
+// `feeType` is 'fixed' (flat ₹ per delivery) or 'per_km' (₹ per km,
+// multiplied against the actual distance at delivery time by whoever's
+// arranging it — DesiMarket doesn't compute distance-based pricing
+// automatically, it's shown so sellers/buyers know the rate to expect).
+export async function saveDeliveryProfile(db, uid, { name, phone, villages, vehicleType, feeType, feeAmount, maxDistanceKm }) {
+    const cleanVillages = (villages || []).map(v => v.trim()).filter(Boolean);
+    if (!name || !phone || cleanVillages.length === 0) {
+        showToast("Please fill in your name, phone, and at least one village/area you serve.", 'error');
+        return false;
+    }
+    if (cleanVillages.length > 25) {
+        showToast("Please list 25 villages/areas or fewer.", 'error');
         return false;
     }
     try {
         await setDoc(doc(db, "delivery_profiles", uid), {
-            uid, name, phone, village, vehicleType: vehicleType || 'bike',
+            uid, name, phone,
+            villages: cleanVillages,
+            village: cleanVillages[0], // kept in sync for any old code path that still reads the singular field
+            vehicleType: vehicleType || 'bike',
+            feeType: feeType === 'per_km' ? 'per_km' : 'fixed',
+            feeAmount: Number(feeAmount) || 0,
+            maxDistanceKm: maxDistanceKm ? Number(maxDistanceKm) : null,
             lat: pickedDeliveryLat,
             lng: pickedDeliveryLng,
             isAvailable: true, // default to available right after setting up — they can toggle off any time
@@ -99,13 +133,14 @@ export async function setDeliveryAvailability(db, uid, isAvailable) {
 // You" elsewhere in the app — no GPS required to use this.
 // ============================================================================
 
-export async function loadJobBoard(db, village) {
-    if (!village) return [];
+export async function loadJobBoard(db, villages) {
+    const list = (villages || []).slice(0, 30); // Firestore "in" supports at most 30 values
+    if (list.length === 0) return [];
     try {
         const q = query(
             collection(db, "orders"),
             where("deliveryRequestStatus", "==", "open"),
-            where("buyerCity", "==", village),
+            where("buyerCity", "in", list),
             limit(50)
         );
         const snap = await getDocs(q);
@@ -118,7 +153,10 @@ export async function loadJobBoard(db, village) {
     }
 }
 
-// A delivery partner claims an OPEN job-board order for themselves.
+// A delivery partner claims an OPEN job-board order for themselves. Their
+// CURRENT fee is snapshotted onto the order at this moment — so it stays
+// accurate for this delivery's history/earnings even if they change their
+// rate later.
 export async function claimDeliveryJob(db, orderId, deliveryBoy) {
     try {
         const orderRef = doc(db, "orders", orderId);
@@ -131,7 +169,9 @@ export async function claimDeliveryJob(db, orderId, deliveryBoy) {
             deliveryBoyUid: deliveryBoy.uid,
             deliveryBoyName: deliveryBoy.name,
             deliveryBoyPhone: deliveryBoy.phone,
-            deliveryRequestStatus: 'assigned'
+            deliveryRequestStatus: 'assigned',
+            deliveryFeeType: deliveryBoy.feeType || 'fixed',
+            deliveryFeeAmount: deliveryBoy.feeAmount || 0
         });
         const order = snap.data();
         if (order.sellerUid) {
@@ -199,27 +239,109 @@ export async function declineDeliveryAssignment(db, orderId) {
 }
 
 // ============================================================================
+// STATS & HISTORY — the "how many done, how many left, how much earned"
+// view every delivery-app dashboard has.
+// ============================================================================
+
+export async function getDeliveryStats(db, uid) {
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+
+    const [deliveredTotalSnap, deliveredTodaySnap, activeSnap] = await Promise.all([
+        getCountFromServer(query(
+            collection(db, "orders"),
+            where("deliveryBoyUid", "==", uid),
+            where("status", "==", "Delivered")
+        )),
+        getCountFromServer(query(
+            collection(db, "orders"),
+            where("deliveryBoyUid", "==", uid),
+            where("status", "==", "Delivered"),
+            where("deliveredAt", ">=", todayStart)
+        )),
+        getCountFromServer(query(
+            collection(db, "orders"),
+            where("deliveryBoyUid", "==", uid),
+            where("status", "in", ["Accepted", "Shipped"])
+        )),
+    ]);
+
+    return {
+        deliveredTotal: deliveredTotalSnap.data().count,
+        deliveredToday: deliveredTodaySnap.data().count,
+        active: activeSnap.data().count
+    };
+}
+
+// Recent completed deliveries, most recent first — the earnings/history log.
+export async function loadDeliveryHistory(db, uid) {
+    const q = query(
+        collection(db, "orders"),
+        where("deliveryBoyUid", "==", uid),
+        where("status", "==", "Delivered"),
+        orderBy("deliveredAt", "desc"),
+        limit(100)
+    );
+    const snap = await getDocs(q);
+    const history = [];
+    snap.forEach(d => history.push({ id: d.id, ...d.data() }));
+    return history;
+}
+
+// ============================================================================
 // SELLER SIDE — finding delivery partners and posting/assigning orders.
 // (Used from seller-dashboard.html.)
 // ============================================================================
 
+// Village-specific search (kept for the "assign to this order's exact
+// destination village" flow).
 export async function findAvailableDeliveryBoys(db, village) {
     if (!village) return [];
     try {
         const q = query(
             collection(db, "delivery_profiles"),
-            where("village", "==", village),
+            where("villages", "array-contains", village),
             where("isAvailable", "==", true),
             limit(50)
         );
         const snap = await getDocs(q);
         const boys = [];
-        snap.forEach(d => boys.push({ id: d.id, ...d.data() }));
+        snap.forEach(d => boys.push({ id: d.id, ...normalizeProfile(d.data()) }));
         return boys;
     } catch (error) {
         console.error("Error finding delivery partners:", error);
         throw error;
     }
+}
+
+// The full "who's live right now" directory — every available delivery
+// partner platform-wide, regardless of village, so a seller can browse
+// everyone rather than only exact village-text matches. If the seller has
+// a shop location pinned (lat/lng), results are sorted nearest-first;
+// otherwise they're shown in whatever order Firestore returns them.
+export async function loadAllAvailableDeliveryPartners(db, myLat, myLng) {
+    const q = query(
+        collection(db, "delivery_profiles"),
+        where("isAvailable", "==", true),
+        limit(200)
+    );
+    const snap = await getDocs(q);
+    let boys = [];
+    snap.forEach(d => boys.push({ id: d.id, ...normalizeProfile(d.data()) }));
+
+    if (typeof myLat === 'number' && typeof myLng === 'number') {
+        boys = boys.map(b => ({
+            ...b,
+            distanceKm: (typeof b.lat === 'number' && typeof b.lng === 'number')
+                ? distanceKm(myLat, myLng, b.lat, b.lng)
+                : null
+        })).sort((a, b) => {
+            if (a.distanceKm === null && b.distanceKm === null) return 0;
+            if (a.distanceKm === null) return 1;
+            if (b.distanceKm === null) return -1;
+            return a.distanceKm - b.distanceKm;
+        });
+    }
+    return boys;
 }
 
 // Puts an order on the open job board for any delivery partner serving that village to claim.
@@ -238,7 +360,8 @@ export async function postOrderToJobBoard(db, orderId) {
     }
 }
 
-// Directly assigns one order to a specific delivery partner (skips the job board).
+// Directly assigns one order to a specific delivery partner (skips the job
+// board). Their current fee is snapshotted onto the order, same as claiming.
 export async function assignOrderToDeliveryBoy(db, orderId, deliveryBoy) {
     try {
         const orderRef = doc(db, "orders", orderId);
@@ -246,11 +369,13 @@ export async function assignOrderToDeliveryBoy(db, orderId, deliveryBoy) {
             deliveryBoyUid: deliveryBoy.id,
             deliveryBoyName: deliveryBoy.name,
             deliveryBoyPhone: deliveryBoy.phone,
-            deliveryRequestStatus: 'assigned'
+            deliveryRequestStatus: 'assigned',
+            deliveryFeeType: deliveryBoy.feeType || 'fixed',
+            deliveryFeeAmount: deliveryBoy.feeAmount || 0
         });
         sendNotification(db, deliveryBoy.id, {
             title: 'New delivery assignment',
-            body: `A shop has asked you to deliver an order in ${deliveryBoy.village || 'your area'}.`,
+            body: `A shop has asked you to deliver an order${deliveryBoy.villages && deliveryBoy.villages[0] ? ' in ' + deliveryBoy.villages[0] : ''}.`,
             type: 'delivery_assigned',
             link: 'delivery-dashboard.html'
         });
