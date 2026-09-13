@@ -26,6 +26,9 @@
         .header-actions { display: flex; align-items: center; gap: 12px; }
         .header-actions a, .header-actions button { color: white; text-decoration: none; font-size: 13px; background: none; border: 1px solid rgba(255,255,255,.4); padding: 6px 10px; border-radius: 6px; cursor: pointer; }
         .container { max-width: 700px; margin: 0 auto; padding: 16px; }
+        .tabs { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 14px; }
+        .tab-btn { flex-shrink: 0; padding: 9px 14px; border-radius: 20px; border: 1px solid #ddd; background: white; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .tab-btn.active { background: #232f3e; color: white; border-color: #232f3e; }
         .card { background: white; border-radius: 10px; padding: 18px; margin-bottom: 16px; }
         .card h2 { font-size: 16px; margin: 0 0 14px; }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -37,18 +40,22 @@
         .availability-banner.available { background: #eafaf1; color: #1a7f4b; }
         .availability-banner.busy { background: #fdecea; color: #c0392b; }
         .availability-banner button { border: none; padding: 8px 14px; border-radius: 6px; font-weight: 700; cursor: pointer; }
-        .job-card, .delivery-card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
-        .job-card h4, .delivery-card h4 { margin: 0 0 4px; font-size: 14.5px; }
-        .job-card p, .delivery-card p { margin: 2px 0; font-size: 13px; color: #555; }
-        .job-card .btn-row, .delivery-card .btn-row { display: flex; gap: 8px; margin-top: 10px; }
+        .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+        .stat-box { background: white; border-radius: 10px; padding: 14px 8px; text-align: center; }
+        .stat-box .num { font-size: 22px; font-weight: 800; color: #232f3e; }
+        .stat-box .lbl { font-size: 11.5px; color: #767676; margin-top: 2px; }
+        .job-card, .delivery-card, .history-card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+        .job-card h4, .delivery-card h4, .history-card h4 { margin: 0 0 4px; font-size: 14.5px; }
+        .job-card p, .delivery-card p, .history-card p { margin: 2px 0; font-size: 13px; color: #555; }
+        .job-card .btn-row, .delivery-card .btn-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
         .btn-claim { background: #ff9900; color: #111; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 13px; }
         .btn-decline { background: #fdecea; color: #c0392b; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 13px; }
         .btn-pickup { background: #007185; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 13px; }
         .btn-deliver { background: #1a7f4b; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 13px; }
         .status-tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: #eee; color: #555; }
+        .fee-tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: #eafaf1; color: #1a7f4b; }
         .no-data { text-align: center; color: #888; padding: 20px; font-size: 14px; }
         .error-box { background: #fdecea; color: #c0392b; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; word-break: break-word; }
-        .error-box a { color: #a02;}
         .login-prompt { text-align: center; padding: 50px 20px; background: white; border-radius: 8px; }
         .login-prompt a { display: inline-block; margin-top: 12px; background: #ffd814; padding: 10px 22px; border-radius: 5px; text-decoration: none; color: #111; font-weight: bold; }
     </style>
@@ -77,11 +84,13 @@
     import {
         loadDeliveryProfile, saveDeliveryProfile, setDeliveryAvailability,
         loadJobBoard, claimDeliveryJob, loadMyDeliveries, declineDeliveryAssignment,
-        useMyLocationForDelivery, refreshDeliveryLocationMap
+        useMyLocationForDelivery, refreshDeliveryLocationMap,
+        getDeliveryStats, loadDeliveryHistory
     } from './delivery-logic.js';
 
     let currentUser = null;
     let myProfile = null;
+    let activeTab = 'jobs'; // 'jobs' | 'deliveries' | 'history' | 'profile'
 
     window.handleLogout = () => signOut(auth).then(() => window.location.href = 'login.html');
     window.useMyLocationForDelivery = useMyLocationForDelivery;
@@ -120,20 +129,27 @@
 
     function renderProfileForm() {
         const content = document.getElementById('pageContent');
+        const p = myProfile || {};
         content.innerHTML = `
             <div class="card">
-                <h2>🚚 Set up your Delivery Partner profile</h2>
+                <h2>🚚 ${myProfile ? 'Edit your' : 'Set up your'} Delivery Partner profile</h2>
                 <p style="font-size:13px; color:#666; margin-top:-6px;">This is shown to sellers when they look for someone to deliver their orders.</p>
                 <div class="form-grid">
-                    <input type="text" id="dName" placeholder="Your Full Name" value="${escapeHtml((currentUser.displayName) || '')}">
-                    <input type="tel" id="dPhone" placeholder="Phone Number">
-                    <input type="text" id="dVillage" placeholder="Village / Area you serve" class="full-width">
-                    <select id="dVehicle" class="full-width">
-                        <option value="bike">🏍️ Bike</option>
-                        <option value="cycle">🚲 Cycle</option>
-                        <option value="van">🚐 Van / Tempo</option>
-                        <option value="on_foot">🚶 On Foot</option>
+                    <input type="text" id="dName" placeholder="Your Full Name" value="${escapeHtml(p.name || currentUser.displayName || '')}">
+                    <input type="tel" id="dPhone" placeholder="Phone Number" value="${escapeHtml(p.phone || '')}">
+                    <input type="text" id="dVillages" placeholder="Villages / areas you serve (comma-separated)" class="full-width" value="${escapeHtml((p.villages || []).join(', '))}">
+                    <input type="number" id="dMaxDistance" placeholder="Max distance you'll travel (km, optional)" min="0" value="${p.maxDistanceKm || ''}">
+                    <select id="dVehicle">
+                        <option value="bike" ${p.vehicleType === 'bike' ? 'selected' : ''}>🏍️ Bike</option>
+                        <option value="cycle" ${p.vehicleType === 'cycle' ? 'selected' : ''}>🚲 Cycle</option>
+                        <option value="van" ${p.vehicleType === 'van' ? 'selected' : ''}>🚐 Van / Tempo</option>
+                        <option value="on_foot" ${p.vehicleType === 'on_foot' ? 'selected' : ''}>🚶 On Foot</option>
                     </select>
+                    <select id="dFeeType">
+                        <option value="fixed" ${p.feeType !== 'per_km' ? 'selected' : ''}>₹ Fixed per delivery</option>
+                        <option value="per_km" ${p.feeType === 'per_km' ? 'selected' : ''}>₹ Per kilometre</option>
+                    </select>
+                    <input type="number" id="dFeeAmount" placeholder="Your rate (₹)" min="0" value="${p.feeAmount || ''}">
                     <div class="full-width">
                         <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">📍 Base Location (optional — helps sellers see how far you are)</label>
                         <button type="button" onclick="window.useMyLocationForDelivery()" class="action-btn secondary full-width" style="margin-bottom:8px;">📍 Use My Current Location</button>
@@ -141,18 +157,25 @@
                         <p id="deliveryLocationStatus" style="font-size:12px; color:#666; margin:0;">Tap the map, or drag the pin, to set it.</p>
                     </div>
                     <button class="action-btn full-width" onclick="window.saveProfileMain()">Save Profile & Continue</button>
+                    ${myProfile ? `<button class="action-btn secondary full-width" onclick="window.cancelEditMain()">Cancel</button>` : ''}
                 </div>
             </div>
         `;
         refreshDeliveryLocationMap();
     }
 
+    window.cancelEditMain = function() { renderDashboard(); };
+
     window.saveProfileMain = async function() {
+        const villages = document.getElementById('dVillages').value.split(',').map(v => v.trim()).filter(Boolean);
         const ok = await saveDeliveryProfile(db, currentUser.uid, {
             name: document.getElementById('dName').value.trim(),
             phone: document.getElementById('dPhone').value.trim(),
-            village: document.getElementById('dVillage').value.trim(),
-            vehicleType: document.getElementById('dVehicle').value
+            villages,
+            vehicleType: document.getElementById('dVehicle').value,
+            feeType: document.getElementById('dFeeType').value,
+            feeAmount: document.getElementById('dFeeAmount').value,
+            maxDistanceKm: document.getElementById('dMaxDistance').value
         });
         if (ok) await loadAndRenderProfile();
     };
@@ -165,24 +188,60 @@
                 <button onclick="window.toggleAvailMain()">${myProfile.isAvailable ? 'Go Busy' : 'Go Available'}</button>
             </div>
 
-            <div class="card">
-                <h2>📋 Job Board — open deliveries in <strong>${escapeHtml(myProfile.village)}</strong></h2>
+            <div class="stats-row" id="statsRow">
+                <div class="stat-box"><div class="num">—</div><div class="lbl">Delivered Today</div></div>
+                <div class="stat-box"><div class="num">—</div><div class="lbl">Active Now</div></div>
+                <div class="stat-box"><div class="num">—</div><div class="lbl">Total Delivered</div></div>
+            </div>
+
+            <div class="tabs">
+                <button class="tab-btn ${activeTab === 'jobs' ? 'active' : ''}" onclick="window.switchTab('jobs')">📋 Job Board</button>
+                <button class="tab-btn ${activeTab === 'deliveries' ? 'active' : ''}" onclick="window.switchTab('deliveries')">🚚 Active Deliveries</button>
+                <button class="tab-btn ${activeTab === 'history' ? 'active' : ''}" onclick="window.switchTab('history')">📜 History</button>
+                <button class="tab-btn ${activeTab === 'profile' ? 'active' : ''}" onclick="window.editProfileMain()">⚙️ Profile</button>
+            </div>
+
+            <div class="card" id="tabContentCard" style="display:${activeTab === 'jobs' ? 'block' : 'none'};">
+                <h2>📋 Job Board — open deliveries in <strong>${escapeHtml((myProfile.villages || []).join(', ') || 'your area')}</strong></h2>
                 <div id="jobBoardContainer"><p>Loading...</p></div>
             </div>
-
-            <div class="card">
-                <h2>🚚 My Deliveries</h2>
+            <div class="card" id="deliveriesCard" style="display:${activeTab === 'deliveries' ? 'block' : 'none'};">
+                <h2>🚚 Active Deliveries</h2>
                 <div id="myDeliveriesContainer"><p>Loading...</p></div>
             </div>
-
-            <div class="card">
-                <h2>⚙️ Profile</h2>
-                <p style="font-size:13px; color:#666;">${escapeHtml(myProfile.name)} · ${escapeHtml(myProfile.phone)} · ${escapeHtml(myProfile.village)}</p>
-                <button class="action-btn secondary" onclick="window.editProfileMain()">✏️ Edit Profile</button>
+            <div class="card" id="historyCard" style="display:${activeTab === 'history' ? 'block' : 'none'};">
+                <h2>📜 Delivery History</h2>
+                <div id="historyContainer"><p>Loading...</p></div>
             </div>
         `;
+        loadAndRenderStats();
         loadAndRenderJobBoard();
         loadAndRenderMyDeliveries();
+        if (activeTab === 'history') loadAndRenderHistory();
+    }
+
+    window.switchTab = function(tab) {
+        activeTab = tab;
+        document.getElementById('tabContentCard').style.display = tab === 'jobs' ? 'block' : 'none';
+        document.getElementById('deliveriesCard').style.display = tab === 'deliveries' ? 'block' : 'none';
+        document.getElementById('historyCard').style.display = tab === 'history' ? 'block' : 'none';
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+        if (tab === 'history') loadAndRenderHistory();
+    };
+
+    async function loadAndRenderStats() {
+        const statsRow = document.getElementById('statsRow');
+        try {
+            const stats = await getDeliveryStats(db, currentUser.uid);
+            statsRow.innerHTML = `
+                <div class="stat-box"><div class="num">${stats.deliveredToday}</div><div class="lbl">Delivered Today</div></div>
+                <div class="stat-box"><div class="num">${stats.active}</div><div class="lbl">Active Now</div></div>
+                <div class="stat-box"><div class="num">${stats.deliveredTotal}</div><div class="lbl">Total Delivered</div></div>
+            `;
+        } catch (error) {
+            statsRow.innerHTML = `<div class="error-box full-width" style="grid-column:1/-1;">⚠️ Stats unavailable: ${escapeHtml(error.message || String(error))}</div>`;
+        }
     }
 
     window.toggleAvailMain = async function() {
@@ -198,17 +257,12 @@
 
     window.editProfileMain = function() {
         renderProfileForm();
-        // Pre-fill with existing values
-        document.getElementById('dName').value = myProfile.name || '';
-        document.getElementById('dPhone').value = myProfile.phone || '';
-        document.getElementById('dVillage').value = myProfile.village || '';
-        document.getElementById('dVehicle').value = myProfile.vehicleType || 'bike';
     };
 
     async function loadAndRenderJobBoard() {
         const container = document.getElementById('jobBoardContainer');
         try {
-            const jobs = await loadJobBoard(db, myProfile.village);
+            const jobs = await loadJobBoard(db, myProfile.villages);
             if (jobs.length === 0) {
                 container.innerHTML = `<div class="no-data">No open deliveries in your area right now. Check back later!</div>`;
                 return;
@@ -229,9 +283,17 @@
     }
 
     window.claimJobMain = async function(orderId) {
-        const ok = await claimDeliveryJob(db, orderId, { uid: currentUser.uid, name: myProfile.name, phone: myProfile.phone });
-        if (ok) { loadAndRenderJobBoard(); loadAndRenderMyDeliveries(); }
+        const ok = await claimDeliveryJob(db, orderId, {
+            uid: currentUser.uid, name: myProfile.name, phone: myProfile.phone,
+            feeType: myProfile.feeType, feeAmount: myProfile.feeAmount
+        });
+        if (ok) { loadAndRenderJobBoard(); loadAndRenderMyDeliveries(); loadAndRenderStats(); }
     };
+
+    function feeLabel(feeType, feeAmount) {
+        if (!feeAmount) return '';
+        return feeType === 'per_km' ? `₹${feeAmount}/km` : `₹${feeAmount} flat`;
+    }
 
     async function loadAndRenderMyDeliveries() {
         const container = document.getElementById('myDeliveriesContainer');
@@ -243,6 +305,7 @@
             }
             container.innerHTML = deliveries.map(o => {
                 const statusTag = `<span class="status-tag">${escapeHtml(o.status)}</span>`;
+                const fee = feeLabel(o.deliveryFeeType, o.deliveryFeeAmount);
                 let actionBtns = '';
                 if (o.status === 'Accepted') {
                     actionBtns = `
@@ -254,7 +317,7 @@
                 }
                 return `
                     <div class="delivery-card">
-                        <h4>📦 ${escapeHtml(o.productName || 'Item')} (Qty ${o.quantity || 1}) ${statusTag}</h4>
+                        <h4>📦 ${escapeHtml(o.productName || 'Item')} (Qty ${o.quantity || 1}) ${statusTag} ${fee ? `<span class="fee-tag">${fee}</span>` : ''}</h4>
                         <p>🏪 From: ${escapeHtml(o.shopName || 'N/A')}</p>
                         <p>📍 To: ${escapeHtml(o.buyerAddress || 'N/A')}</p>
                         <p>📞 Buyer: ${escapeHtml(o.buyerPhone || 'N/A')}</p>
@@ -267,11 +330,41 @@
         }
     }
 
+    async function loadAndRenderHistory() {
+        const container = document.getElementById('historyContainer');
+        container.innerHTML = `<p>Loading...</p>`;
+        try {
+            const history = await loadDeliveryHistory(db, currentUser.uid);
+            if (history.length === 0) {
+                container.innerHTML = `<div class="no-data">No completed deliveries yet.</div>`;
+                return;
+            }
+            const totalEarned = history.reduce((sum, o) => sum + (o.deliveryFeeType !== 'per_km' ? (o.deliveryFeeAmount || 0) : 0), 0);
+            container.innerHTML = `
+                <p style="font-size:13px; color:#666; margin-bottom:10px;"><strong>${history.length}</strong> completed deliveries shown${totalEarned > 0 ? ` · Fixed-rate earnings: <strong>₹${totalEarned}</strong> (per-km deliveries aren't totalled automatically)` : ''}</p>
+                ${history.map(o => {
+                    const deliveredDate = o.deliveredAt && o.deliveredAt.toDate ? o.deliveredAt.toDate().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+                    const fee = feeLabel(o.deliveryFeeType, o.deliveryFeeAmount);
+                    return `
+                        <div class="history-card">
+                            <h4>📦 ${escapeHtml(o.productName || 'Item')} ${fee ? `<span class="fee-tag">${fee}</span>` : ''}</h4>
+                            <p>🏪 ${escapeHtml(o.shopName || 'N/A')} → ${escapeHtml(o.buyerAddress || 'N/A')}</p>
+                            <p style="color:#999;">Delivered ${deliveredDate}</p>
+                        </div>
+                    `;
+                }).join('')}
+            `;
+        } catch (error) {
+            container.innerHTML = `<div class="error-box">⚠️ Unable to load delivery history: ${escapeHtml(error.message || String(error))}</div>`;
+        }
+    }
+
     window.declineMain = async function(orderId) {
         if (!confirm("Back out of this delivery? It'll go back on the job board for someone else.")) return;
         await declineDeliveryAssignment(db, orderId);
         loadAndRenderMyDeliveries();
         loadAndRenderJobBoard();
+        loadAndRenderStats();
     };
 
     window.pickupMain = async function(orderId) {
@@ -282,6 +375,7 @@
     window.deliverMain = async function(orderId) {
         await confirmDelivery(db, orderId);
         loadAndRenderMyDeliveries();
+        loadAndRenderStats();
     };
 </script>
 </body>
