@@ -30,6 +30,7 @@ function sortByCreatedAtDesc(list) {
 
 let cachedSellers = [];
 let cachedBuyers = [];
+let cachedDeliveryPartners = [];
 let cachedProducts = [];
 let cachedReports = [];
 let cachedKyc = [];
@@ -50,15 +51,20 @@ export async function loadDashboardCharts(db, renderCallback) {
     // error, while everything else that succeeded still renders.
 
     // ---- Exact platform-wide counts via Firestore's count() aggregation.
-    let totalSellers = 0, totalBuyers = 0, totalProducts = 0, totalOrders = 0;
+    let totalSellers = 0, totalBuyers = 0, totalDeliveryPartners = 0, totalProducts = 0, totalOrders = 0;
     let statusCounts = { Pending: 0, Accepted: 0, Shipped: 0, Delivered: 0, Cancelled: 0 };
     try {
         const [
-            sellersCountSnap, buyersCountSnap, productsCountSnap, ordersCountSnap,
+            sellersCountSnap, buyersCountSnap, deliveryCountSnap, productsCountSnap, ordersCountSnap,
             pendingCountSnap, acceptedCountSnap, shippedCountSnap, deliveredCountSnap, cancelledCountSnap,
         ] = await Promise.all([
             getCountFromServer(query(collection(db, "users"), where("role", "==", "seller"))),
             getCountFromServer(query(collection(db, "users"), where("role", "==", "customer"))),
+            // Delivery partners aren't tracked via users.role (anyone —
+            // buyer or seller — can also set up a delivery profile without
+            // switching their account's primary role), so this counts the
+            // delivery_profiles collection directly instead.
+            getCountFromServer(collection(db, "delivery_profiles")),
             getCountFromServer(collection(db, "vendors")),
             getCountFromServer(collection(db, "orders")),
             getCountFromServer(query(collection(db, "orders"), where("status", "==", "Pending"))),
@@ -69,6 +75,7 @@ export async function loadDashboardCharts(db, renderCallback) {
         ]);
         totalSellers = sellersCountSnap.data().count;
         totalBuyers = buyersCountSnap.data().count;
+        totalDeliveryPartners = deliveryCountSnap.data().count;
         totalProducts = productsCountSnap.data().count;
         totalOrders = ordersCountSnap.data().count;
         statusCounts = {
@@ -151,7 +158,7 @@ export async function loadDashboardCharts(db, renderCallback) {
     }
 
     renderCallback({
-        totalSellers, totalBuyers, totalProducts, totalOrders,
+        totalSellers, totalBuyers, totalDeliveryPartners, totalProducts, totalOrders,
         totalRevenue, dayLabels, dayTotals, statusCounts, topSellers, recentOrders,
         errors // non-empty = some section(s) failed; check the console for details/index links
     });
@@ -441,7 +448,59 @@ export async function loadBuyers(db) {
     }
 }
 
-// Shared by both Sellers and Buyers tabs — patches whichever cache the user belongs to.
+// ---------- DELIVERY PARTNERS ----------
+function renderDeliveryPartners() {
+    const container = document.getElementById('deliveryPartnersContainer');
+    if (cachedDeliveryPartners.length === 0) {
+        container.innerHTML = `<div class="admin-no-data">No delivery partners registered yet.</div>`;
+        return;
+    }
+    container.innerHTML = cachedDeliveryPartners.map(d => {
+        const blocked = d.blocked === true;
+        const available = d.isAvailable === true;
+        const feeLabel = d.feeAmount ? (d.feeType === 'per_km' ? `₹${d.feeAmount}/km` : `₹${d.feeAmount} flat`) : 'rate not set';
+        return `
+            <div class="admin-row-card ${blocked ? 'is-blocked' : ''}">
+                <div class="arc-info">
+                    <h4>${escapeHtml(d.name || 'Unnamed')} ${blocked ? '<span class="blocked-tag">BLOCKED</span>' : ''} ${(available && !blocked) ? '<span class="blocked-tag" style="background:#1a7f4b;">🟢 AVAILABLE</span>' : ''}</h4>
+                    <p>📞 ${escapeHtml(d.phone || 'N/A')} &nbsp; 🚲 ${escapeHtml(d.vehicleType || 'N/A')} &nbsp; 💰 ${escapeHtml(feeLabel)}</p>
+                    <p>📍 Villages: ${escapeHtml((d.villages || []).join(', ') || 'N/A')}</p>
+                    <p class="uid-tag">UID: ${d.id}</p>
+                </div>
+                <div class="arc-actions">
+                    <button class="admin-btn ${blocked ? 'admin-btn-unblock' : 'admin-btn-block'}" onclick="toggleBlockMain('${d.id}', ${!blocked})">
+                        ${blocked ? '✅ Unblock' : '🚫 Block'}
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+export async function loadDeliveryPartners(db) {
+    const container = document.getElementById('deliveryPartnersContainer');
+    container.innerHTML = "<p>Loading delivery partners...</p>";
+    try {
+        const snap = await getDocs(query(collection(db, "delivery_profiles"), limit(LIST_FETCH_LIMIT)));
+        const profileDocs = snap.docs;
+        // Blocking uses the SAME users.blocked field as sellers/buyers (it's
+        // an account-wide block, not delivery-specific), so cross-reference
+        // each delivery partner's own users doc for their current status.
+        const userSnaps = await Promise.all(
+            profileDocs.map(d => getDoc(doc(db, "users", d.id)))
+        );
+        cachedDeliveryPartners = profileDocs.map((d, i) => {
+            const userData = userSnaps[i].exists() ? userSnaps[i].data() : {};
+            return { id: d.id, ...d.data(), blocked: userData.blocked === true };
+        });
+        renderDeliveryPartners();
+    } catch (error) {
+        console.error(error);
+        container.innerHTML = `<p style="color:red;">Unable to load delivery partners.<br><small style="color:#c77;">${escapeHtml(error.message || String(error))}</small></p>`;
+    }
+}
+
+// Shared by Sellers, Buyers, AND Delivery Partners tabs — patches whichever cache the user belongs to.
 export async function toggleBlockUser(db, uid, shouldBlock) {
     try {
         await updateDoc(doc(db, "users", uid), { blocked: shouldBlock });
@@ -452,6 +511,9 @@ export async function toggleBlockUser(db, uid, shouldBlock) {
 
         const buyer = cachedBuyers.find(u => u.id === uid);
         if (buyer) { buyer.blocked = shouldBlock; renderBuyers(); }
+
+        const deliveryPartner = cachedDeliveryPartners.find(d => d.id === uid);
+        if (deliveryPartner) { deliveryPartner.blocked = shouldBlock; renderDeliveryPartners(); }
     } catch (error) {
         console.error(error);
         showToast("Error updating user status.", 'error');
