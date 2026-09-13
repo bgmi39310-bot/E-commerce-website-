@@ -185,6 +185,7 @@
             <button class="sidebar-nav-item active" id="nav-dashboard" onclick="switchTab('dashboard')"><span class="icon">📊</span> Dashboard</button>
             <button class="sidebar-nav-item" id="nav-sellers" onclick="switchTab('sellers')"><span class="icon">🏪</span> Sellers</button>
             <button class="sidebar-nav-item" id="nav-buyers" onclick="switchTab('buyers')"><span class="icon">🧑‍🤝‍🧑</span> Buyers</button>
+            <button class="sidebar-nav-item" id="nav-delivery" onclick="switchTab('delivery')"><span class="icon">🚚</span> Delivery Partners</button>
             <button class="sidebar-nav-item" id="nav-products" onclick="switchTab('products')"><span class="icon">📦</span> Products</button>
             <button class="sidebar-nav-item" id="nav-orders" onclick="switchTab('orders')"><span class="icon">🧾</span> Orders</button>
             <button class="sidebar-nav-item" id="nav-reports" onclick="switchTab('reports')"><span class="icon">⚠️</span> Reports</button>
@@ -256,6 +257,11 @@
                 <div id="buyersContainer"><p>Loading buyers...</p></div>
             </div>
 
+            <!-- DELIVERY PARTNERS -->
+            <div class="admin-section" id="section-delivery">
+                <div id="deliveryPartnersContainer"><p>Loading delivery partners...</p></div>
+            </div>
+
             <!-- PRODUCTS -->
             <div class="admin-section" id="section-products">
                 <div id="productsContainer"><p>Loading products...</p></div>
@@ -317,7 +323,7 @@
     import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     import {
-        loadDashboardCharts, loadSellers, loadBuyers, toggleBlockUser,
+        loadDashboardCharts, loadSellers, loadBuyers, loadDeliveryPartners, toggleBlockUser,
         loadAllProducts, deleteProductAdmin, loadAllOrders, loadReports, resolveReport,
         resolveReportAndDeleteProduct,
         loadPendingKyc, updateKycStatus, loadAllReviews, deleteReviewAdmin
@@ -362,6 +368,7 @@
             document.getElementById('statsRow').innerHTML = `
                 <div class="stat-card"><div class="stat-icon sellers">🏪</div><div class="stat-text"><div class="stat-num">${data.totalSellers}</div><div class="stat-lbl">Total Sellers</div></div></div>
                 <div class="stat-card"><div class="stat-icon buyers">🧑‍🤝‍🧑</div><div class="stat-text"><div class="stat-num">${data.totalBuyers}</div><div class="stat-lbl">Total Buyers</div></div></div>
+                <div class="stat-card"><div class="stat-icon sellers">🚚</div><div class="stat-text"><div class="stat-num">${data.totalDeliveryPartners}</div><div class="stat-lbl">Delivery Partners</div></div></div>
                 <div class="stat-card"><div class="stat-icon products">📦</div><div class="stat-text"><div class="stat-num">${data.totalProducts}</div><div class="stat-lbl">Total Products</div></div></div>
                 <div class="stat-card"><div class="stat-icon orders">🧾</div><div class="stat-text"><div class="stat-num">${data.totalOrders}</div><div class="stat-lbl">Total Orders</div></div></div>
                 <div class="stat-card"><div class="stat-icon revenue">₹</div><div class="stat-text"><div class="stat-num">₹${data.totalRevenue.toFixed(0)}</div><div class="stat-lbl">Platform Revenue</div></div></div>
@@ -506,7 +513,7 @@
         document.getElementById('menuOverlay').style.display = document.getElementById('sidebar').classList.contains('open') ? 'block' : 'none';
     };
 
-    const PAGE_TITLES = { dashboard: 'Dashboard', sellers: 'Sellers', buyers: 'Buyers', products: 'Products', orders: 'Orders', reports: 'Reports', kyc: 'Seller KYC', banners: 'Banners', disputes: 'Disputes', reviews: 'Reviews' };
+    const PAGE_TITLES = { dashboard: 'Dashboard', sellers: 'Sellers', buyers: 'Buyers', delivery: 'Delivery Partners', products: 'Products', orders: 'Orders', reports: 'Reports', kyc: 'Seller KYC', banners: 'Banners', disputes: 'Disputes', reviews: 'Reviews' };
 
     window.switchTab = function(tabName) {
         document.querySelectorAll('.sidebar-nav-item').forEach(b => b.classList.remove('active'));
@@ -521,6 +528,7 @@
         if (tabName === 'dashboard') renderDashboardData();
         if (tabName === 'sellers') loadSellers(db);
         if (tabName === 'buyers') loadBuyers(db);
+        if (tabName === 'delivery') loadDeliveryPartners(db);
         if (tabName === 'products') loadAllProducts(db);
         if (tabName === 'orders') loadAllOrders(db, document.getElementById('orderStatusFilter').value);
         if (tabName === 'reports') loadReports(db);
