@@ -186,6 +186,7 @@
             <button class="sidebar-nav-item" id="nav-sellers" onclick="switchTab('sellers')"><span class="icon">🏪</span> Sellers</button>
             <button class="sidebar-nav-item" id="nav-buyers" onclick="switchTab('buyers')"><span class="icon">🧑‍🤝‍🧑</span> Buyers</button>
             <button class="sidebar-nav-item" id="nav-delivery" onclick="switchTab('delivery')"><span class="icon">🚚</span> Delivery Partners</button>
+            <button class="sidebar-nav-item" id="nav-auditlog" onclick="switchTab('auditlog')"><span class="icon">🧾</span> Audit Log</button>
             <button class="sidebar-nav-item" id="nav-products" onclick="switchTab('products')"><span class="icon">📦</span> Products</button>
             <button class="sidebar-nav-item" id="nav-orders" onclick="switchTab('orders')"><span class="icon">🧾</span> Orders</button>
             <button class="sidebar-nav-item" id="nav-reports" onclick="switchTab('reports')"><span class="icon">⚠️</span> Reports</button>
@@ -262,6 +263,12 @@
                 <div id="deliveryPartnersContainer"><p>Loading delivery partners...</p></div>
             </div>
 
+            <!-- AUDIT LOG -->
+            <div class="admin-section" id="section-auditlog">
+                <p style="font-size:12.5px; color:#8a94a6; margin-bottom:12px;">A record of admin actions (block/unblock, product removal, report resolution, KYC decisions) — who did what, and when.</p>
+                <div id="auditLogContainer"><p>Loading audit log...</p></div>
+            </div>
+
             <!-- PRODUCTS -->
             <div class="admin-section" id="section-products">
                 <div id="productsContainer"><p>Loading products...</p></div>
@@ -323,7 +330,7 @@
     import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     import {
-        loadDashboardCharts, loadSellers, loadBuyers, loadDeliveryPartners, toggleBlockUser,
+        loadDashboardCharts, loadSellers, loadBuyers, loadDeliveryPartners, toggleBlockUser, loadAdminActionLog,
         loadAllProducts, deleteProductAdmin, loadAllOrders, loadReports, resolveReport,
         resolveReportAndDeleteProduct,
         loadPendingKyc, updateKycStatus, loadAllReviews, deleteReviewAdmin
@@ -513,7 +520,7 @@
         document.getElementById('menuOverlay').style.display = document.getElementById('sidebar').classList.contains('open') ? 'block' : 'none';
     };
 
-    const PAGE_TITLES = { dashboard: 'Dashboard', sellers: 'Sellers', buyers: 'Buyers', delivery: 'Delivery Partners', products: 'Products', orders: 'Orders', reports: 'Reports', kyc: 'Seller KYC', banners: 'Banners', disputes: 'Disputes', reviews: 'Reviews' };
+    const PAGE_TITLES = { dashboard: 'Dashboard', sellers: 'Sellers', buyers: 'Buyers', delivery: 'Delivery Partners', auditlog: 'Audit Log', products: 'Products', orders: 'Orders', reports: 'Reports', kyc: 'Seller KYC', banners: 'Banners', disputes: 'Disputes', reviews: 'Reviews' };
 
     window.switchTab = function(tabName) {
         document.querySelectorAll('.sidebar-nav-item').forEach(b => b.classList.remove('active'));
@@ -529,6 +536,7 @@
         if (tabName === 'sellers') loadSellers(db);
         if (tabName === 'buyers') loadBuyers(db);
         if (tabName === 'delivery') loadDeliveryPartners(db);
+        if (tabName === 'auditlog') loadAdminActionLog(db);
         if (tabName === 'products') loadAllProducts(db);
         if (tabName === 'orders') loadAllOrders(db, document.getElementById('orderStatusFilter').value);
         if (tabName === 'reports') loadReports(db);
