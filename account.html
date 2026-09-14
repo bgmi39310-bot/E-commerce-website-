@@ -146,6 +146,24 @@
                 <a href="seller-dashboard.html" class="quick-link">🏪 Seller Hub</a>
                 <a href="delivery-dashboard.html" class="quick-link">🚚 Delivery Partner Hub</a>
             </div>
+
+            <div style="margin-top:24px; border-top:1px solid #eee; padding-top:16px;">
+                <button class="btn-action" style="background:none; border:1px solid #c0392b; color:#c0392b; width:100%;" onclick="window.openDeleteAccountModal()">🗑️ Delete My Account</button>
+            </div>
+        </div>
+
+        <div id="deleteAccountModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:2000; align-items:center; justify-content:center;">
+            <div style="background:white; border-radius:10px; padding:22px; max-width:380px; width:90%;">
+                <h3 style="margin-top:0; color:#c0392b;">⚠️ Delete your account?</h3>
+                <p style="font-size:13.5px; color:#444;">This permanently deletes your profile, addresses, and (if you have them) your seller shop and delivery partner profile. This <strong>cannot be undone</strong>.</p>
+                <p style="font-size:12.5px; color:#767676;">Your past orders and reviews stay on record for the sellers/buyers involved — deleting your account doesn't erase their transaction history.</p>
+                <p style="font-size:13px; font-weight:600;">Type <code>DELETE</code> below to confirm:</p>
+                <input type="text" id="deleteConfirmInput" placeholder="Type DELETE" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px; margin-bottom:12px; box-sizing:border-box;">
+                <div style="display:flex; gap:8px;">
+                    <button onclick="window.closeDeleteAccountModal()" style="flex:1; padding:10px; border-radius:6px; border:1px solid #ccc; background:white; cursor:pointer;">Cancel</button>
+                    <button id="confirmDeleteBtn" onclick="window.confirmDeleteAccount()" style="flex:1; padding:10px; border-radius:6px; border:none; background:#c0392b; color:white; font-weight:700; cursor:pointer;">Delete Forever</button>
+                </div>
+            </div>
         </div>
 
         <div id="guestSection" class="login-prompt" style="display: none;">
@@ -174,6 +192,50 @@
             await signOut(auth);
             window.location.href = 'login.html';
         }
+
+        // Backend URL for the Flask API — see render.yaml.
+        const BACKEND_BASE_URL = 'https://vande-market-api.onrender.com';
+
+        window.openDeleteAccountModal = function() {
+            document.getElementById('deleteConfirmInput').value = '';
+            document.getElementById('deleteAccountModal').style.display = 'flex';
+        };
+        window.closeDeleteAccountModal = function() {
+            document.getElementById('deleteAccountModal').style.display = 'none';
+        };
+
+        window.confirmDeleteAccount = async function() {
+            const typed = document.getElementById('deleteConfirmInput').value.trim();
+            if (typed !== 'DELETE') {
+                alert('Please type DELETE exactly to confirm.');
+                return;
+            }
+            const btn = document.getElementById('confirmDeleteBtn');
+            btn.disabled = true;
+            btn.textContent = 'Deleting...';
+
+            try {
+                const user = auth.currentUser;
+                if (!user) throw new Error('You are not logged in.');
+                const idToken = await user.getIdToken();
+
+                const response = await fetch(`${BACKEND_BASE_URL}/api/account/delete-me`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${idToken}` }
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Could not delete your account.');
+
+                alert('Your account has been deleted. Sorry to see you go!');
+                await signOut(auth).catch(() => {}); // the account is already gone server-side either way
+                window.location.href = 'index.html';
+            } catch (error) {
+                console.error(error);
+                alert('Error: ' + error.message);
+                btn.disabled = false;
+                btn.textContent = 'Delete Forever';
+            }
+        };
 
         let unsubscribeNotifBell = null;
         let notifBellMountedForUid = null;
