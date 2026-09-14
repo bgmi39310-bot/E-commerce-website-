@@ -1,8 +1,9 @@
+import { auth } from './firebase-config.js';
 import { showToast } from './toast.js';
 import { escapeHtml } from './sanitize.js';
 import {
     collection, getDocs, query, where, doc, updateDoc, deleteDoc, getDoc,
-    getCountFromServer, getAggregateFromServer, sum, limit, orderBy, writeBatch
+    getCountFromServer, getAggregateFromServer, sum, limit, orderBy, writeBatch, addDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // Local caches — each list is fetched from Firestore ONCE per admin session.
@@ -15,6 +16,26 @@ import {
 // and cheap instead of downloading every document in every collection on
 // every visit — which is what it used to do.
 const LIST_FETCH_LIMIT = 300;
+
+// Writes a record of every admin action that changes something, so there's
+// an actual trail of who did what and when — this used to be written by
+// the backend (routes/admin.py) but the admin panel never actually calls
+// the backend for these actions, it talks to Firestore directly, so that
+// logging never ran in practice. This is the fix: log from here instead,
+// right where the actions actually happen.
+async function logAdminAction(db, action, target, extra) {
+    try {
+        await addDoc(collection(db, "adminActionLog"), {
+            action, target,
+            performedBy: auth.currentUser ? auth.currentUser.uid : null,
+            extra: extra || {},
+            at: new Date()
+        });
+    } catch (error) {
+        // Never let logging itself block or fail the actual admin action.
+        console.error('Failed to write admin action log:', error);
+    }
+}
 
 // Sorts newest-first using createdAt when present, WITHOUT excluding
 // documents that don't have it (unlike a Firestore orderBy, which would
@@ -204,6 +225,7 @@ export async function deleteReviewAdmin(db, reviewId) {
         await deleteDoc(doc(db, "reviews", reviewId));
         cachedReviews = cachedReviews.filter(r => r.id !== reviewId); // patch locally, no re-fetch
         renderReviews();
+        logAdminAction(db, 'delete_review', reviewId);
     } catch (error) {
         console.error(error);
         showToast("Error removing review.", 'error');
@@ -258,6 +280,7 @@ export async function resolveReport(db, reportId) {
         const r = cachedReports.find(x => x.id === reportId);
         if (r) r.status = 'Resolved';
         renderReports();
+        logAdminAction(db, 'resolve_report', reportId);
     } catch (error) {
         console.error(error);
         showToast("Error updating report.", 'error');
@@ -282,6 +305,7 @@ export async function resolveReportAndDeleteProduct(db, reportId, productId) {
         renderReports();
         renderProducts();
         showToast("Product removed and report resolved.");
+        logAdminAction(db, 'resolve_report', reportId, { deletedProduct: productId });
     } catch (error) {
         console.error(error);
         showToast("Error resolving report / removing product.", 'error');
@@ -338,6 +362,7 @@ export async function updateKycStatus(db, sellerUid, newStatus) {
         // This seller no longer belongs in the "Pending" list once decided
         cachedKyc = cachedKyc.filter(s => s.id !== sellerUid);
         renderKyc();
+        logAdminAction(db, 'verify_kyc', sellerUid, { status: newStatus });
     } catch (error) {
         console.error(error);
         showToast("Error updating KYC status.", 'error');
@@ -378,23 +403,29 @@ export async function loadSellers(db) {
     const container = document.getElementById('sellersContainer');
     container.innerHTML = "<p>Loading sellers...</p>";
     try {
-        // Deliberately NOT using orderBy("createdAt") here: Firestore
-        // silently EXCLUDES any document that doesn't have the sorted
-        // field at all — so older/manually-added user docs without a
-        // createdAt field would just vanish from this list entirely, even
-        // though they still match role == "seller". Sorting after fetching
-        // (with a safe fallback below) shows every matching seller.
-        const q = query(collection(db, "users"), where("role", "==", "seller"), limit(LIST_FETCH_LIMIT));
-        const snap = await getDocs(q);
-
-        const sellerDocs = snap.docs;
-        const profileSnaps = await Promise.all(
-            sellerDocs.map(d => getDoc(doc(db, "sellers_profiles", d.id)))
+        // Querying sellers_profiles directly (not users.role=="seller") is
+        // deliberate: since ANY account can set up a shop without changing
+        // its role field (see delivery-dashboard.html for the same idea),
+        // users.role has become an unreliable way to find "who actually has
+        // a shop" — a seller_profiles doc existing IS the real definition
+        // of "this account is a seller".
+        const snap = await getDocs(query(collection(db, "sellers_profiles"), limit(LIST_FETCH_LIMIT)));
+        const profileDocs = snap.docs;
+        const userSnaps = await Promise.all(
+            profileDocs.map(d => getDoc(doc(db, "users", d.id)))
         );
 
-        cachedSellers = sellerDocs.map((d, i) => {
-            const profile = profileSnaps[i].exists() ? profileSnaps[i].data() : {};
-            return { id: d.id, ...d.data(), isPremium: profile.isPremium === true };
+        cachedSellers = profileDocs.map((d, i) => {
+            const profile = d.data();
+            const userData = userSnaps[i].exists() ? userSnaps[i].data() : {};
+            return {
+                id: d.id,
+                name: userData.name || profile.ownerName || 'Unnamed',
+                email: userData.email || '',
+                phone: userData.phone || profile.phone || '',
+                blocked: userData.blocked === true,
+                isPremium: profile.isPremium === true
+            };
         });
         cachedSellers = sortByCreatedAtDesc(cachedSellers);
 
@@ -506,6 +537,7 @@ export async function toggleBlockUser(db, uid, shouldBlock) {
     try {
         await updateDoc(doc(db, "users", uid), { blocked: shouldBlock });
         showToast(shouldBlock ? "User has been blocked." : "User has been unblocked.");
+        logAdminAction(db, shouldBlock ? 'block_user' : 'unblock_user', uid);
 
         const seller = cachedSellers.find(u => u.id === uid);
         if (seller) { seller.blocked = shouldBlock; renderSellers(); }
@@ -525,6 +557,36 @@ export async function setSellerPremiumLocal(sellerUid, isPremium) {
     // Called after premium-logic.js's setSellerPremium succeeds, to patch the cache
     const seller = cachedSellers.find(u => u.id === sellerUid);
     if (seller) { seller.isPremium = isPremium; renderSellers(); }
+}
+
+// ---------- ADMIN AUDIT LOG ----------
+export async function loadAdminActionLog(db) {
+    const container = document.getElementById('auditLogContainer');
+    container.innerHTML = "<p>Loading audit log...</p>";
+    try {
+        const snap = await getDocs(query(collection(db, "adminActionLog"), orderBy("at", "desc"), limit(LIST_FETCH_LIMIT)));
+        if (snap.empty) {
+            container.innerHTML = `<div class="admin-no-data">No admin actions logged yet.</div>`;
+            return;
+        }
+        container.innerHTML = snap.docs.map(d => {
+            const log = d.data();
+            const when = log.at && log.at.toDate ? log.at.toDate().toLocaleString('en-IN') : '';
+            const extra = log.extra && Object.keys(log.extra).length ? ` — ${escapeHtml(JSON.stringify(log.extra))}` : '';
+            return `
+                <div class="admin-row-card">
+                    <div class="arc-info">
+                        <h4>${escapeHtml(log.action || 'unknown action')}</h4>
+                        <p>Target: <span class="uid-tag">${escapeHtml(log.target || 'N/A')}</span>${extra}</p>
+                        <p class="uid-tag">By: ${escapeHtml(log.performedBy || 'N/A')} · ${escapeHtml(when)}</p>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error(error);
+        container.innerHTML = `<p style="color:red;">Unable to load audit log.<br><small style="color:#c77;">${escapeHtml(error.message || String(error))}</small></p>`;
+    }
 }
 
 // ---------- PRODUCTS ----------
@@ -569,6 +631,7 @@ export async function deleteProductAdmin(db, productId) {
         showToast("Product removed from the marketplace.");
         cachedProducts = cachedProducts.filter(p => p.id !== productId);
         renderProducts();
+        logAdminAction(db, 'delete_product', productId);
     } catch (error) {
         console.error(error);
         showToast("Error removing product.", 'error');
