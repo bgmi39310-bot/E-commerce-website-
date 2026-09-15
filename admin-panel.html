@@ -130,6 +130,8 @@
     .admin-btn-delete { background: #a78bfa; color: #1e1033; }
 
     .admin-no-data { text-align: center; padding: 40px 20px; color: #8a94a6; background: #1a2028; border-radius: 10px; border: 1px solid #232b38; }
+    .admin-search-box { width: 100%; box-sizing: border-box; padding: 10px 14px; margin-bottom: 14px; border-radius: 8px; border: 1px solid #232b38; background: #1a2028; color: #e6e9ef; font-size: 14px; }
+    .admin-search-box::placeholder { color: #6b7686; }
 
     .admin-section { display: none; }
     .admin-section.active { display: block; }
@@ -250,16 +252,19 @@
 
             <!-- SELLERS -->
             <div class="admin-section" id="section-sellers">
+                <input type="text" placeholder="🔍 Search by name, phone, or email..." class="admin-search-box" oninput="filterSellers(this.value)">
                 <div id="sellersContainer"><p>Loading sellers...</p></div>
             </div>
 
             <!-- BUYERS -->
             <div class="admin-section" id="section-buyers">
+                <input type="text" placeholder="🔍 Search by name, phone, or email..." class="admin-search-box" oninput="filterBuyers(this.value)">
                 <div id="buyersContainer"><p>Loading buyers...</p></div>
             </div>
 
             <!-- DELIVERY PARTNERS -->
             <div class="admin-section" id="section-delivery">
+                <input type="text" placeholder="🔍 Search by name, phone, or village..." class="admin-search-box" oninput="filterDeliveryPartners(this.value)">
                 <div id="deliveryPartnersContainer"><p>Loading delivery partners...</p></div>
             </div>
 
@@ -271,6 +276,7 @@
 
             <!-- PRODUCTS -->
             <div class="admin-section" id="section-products">
+                <input type="text" placeholder="🔍 Search by product name or shop..." class="admin-search-box" oninput="filterProducts(this.value)">
                 <div id="productsContainer"><p>Loading products...</p></div>
             </div>
 
@@ -331,6 +337,7 @@
     import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     import {
         loadDashboardCharts, loadSellers, loadBuyers, loadDeliveryPartners, toggleBlockUser, loadAdminActionLog,
+        filterSellers, filterBuyers, filterDeliveryPartners, filterProducts,
         loadAllProducts, deleteProductAdmin, loadAllOrders, loadReports, resolveReport,
         resolveReportAndDeleteProduct,
         loadPendingKyc, updateKycStatus, loadAllReviews, deleteReviewAdmin
@@ -598,6 +605,11 @@
     window.toggleBlockMain = function(uid, shouldBlock) {
         toggleBlockUser(db, uid, shouldBlock);
     };
+
+    window.filterSellers = filterSellers;
+    window.filterBuyers = filterBuyers;
+    window.filterDeliveryPartners = filterDeliveryPartners;
+    window.filterProducts = filterProducts;
 
     window.deleteProductMain = function(productId) {
         if (!confirm('Remove this product from the marketplace? This cannot be undone.')) return;
