@@ -241,20 +241,45 @@ function renderReports() {
     }
     container.innerHTML = cachedReports.map(r => {
         const resolved = r.status === 'Resolved';
+        const type = r.reportType || 'product';
+
+        let heading, details, actions;
+        if (type === 'buyer' || type === 'delivery_partner') {
+            const roleLabel = type === 'buyer' ? 'Buyer' : 'Delivery Partner';
+            heading = `${escapeHtml(r.reportedName || 'Unknown ' + roleLabel)} <span class="uid-tag" style="text-transform:none;">(${roleLabel})</span>`;
+            details = `
+                <p>Reason: <strong>${escapeHtml(r.reason || 'N/A')}</strong>${r.orderId ? ` &nbsp; | &nbsp; Order: ${escapeHtml(r.orderId)}` : ''}</p>
+                ${r.details ? `<p>"${escapeHtml(r.details)}"</p>` : ''}
+                <p class="uid-tag">Reported user UID: ${escapeHtml(r.reportedUid || 'N/A')}</p>
+            `;
+            actions = !resolved ? `
+                <div class="arc-actions">
+                    <button class="admin-btn admin-btn-block" onclick="toggleBlockMain('${r.reportedUid}', true)">🚫 Block User</button>
+                    <button class="admin-btn admin-btn-unblock" onclick="dismissReportMain('${r.id}')">✅ Dismiss</button>
+                </div>
+            ` : '';
+        } else {
+            heading = escapeHtml(r.productName || 'Unknown product');
+            details = `
+                <p>🏪 ${escapeHtml(r.shopName || 'Unknown shop')} &nbsp; | &nbsp; Reason: <strong>${escapeHtml(r.reason || 'N/A')}</strong></p>
+                ${r.details ? `<p>"${escapeHtml(r.details)}"</p>` : ''}
+                <p class="uid-tag">Product ID: ${escapeHtml(r.productId || 'N/A')} | Seller UID: ${escapeHtml(r.sellerUid || 'N/A')}</p>
+            `;
+            actions = !resolved ? `
+                <div class="arc-actions">
+                    <button class="admin-btn admin-btn-delete" onclick="deleteReportedProductMain('${r.id}', '${r.productId}')">🗑️ Remove Product</button>
+                    <button class="admin-btn admin-btn-unblock" onclick="dismissReportMain('${r.id}')">✅ Dismiss</button>
+                </div>
+            ` : '';
+        }
+
         return `
             <div class="admin-row-card ${resolved ? 'is-blocked' : ''}">
                 <div class="arc-info">
-                    <h4>${escapeHtml(r.productName || 'Unknown product')} ${resolved ? '<span class="blocked-tag">RESOLVED</span>' : ''}</h4>
-                    <p>🏪 ${escapeHtml(r.shopName || 'Unknown shop')} &nbsp; | &nbsp; Reason: <strong>${escapeHtml(r.reason || 'N/A')}</strong></p>
-                    ${r.details ? `<p>"${escapeHtml(r.details)}"</p>` : ''}
-                    <p class="uid-tag">Product ID: ${escapeHtml(r.productId || 'N/A')} | Seller UID: ${escapeHtml(r.sellerUid || 'N/A')}</p>
+                    <h4>${heading} ${resolved ? '<span class="blocked-tag">RESOLVED</span>' : ''}</h4>
+                    ${details}
                 </div>
-                ${!resolved ? `
-                    <div class="arc-actions">
-                        <button class="admin-btn admin-btn-delete" onclick="deleteReportedProductMain('${r.id}', '${r.productId}')">🗑️ Remove Product</button>
-                        <button class="admin-btn admin-btn-unblock" onclick="dismissReportMain('${r.id}')">✅ Dismiss</button>
-                    </div>
-                ` : ''}
+                ${actions}
             </div>
         `;
     }).join('');
@@ -287,6 +312,27 @@ export async function resolveReport(db, reportId) {
     }
 }
 
+// Reviews are only deletable by an admin (Firestore rule) — deliberately
+// NOT by the seller themselves, so a seller can't quietly erase bad
+// reviews by claiming to "clean up" their own product. When an ADMIN
+// removes a product though, cleaning up the reviews that pointed at it is
+// safe and avoids leaving reviews permanently dangling with no product to
+// show for them.
+async function deleteReviewsForProduct(db, productId) {
+    try {
+        const snap = await getDocs(query(collection(db, "reviews"), where("productId", "==", productId)));
+        if (snap.empty) return;
+        const batch = writeBatch(db);
+        snap.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+        cachedReviews = cachedReviews.filter(r => r.productId !== productId);
+    } catch (error) {
+        // Non-fatal — the product deletion itself should still succeed even
+        // if this cleanup step has a problem.
+        console.error('Failed to delete reviews for product', productId, error);
+    }
+}
+
 // Marking a report Resolved AND removing the product it was about used to
 // be two completely separate, unawaited Firestore calls — either one could
 // fail independently of the other, leaving the report marked "Resolved"
@@ -298,6 +344,7 @@ export async function resolveReportAndDeleteProduct(db, reportId, productId) {
         batch.set(doc(db, "reports", reportId), { status: 'Resolved' }, { merge: true });
         batch.delete(doc(db, "vendors", productId));
         await batch.commit();
+        await deleteReviewsForProduct(db, productId);
 
         const r = cachedReports.find(x => x.id === reportId);
         if (r) r.status = 'Resolved';
@@ -370,13 +417,48 @@ export async function updateKycStatus(db, sellerUid, newStatus) {
 }
 
 // ---------- SELLERS ----------
+// Shows "how long ago" someone last logged in — lets an admin tell a
+// genuinely inactive account from a live one, which createdAt alone can't
+// (an account could be a year old but active yesterday, or two days old
+// and never touched since).
+function formatLastActive(lastLoginAt) {
+    if (!lastLoginAt || !lastLoginAt.toDate) return 'Never logged in since tracking started';
+    const days = Math.floor((Date.now() - lastLoginAt.toDate().getTime()) / 86400000);
+    if (days <= 0) return 'Active today';
+    if (days === 1) return 'Active yesterday';
+    if (days < 30) return `Active ${days} days ago`;
+    if (days < 365) return `Active ${Math.floor(days / 30)} months ago`;
+    return `Active ${Math.floor(days / 365)} years ago`;
+}
+
+// Simple case-insensitive "does this text appear in name/phone/email"
+// filter — applied client-side against the already-cached list, so typing
+// in a search box never triggers a new Firestore read.
+function matchesSearch(item, searchText, fields) {
+    if (!searchText) return true;
+    const needle = searchText.trim().toLowerCase();
+    if (!needle) return true;
+    return fields.some(f => (item[f] || '').toString().toLowerCase().includes(needle));
+}
+
+let sellerSearchText = '';
+export function filterSellers(text) { sellerSearchText = text; renderSellers(); }
+
+let buyerSearchText = '';
+export function filterBuyers(text) { buyerSearchText = text; renderBuyers(); }
+
 function renderSellers() {
     const container = document.getElementById('sellersContainer');
+    const filtered = cachedSellers.filter(u => matchesSearch(u, sellerSearchText, ['name', 'phone', 'email']));
     if (cachedSellers.length === 0) {
         container.innerHTML = `<div class="admin-no-data">No sellers registered yet.</div>`;
         return;
     }
-    container.innerHTML = cachedSellers.map(u => {
+    if (filtered.length === 0) {
+        container.innerHTML = `<div class="admin-no-data">No sellers match "${escapeHtml(sellerSearchText)}".</div>`;
+        return;
+    }
+    container.innerHTML = filtered.map(u => {
         const blocked = u.blocked === true;
         const isPremium = u.isPremium === true;
         return `
@@ -384,6 +466,7 @@ function renderSellers() {
                 <div class="arc-info">
                     <h4>${escapeHtml(u.name || 'Unnamed')} ${blocked ? '<span class="blocked-tag">BLOCKED</span>' : ''} ${isPremium ? '<span class="blocked-tag" style="background:#ff9900; color:#111;">🌟 PREMIUM</span>' : ''}</h4>
                     <p>📞 ${escapeHtml(u.phone || 'N/A')} &nbsp; ✉️ ${escapeHtml(u.email || 'N/A')}</p>
+                    <p style="color:#8a94a6; font-size:12px;">${escapeHtml(formatLastActive(u.lastLoginAt))}</p>
                     <p class="uid-tag">UID: ${u.id}</p>
                 </div>
                 <div class="arc-actions">
@@ -424,7 +507,8 @@ export async function loadSellers(db) {
                 email: userData.email || '',
                 phone: userData.phone || profile.phone || '',
                 blocked: userData.blocked === true,
-                isPremium: profile.isPremium === true
+                isPremium: profile.isPremium === true,
+                lastLoginAt: userData.lastLoginAt || null
             };
         });
         cachedSellers = sortByCreatedAtDesc(cachedSellers);
@@ -439,17 +523,23 @@ export async function loadSellers(db) {
 // ---------- BUYERS ----------
 function renderBuyers() {
     const container = document.getElementById('buyersContainer');
+    const filtered = cachedBuyers.filter(u => matchesSearch(u, buyerSearchText, ['name', 'phone', 'email']));
     if (cachedBuyers.length === 0) {
         container.innerHTML = `<div class="admin-no-data">No buyers registered yet.</div>`;
         return;
     }
-    container.innerHTML = cachedBuyers.map(u => {
+    if (filtered.length === 0) {
+        container.innerHTML = `<div class="admin-no-data">No buyers match "${escapeHtml(buyerSearchText)}".</div>`;
+        return;
+    }
+    container.innerHTML = filtered.map(u => {
         const blocked = u.blocked === true;
         return `
             <div class="admin-row-card ${blocked ? 'is-blocked' : ''}">
                 <div class="arc-info">
                     <h4>${escapeHtml(u.name || 'Unnamed')} ${blocked ? '<span class="blocked-tag">BLOCKED</span>' : ''}</h4>
                     <p>📞 ${escapeHtml(u.phone || 'N/A')} &nbsp; ✉️ ${escapeHtml(u.email || 'N/A')}</p>
+                    <p style="color:#8a94a6; font-size:12px;">${escapeHtml(formatLastActive(u.lastLoginAt))}</p>
                     <p class="uid-tag">UID: ${u.id}</p>
                 </div>
                 <div class="arc-actions">
@@ -480,13 +570,24 @@ export async function loadBuyers(db) {
 }
 
 // ---------- DELIVERY PARTNERS ----------
+let deliverySearchText = '';
+export function filterDeliveryPartners(text) { deliverySearchText = text; renderDeliveryPartners(); }
+
 function renderDeliveryPartners() {
     const container = document.getElementById('deliveryPartnersContainer');
+    const filtered = cachedDeliveryPartners.filter(d =>
+        matchesSearch(d, deliverySearchText, ['name', 'phone']) ||
+        (d.villages || []).some(v => (v || '').toLowerCase().includes(deliverySearchText.trim().toLowerCase()))
+    );
     if (cachedDeliveryPartners.length === 0) {
         container.innerHTML = `<div class="admin-no-data">No delivery partners registered yet.</div>`;
         return;
     }
-    container.innerHTML = cachedDeliveryPartners.map(d => {
+    if (filtered.length === 0) {
+        container.innerHTML = `<div class="admin-no-data">No delivery partners match "${escapeHtml(deliverySearchText)}".</div>`;
+        return;
+    }
+    container.innerHTML = filtered.map(d => {
         const blocked = d.blocked === true;
         const available = d.isAvailable === true;
         const feeUnit = d.feeType === 'per_km' ? '/km' : (d.feeType === 'per_trip' ? '/trip' : '/order');
@@ -590,15 +691,23 @@ export async function loadAdminActionLog(db) {
 }
 
 // ---------- PRODUCTS ----------
+let productSearchText = '';
+export function filterProducts(text) { productSearchText = text; renderProducts(); }
+
 function renderProducts() {
     const container = document.getElementById('productsContainer');
+    const filtered = cachedProducts.filter(p => matchesSearch(p, productSearchText, ['name', 'shopName', 'sellerUid']));
     if (cachedProducts.length === 0) {
         container.innerHTML = `<div class="admin-no-data">No products listed yet.</div>`;
         return;
     }
-    container.innerHTML = cachedProducts.map(p => `
+    if (filtered.length === 0) {
+        container.innerHTML = `<div class="admin-no-data">No products match "${escapeHtml(productSearchText)}".</div>`;
+        return;
+    }
+    container.innerHTML = filtered.map(p => `
         <div class="admin-row-card">
-            <img class="arc-thumb" src="${p.image || 'https://via.placeholder.com/60'}" alt="">
+            <img class="arc-thumb" src="${escapeHtml(p.image || 'https://via.placeholder.com/60')}" alt="">
             <div class="arc-info">
                 <h4>${escapeHtml(p.name || 'Unnamed product')}</h4>
                 <p>₹${p.price || 0} &nbsp; 🏪 ${escapeHtml(p.shopName || 'N/A')}</p>
@@ -628,6 +737,7 @@ export async function loadAllProducts(db) {
 export async function deleteProductAdmin(db, productId) {
     try {
         await deleteDoc(doc(db, "vendors", productId));
+        await deleteReviewsForProduct(db, productId);
         showToast("Product removed from the marketplace.");
         cachedProducts = cachedProducts.filter(p => p.id !== productId);
         renderProducts();
