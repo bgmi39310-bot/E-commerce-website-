@@ -477,6 +477,23 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="reportBuyerModal">
+        <div class="modal-box">
+            <span class="modal-close" onclick="window.closeReportBuyerModal()">&times;</span>
+            <h3>🚩 Report Buyer</h3>
+            <p class="modal-sub" style="font-size:12.5px; color:#767676;">Reporting <strong id="reportBuyerNameDisplay"></strong>. This goes to DesiMarket admins for review.</p>
+            <select id="reportBuyerReason" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px; margin-bottom:10px;">
+                <option value="">Select a reason</option>
+                <option value="Refused to pay / fake COD order">Refused to pay / fake COD order</option>
+                <option value="Abusive or threatening behaviour">Abusive or threatening behaviour</option>
+                <option value="False claim about the order">False claim about the order (e.g. "never delivered")</option>
+                <option value="Other">Other</option>
+            </select>
+            <textarea id="reportBuyerDetails" rows="3" placeholder="Additional details (optional)" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px; margin-bottom:10px; box-sizing:border-box;"></textarea>
+            <button class="action-btn full-width" onclick="window.submitReportBuyerMain()">Submit Report</button>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="deliveryOptionsModal">
         <div class="modal-box">
             <span class="modal-close" onclick="window.closeDeliveryOptions()">&times;</span>
@@ -512,6 +529,7 @@
         import { getFollowerCount } from './follow-logic.js';
         import { showToast } from './toast.js';
         import { findAvailableDeliveryBoys, postOrderToJobBoard, assignOrderToDeliveryBoy, cancelDeliveryRequest, loadAllAvailableDeliveryPartners } from './delivery-logic.js';
+        import { submitReport } from './report-logic.js';
 
         wireImageUpload('shopLogoFileUpload', 'shopLogoFile', 'shopLogoStatus');
         wireImageUpload('pImageFileUpload', 'pImageFile', 'pImageStatus');
@@ -865,6 +883,34 @@
         window.cancelDeliveryMain = async function(orderId) {
             if (!confirm("Cancel this delivery request? The order will go back to self-delivery.")) return;
             await cancelDeliveryRequest(db, orderId);
+        };
+
+        // ---------- Report Buyer ----------
+        let reportingBuyerUid = '', reportingOrderId = '';
+        window.openReportBuyerModal = function(buyerUid, buyerName, orderId) {
+            if (!buyerUid) { showToast("This order has no linked buyer account to report.", 'error'); return; }
+            reportingBuyerUid = buyerUid;
+            reportingOrderId = orderId;
+            document.getElementById('reportBuyerNameDisplay').textContent = buyerName || 'this buyer';
+            document.getElementById('reportBuyerReason').value = '';
+            document.getElementById('reportBuyerDetails').value = '';
+            document.getElementById('reportBuyerModal').classList.add('active');
+        };
+        window.closeReportBuyerModal = function() {
+            document.getElementById('reportBuyerModal').classList.remove('active');
+        };
+        window.submitReportBuyerMain = function() {
+            if (!currentLoggedInUser) return;
+            submitReport(db, {
+                reportType: 'buyer',
+                reportedUid: reportingBuyerUid,
+                reportedName: document.getElementById('reportBuyerNameDisplay').textContent,
+                orderId: reportingOrderId,
+                reporterUid: currentLoggedInUser.uid,
+                reason: document.getElementById('reportBuyerReason').value,
+                details: document.getElementById('reportBuyerDetails').value
+            });
+            window.closeReportBuyerModal();
         };
 
         window.generateVariantStockGrid = generateVariantStockGrid;
