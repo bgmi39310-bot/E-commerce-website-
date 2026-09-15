@@ -160,6 +160,10 @@
         try {
             const snap = await getDoc(doc(db, "users", uid));
             const role = snap.exists() ? snap.data().role : 'customer';
+            // Fire-and-forget — knowing when someone was last active helps
+            // admins tell a genuinely inactive account from a live one, and
+            // it shouldn't ever hold up getting the person to their page.
+            setDoc(doc(db, "users", uid), { lastLoginAt: new Date() }, { merge: true }).catch(() => {});
             if (role === 'seller') { window.location.href = 'seller-dashboard.html'; return; }
             if (role === 'delivery') { window.location.href = 'delivery-dashboard.html'; return; }
             window.location.href = 'index.html';
