@@ -95,6 +95,7 @@ function displayDashboardOrders() {
 
                     <div class="btn-group">
                         <a href="tel:${encodeURIComponent(order.buyerPhone || '')}" class="call-btn">📞 Call Buyer</a>
+                        <button type="button" class="dash-action-btn" style="background:#f0f2f2; color:#555;" data-buyer-uid="${order.buyerUid || ''}" data-buyer-name="${escapeHtml(order.buyerName || 'this buyer')}" data-order-id="${order.id}" onclick="window.openReportBuyerModal(this.dataset.buyerUid, this.dataset.buyerName, this.dataset.orderId)">🚩 Report Buyer</button>
                         ${currentStatusFilter === 'Pending' ? `<button class="dash-action-btn btn-accept" onclick="updateOrderStatus('${order.id}', 'Accepted')">Accept</button>` : ''}
                         ${currentStatusFilter === 'Accepted' && !order.deliveryRequestStatus ? `<button class="dash-action-btn btn-ship" onclick="markShippedMain('${order.id}')">Mark Shipped (Self-Deliver)</button>` : ''}
                         ${currentStatusFilter === 'Accepted' && !order.deliveryRequestStatus ? `<button class="dash-action-btn" style="background:#007185; color:white;" data-order-id="${order.id}" data-buyer-city="${escapeHtml(order.buyerCity || '')}" onclick="window.openDeliveryOptions(this.dataset.orderId, this.dataset.buyerCity)">🚚 Get Delivery Help</button>` : ''}
