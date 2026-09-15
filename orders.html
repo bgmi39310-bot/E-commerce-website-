@@ -103,6 +103,26 @@
         <div class="skel skel-order"></div>
     </div>
 
+    <div class="modal-overlay" id="reportDeliveryModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:2000; align-items:center; justify-content:center;">
+        <div style="background:white; border-radius:10px; padding:20px; max-width:380px; width:90%;">
+            <h3 style="margin-top:0;">🚩 Report Delivery Partner</h3>
+            <p style="font-size:12.5px; color:#767676;">Reporting <strong id="reportDeliveryNameDisplay"></strong>. This goes to DesiMarket admins for review.</p>
+            <select id="reportDeliveryReason" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px; margin-bottom:10px; box-sizing:border-box;">
+                <option value="">Select a reason</option>
+                <option value="Never delivered / went missing">Never delivered / went missing</option>
+                <option value="Rude or abusive behaviour">Rude or abusive behaviour</option>
+                <option value="Damaged the package">Damaged the package</option>
+                <option value="Asked for extra money">Asked for extra money</option>
+                <option value="Other">Other</option>
+            </select>
+            <textarea id="reportDeliveryDetails" rows="3" placeholder="Additional details (optional)" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px; margin-bottom:10px; box-sizing:border-box;"></textarea>
+            <div style="display:flex; gap:8px;">
+                <button onclick="window.closeReportDeliveryModal()" style="flex:1; padding:10px; border-radius:6px; border:1px solid #ccc; background:white; cursor:pointer;">Cancel</button>
+                <button onclick="window.submitReportDeliveryMain()" style="flex:1; padding:10px; border-radius:6px; border:none; background:#c0392b; color:white; font-weight:700; cursor:pointer;">Submit</button>
+            </div>
+        </div>
+    </div>
+
     <script type="module">
         import { db, auth } from './firebase-config.js';
         import { collection, getDocs, query, where, doc, updateDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -115,6 +135,7 @@
         import { showToast } from './toast.js';
         import { restoreStock, buildVariantKey } from './stock-logic.js';
         import { getCart, saveCart, migrateLegacyCartData } from './cart-storage.js';
+        import { submitReport } from './report-logic.js';
 
         let currentBuyerUid = null;
         let currentBuyerName = 'DesiMarket Buyer';
@@ -188,6 +209,11 @@
                                 <div class="code-label">🔐 Your Delivery OTP</div>
                                 <div class="code-value">${order.deliveryOTP}</div>
                                 <div class="code-hint">Share this code with the seller ONLY after you physically receive your order</div>
+                            </div>
+                        ` : ''}
+                        ${order.deliveryBoyName ? `
+                            <div style="font-size:12.5px; color:#666; margin:4px 0;">🚚 Delivery by: ${escapeHtml(order.deliveryBoyName)}
+                                <button type="button" style="background:none; border:none; color:#c0392b; font-size:12px; font-weight:600; cursor:pointer; margin-left:6px;" data-boy-uid="${order.deliveryBoyUid || ''}" data-boy-name="${escapeHtml(order.deliveryBoyName)}" data-order-id="${order.id}" onclick="window.openReportDeliveryModal(this.dataset.boyUid, this.dataset.boyName, this.dataset.orderId)">🚩 Report</button>
                             </div>
                         ` : ''}
                         <div class="order-price">₹${order.price || 0}</div>
@@ -341,6 +367,34 @@
                 console.error(error);
                 showToast('Unable to add this item right now.', 'error');
             }
+        };
+
+        // ---------- Report Delivery Partner ----------
+        let reportingDeliveryUid = '', reportingDeliveryOrderId = '';
+        window.openReportDeliveryModal = function(boyUid, boyName, orderId) {
+            if (!boyUid) { showToast("No linked delivery partner account to report.", 'error'); return; }
+            reportingDeliveryUid = boyUid;
+            reportingDeliveryOrderId = orderId;
+            document.getElementById('reportDeliveryNameDisplay').textContent = boyName || 'this delivery partner';
+            document.getElementById('reportDeliveryReason').value = '';
+            document.getElementById('reportDeliveryDetails').value = '';
+            document.getElementById('reportDeliveryModal').style.display = 'flex';
+        };
+        window.closeReportDeliveryModal = function() {
+            document.getElementById('reportDeliveryModal').style.display = 'none';
+        };
+        window.submitReportDeliveryMain = function() {
+            if (!currentBuyerUid) return;
+            submitReport(db, {
+                reportType: 'delivery_partner',
+                reportedUid: reportingDeliveryUid,
+                reportedName: document.getElementById('reportDeliveryNameDisplay').textContent,
+                orderId: reportingDeliveryOrderId,
+                reporterUid: currentBuyerUid,
+                reason: document.getElementById('reportDeliveryReason').value,
+                details: document.getElementById('reportDeliveryDetails').value
+            });
+            window.closeReportDeliveryModal();
         };
 
         window.cancelMyOrder = async function(orderId) {
