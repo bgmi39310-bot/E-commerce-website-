@@ -61,6 +61,10 @@
         .fee-type-option input { margin-right: 6px; }
         .fee-type-option strong { font-size: 13.5px; color: #232f3e; }
         .fee-type-option.selected { border-color: #232f3e; background: #f5f6f8; }
+        .kyc-status-box { padding: 12px 14px; border-radius: 8px; font-size: 13.5px; }
+        .kyc-status-box.verified { background: #eafaf1; color: #1a7f4b; }
+        .kyc-status-box.pending { background: #fff8ee; color: #c7511f; }
+        .kyc-status-box.rejected { background: #fdecea; color: #c0392b; margin-bottom: 14px; }
         .village-chip { background: #eafaf1; color: #1a7f4b; border: 1px solid #b6e3c8; border-radius: 14px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
         .village-chip:disabled { opacity: .5; cursor: default; }
         .login-prompt { text-align: center; padding: 50px 20px; background: white; border-radius: 8px; }
@@ -94,6 +98,7 @@
         useMyLocationForDelivery, refreshDeliveryLocationMap, getCurrentPinLatLng,
         suggestNearbyVillages, getDeliveryStats, loadDeliveryHistory
     } from './delivery-logic.js';
+    import { loadKycStatus } from './kyc-logic.js';
 
     let currentUser = null;
     let myProfile = null;
@@ -264,6 +269,7 @@
                 <button class="tab-btn ${activeTab === 'jobs' ? 'active' : ''}" onclick="window.switchTab('jobs')">📋 Job Board</button>
                 <button class="tab-btn ${activeTab === 'deliveries' ? 'active' : ''}" onclick="window.switchTab('deliveries')">🚚 Active Deliveries</button>
                 <button class="tab-btn ${activeTab === 'history' ? 'active' : ''}" onclick="window.switchTab('history')">📜 History</button>
+                <button class="tab-btn ${activeTab === 'kyc' ? 'active' : ''}" onclick="window.switchTab('kyc')">🪪 Verification</button>
                 <button class="tab-btn ${activeTab === 'profile' ? 'active' : ''}" onclick="window.editProfileMain()">⚙️ Profile</button>
             </div>
 
@@ -279,11 +285,17 @@
                 <h2>📜 Delivery History</h2>
                 <div id="historyContainer"><p>Loading...</p></div>
             </div>
+            <div class="card" id="kycCard" style="display:${activeTab === 'kyc' ? 'block' : 'none'};">
+                <h2>🪪 Get Verified</h2>
+                <p style="font-size:13px; color:#666; margin-top:-6px;">A "Verified" badge helps sellers trust you with their orders.</p>
+                <div id="kycContainer"><p>Loading verification status...</p></div>
+            </div>
         `;
         loadAndRenderStats();
         loadAndRenderJobBoard();
         loadAndRenderMyDeliveries();
         if (activeTab === 'history') loadAndRenderHistory();
+        if (activeTab === 'kyc') loadKycStatus(db, currentUser.uid, 'delivery_profiles', 'delivery_private_kyc');
     }
 
     window.switchTab = function(tab) {
@@ -291,9 +303,11 @@
         document.getElementById('tabContentCard').style.display = tab === 'jobs' ? 'block' : 'none';
         document.getElementById('deliveriesCard').style.display = tab === 'deliveries' ? 'block' : 'none';
         document.getElementById('historyCard').style.display = tab === 'history' ? 'block' : 'none';
+        document.getElementById('kycCard').style.display = tab === 'kyc' ? 'block' : 'none';
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         event.target.classList.add('active');
         if (tab === 'history') loadAndRenderHistory();
+        if (tab === 'kyc') loadKycStatus(db, currentUser.uid, 'delivery_profiles', 'delivery_private_kyc');
     };
 
     async function loadAndRenderStats() {
