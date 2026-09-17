@@ -141,7 +141,7 @@
 <script type="module">
     import { auth, db } from './firebase-config.js';
     import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-    import { doc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { doc, setDoc, collection, query, where, getDocs, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     let selectedRole = 'customer';
 
@@ -218,6 +218,21 @@
         try {
             const cred = await createUserWithEmailAndPassword(auth, email, password);
             const uid = cred.user.uid;
+
+            // Firestore's users collection can only be READ once signed in
+            // (see firestore.rules), so this uniqueness check has to happen
+            // right here, after account creation — if it turns out someone
+            // else already has this phone number, we undo the signup rather
+            // than leaving two accounts sharing one number.
+            const dupSnap = await getDocs(query(collection(db, "users"), where("phone", "==", phone), limit(2)));
+            const isDuplicate = dupSnap.docs.some(d => d.id !== uid);
+            if (isDuplicate) {
+                await cred.user.delete().catch(() => {});
+                showError('This phone number is already registered with another account. Please login instead, or use a different number.');
+                signupBtn.disabled = false;
+                signupBtn.innerText = 'Create your DesiMarket account';
+                return;
+            }
 
             await updateProfile(cred.user, { displayName: name });
             sendEmailVerification(cred.user).catch(() => {}); // best-effort, never blocks signup
