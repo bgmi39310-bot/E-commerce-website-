@@ -4,12 +4,17 @@ import { showToast } from './toast.js';
 const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
 const AADHAR_REGEX = /^\d{12}$/;
 
-// PAN and Aadhar are kept in a SEPARATE, non-public collection
-// (seller_private_kyc/{uid}) — not on sellers_profiles, which anyone can
-// read (it's the public shop page data). Only kycStatus stays on the public
-// profile, since the "Verified Seller" badge needs to be readable by buyers;
-// the actual PAN/Aadhar numbers never need to be.
-export async function submitKycDetails(db, uid, panNumber, aadharNumber, refreshCallback) {
+// PAN and Aadhar are kept in a SEPARATE, non-public collection — not on the
+// public profile (sellers_profiles / delivery_profiles), which anyone can
+// read. Only kycStatus stays on the public profile, since a "Verified"
+// badge needs to be readable by buyers/sellers browsing; the actual
+// PAN/Aadhar numbers never need to be.
+//
+// `profileCollection`/`privateCollection` make this the SAME logic for
+// both sellers (sellers_profiles / seller_private_kyc) and delivery
+// partners (delivery_profiles / delivery_private_kyc) — defaults keep every
+// existing seller call site working unchanged.
+export async function submitKycDetails(db, uid, panNumber, aadharNumber, refreshCallback, profileCollection = 'sellers_profiles', privateCollection = 'seller_private_kyc') {
     const pan = panNumber.trim().toUpperCase();
     const aadhar = aadharNumber.trim();
 
@@ -23,13 +28,13 @@ export async function submitKycDetails(db, uid, panNumber, aadharNumber, refresh
     }
 
     try {
-        await setDoc(doc(db, "seller_private_kyc", uid), {
+        await setDoc(doc(db, privateCollection, uid), {
             pan,
             aadharLast4: aadhar.slice(-4), // only store last 4 digits for privacy
             submittedAt: new Date()
         }, { merge: true });
 
-        await setDoc(doc(db, "sellers_profiles", uid), {
+        await setDoc(doc(db, profileCollection, uid), {
             kycStatus: 'Pending'
         }, { merge: true });
 
@@ -41,18 +46,19 @@ export async function submitKycDetails(db, uid, panNumber, aadharNumber, refresh
     }
 }
 
-export async function loadKycStatus(db, uid) {
+export async function loadKycStatus(db, uid, profileCollection = 'sellers_profiles', privateCollection = 'seller_private_kyc') {
     const container = document.getElementById('kycContainer');
     if (!container) return;
 
     try {
-        const profileSnap = await getDoc(doc(db, "sellers_profiles", uid));
+        const profileSnap = await getDoc(doc(db, profileCollection, uid));
         const status = profileSnap.exists() ? (profileSnap.data().kycStatus || 'Not Submitted') : 'Not Submitted';
+        const badgeContext = profileCollection === 'delivery_profiles' ? 'your delivery partner profile shows a trusted badge to sellers' : 'your shop shows a trusted seller badge to buyers';
 
         if (status === 'Verified') {
-            container.innerHTML = `<div class="kyc-status-box verified">✅ <strong>KYC Verified</strong> — your shop shows a trusted seller badge to buyers.</div>`;
+            container.innerHTML = `<div class="kyc-status-box verified">✅ <strong>KYC Verified</strong> — ${badgeContext}.</div>`;
         } else if (status === 'Pending') {
-            const privateSnap = await getDoc(doc(db, "seller_private_kyc", uid));
+            const privateSnap = await getDoc(doc(db, privateCollection, uid));
             const priv = privateSnap.exists() ? privateSnap.data() : {};
             container.innerHTML = `<div class="kyc-status-box pending">⏳ <strong>KYC Under Review</strong> — PAN: ${escapeForDisplay(priv.pan) || 'N/A'}, Aadhar ending in ${escapeForDisplay(priv.aadharLast4) || '----'}. We'll notify you once verified.</div>`;
         } else if (status === 'Rejected') {
@@ -60,13 +66,13 @@ export async function loadKycStatus(db, uid) {
                 <div class="kyc-status-box rejected">❌ <strong>KYC Rejected</strong> — please re-check your details and submit again.</div>
                 ${renderKycForm()}
             `;
-            wireKycForm(db, uid);
+            wireKycForm(db, uid, profileCollection, privateCollection);
         } else {
             container.innerHTML = `
-                <p style="font-size:13px; color:#666; margin-top:0;">Get a "Verified Seller" badge on your shop by submitting your PAN and Aadhar for review.</p>
+                <p style="font-size:13px; color:#666; margin-top:0;">Get a "Verified" badge by submitting your PAN and Aadhar for review.</p>
                 ${renderKycForm()}
             `;
-            wireKycForm(db, uid);
+            wireKycForm(db, uid, profileCollection, privateCollection);
         }
     } catch (error) {
         console.error("Error loading KYC status:", error);
@@ -92,12 +98,12 @@ function renderKycForm() {
     `;
 }
 
-function wireKycForm(db, uid) {
+function wireKycForm(db, uid, profileCollection, privateCollection) {
     const btn = document.getElementById('kycSubmitBtn');
     if (!btn) return;
     btn.addEventListener('click', () => {
         const pan = document.getElementById('kycPanInput').value;
         const aadhar = document.getElementById('kycAadharInput').value;
-        submitKycDetails(db, uid, pan, aadhar, () => loadKycStatus(db, uid));
+        submitKycDetails(db, uid, pan, aadhar, () => loadKycStatus(db, uid, profileCollection, privateCollection), profileCollection, privateCollection);
     });
 }
