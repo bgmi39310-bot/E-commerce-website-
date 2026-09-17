@@ -193,6 +193,7 @@
             <button class="sidebar-nav-item" id="nav-orders" onclick="switchTab('orders')"><span class="icon">🧾</span> Orders</button>
             <button class="sidebar-nav-item" id="nav-reports" onclick="switchTab('reports')"><span class="icon">⚠️</span> Reports</button>
             <button class="sidebar-nav-item" id="nav-kyc" onclick="switchTab('kyc')"><span class="icon">🪪</span> Seller KYC</button>
+            <button class="sidebar-nav-item" id="nav-deliverykyc" onclick="switchTab('deliverykyc')"><span class="icon">🪪</span> Delivery KYC</button>
             <button class="sidebar-nav-item" id="nav-banners" onclick="switchTab('banners')"><span class="icon">🖼️</span> Banners</button>
             <button class="sidebar-nav-item" id="nav-disputes" onclick="switchTab('disputes')"><span class="icon">⚖️</span> Disputes</button>
             <button class="sidebar-nav-item" id="nav-reviews" onclick="switchTab('reviews')"><span class="icon">⭐</span> Reviews</button>
@@ -303,6 +304,10 @@
                 <div id="kycReviewContainer"><p>Loading KYC submissions...</p></div>
             </div>
 
+            <div class="admin-section" id="section-deliverykyc">
+                <div id="deliveryKycReviewContainer"><p>Loading delivery partner KYC submissions...</p></div>
+            </div>
+
             <!-- BANNERS -->
             <div class="admin-section" id="section-banners">
                 <div class="panel" style="margin-bottom:16px;">
@@ -340,7 +345,7 @@
         filterSellers, filterBuyers, filterDeliveryPartners, filterProducts,
         loadAllProducts, deleteProductAdmin, loadAllOrders, loadReports, resolveReport,
         resolveReportAndDeleteProduct,
-        loadPendingKyc, updateKycStatus, loadAllReviews, deleteReviewAdmin
+        loadPendingKyc, updateKycStatus, loadPendingDeliveryKyc, updateDeliveryKycStatus, loadAllReviews, deleteReviewAdmin
     } from './admin-logic.js';
     import { loadAllBanners, createBanner, toggleBannerActive, deleteBanner } from './banner-logic.js';
     import { loadAllDisputes } from './dispute-logic.js';
@@ -527,7 +532,7 @@
         document.getElementById('menuOverlay').style.display = document.getElementById('sidebar').classList.contains('open') ? 'block' : 'none';
     };
 
-    const PAGE_TITLES = { dashboard: 'Dashboard', sellers: 'Sellers', buyers: 'Buyers', delivery: 'Delivery Partners', auditlog: 'Audit Log', products: 'Products', orders: 'Orders', reports: 'Reports', kyc: 'Seller KYC', banners: 'Banners', disputes: 'Disputes', reviews: 'Reviews' };
+    const PAGE_TITLES = { dashboard: 'Dashboard', sellers: 'Sellers', buyers: 'Buyers', delivery: 'Delivery Partners', auditlog: 'Audit Log', products: 'Products', orders: 'Orders', reports: 'Reports', kyc: 'Seller KYC', deliverykyc: 'Delivery KYC', banners: 'Banners', disputes: 'Disputes', reviews: 'Reviews' };
 
     window.switchTab = function(tabName) {
         document.querySelectorAll('.sidebar-nav-item').forEach(b => b.classList.remove('active'));
@@ -548,6 +553,7 @@
         if (tabName === 'orders') loadAllOrders(db, document.getElementById('orderStatusFilter').value);
         if (tabName === 'reports') loadReports(db);
         if (tabName === 'kyc') loadPendingKyc(db);
+        if (tabName === 'deliverykyc') loadPendingDeliveryKyc(db);
         if (tabName === 'banners') loadAllBanners(db);
         if (tabName === 'disputes') loadAllDisputes(db);
         if (tabName === 'reviews') loadAllReviews(db);
@@ -587,6 +593,14 @@
 
     window.rejectKycMain = function(sellerUid) {
         updateKycStatus(db, sellerUid, 'Rejected');
+    };
+
+    window.approveDeliveryKycMain = function(deliveryUid) {
+        updateDeliveryKycStatus(db, deliveryUid, 'Verified');
+    };
+
+    window.rejectDeliveryKycMain = function(deliveryUid) {
+        updateDeliveryKycStatus(db, deliveryUid, 'Rejected');
     };
 
     window.dismissReportMain = function(reportId) {
