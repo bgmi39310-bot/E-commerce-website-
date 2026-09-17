@@ -3,7 +3,7 @@ import { showToast } from './toast.js';
 import { escapeHtml } from './sanitize.js';
 import {
     collection, getDocs, query, where, doc, updateDoc, deleteDoc, getDoc,
-    getCountFromServer, getAggregateFromServer, sum, limit, orderBy, writeBatch, addDoc
+    getCountFromServer, getAggregateFromServer, sum, limit, orderBy, writeBatch, addDoc, startAfter
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // Local caches — each list is fetched from Firestore ONCE per admin session.
@@ -16,6 +16,28 @@ import {
 // and cheap instead of downloading every document in every collection on
 // every visit — which is what it used to do.
 const LIST_FETCH_LIMIT = 300;
+
+// Cursor + "is there more" tracking for the "Load More" button on each
+// paginated list — lets the admin panel go past the 300-item cap instead
+// of that just being a hard, invisible ceiling.
+const pagination = {
+    products: { lastDoc: null, hasMore: false },
+    orders: { lastDoc: null, hasMore: false },
+    reviews: { lastDoc: null, hasMore: false },
+    reports: { lastDoc: null, hasMore: false }
+};
+
+function renderLoadMoreButton(key, containerEl, onClick) {
+    const existing = containerEl.querySelector('.load-more-btn');
+    if (existing) existing.remove();
+    if (!pagination[key].hasMore) return;
+    const btn = document.createElement('button');
+    btn.className = 'admin-btn admin-btn-unblock load-more-btn';
+    btn.style.cssText = 'display:block; width:100%; margin-top:10px;';
+    btn.textContent = `Load ${LIST_FETCH_LIMIT} More`;
+    btn.onclick = onClick;
+    containerEl.appendChild(btn);
+}
 
 // Writes a record of every admin action that changes something, so there's
 // an actual trail of who did what and when — this used to be written by
@@ -206,14 +228,21 @@ function renderReviews() {
     `).join('');
 }
 
-export async function loadAllReviews(db) {
+export async function loadAllReviews(db, loadMore = false) {
     const container = document.getElementById('reviewsAdminContainer');
-    container.innerHTML = "<p>Loading reviews...</p>";
+    if (!loadMore) container.innerHTML = "<p>Loading reviews...</p>";
     try {
-        const snap = await getDocs(query(collection(db, "reviews"), orderBy("createdAt", "desc"), limit(LIST_FETCH_LIMIT)));
-        cachedReviews = [];
+        const q = loadMore && pagination.reviews.lastDoc
+            ? query(collection(db, "reviews"), orderBy("createdAt", "desc"), startAfter(pagination.reviews.lastDoc), limit(LIST_FETCH_LIMIT))
+            : query(collection(db, "reviews"), orderBy("createdAt", "desc"), limit(LIST_FETCH_LIMIT));
+        const snap = await getDocs(q);
+        pagination.reviews.hasMore = snap.docs.length === LIST_FETCH_LIMIT;
+        if (snap.docs.length > 0) pagination.reviews.lastDoc = snap.docs[snap.docs.length - 1];
+
+        if (!loadMore) cachedReviews = [];
         snap.forEach(d => cachedReviews.push({ id: d.id, ...d.data() }));
         renderReviews();
+        renderLoadMoreButton('reviews', container, () => loadAllReviews(db, true));
     } catch (error) {
         console.error(error);
         container.innerHTML = `<p style="color:red;">Unable to load reviews.<br><small style="color:#c77;">${escapeHtml(error.message || String(error))}</small></p>`;
@@ -285,14 +314,21 @@ function renderReports() {
     }).join('');
 }
 
-export async function loadReports(db) {
+export async function loadReports(db, loadMore = false) {
     const container = document.getElementById('reportsContainer');
-    container.innerHTML = "<p>Loading reports...</p>";
+    if (!loadMore) container.innerHTML = "<p>Loading reports...</p>";
     try {
-        const snap = await getDocs(query(collection(db, "reports"), orderBy("createdAt", "desc"), limit(LIST_FETCH_LIMIT)));
-        cachedReports = [];
+        const q = loadMore && pagination.reports.lastDoc
+            ? query(collection(db, "reports"), orderBy("createdAt", "desc"), startAfter(pagination.reports.lastDoc), limit(LIST_FETCH_LIMIT))
+            : query(collection(db, "reports"), orderBy("createdAt", "desc"), limit(LIST_FETCH_LIMIT));
+        const snap = await getDocs(q);
+        pagination.reports.hasMore = snap.docs.length === LIST_FETCH_LIMIT;
+        if (snap.docs.length > 0) pagination.reports.lastDoc = snap.docs[snap.docs.length - 1];
+
+        if (!loadMore) cachedReports = [];
         snap.forEach(d => cachedReports.push({ id: d.id, ...d.data() }));
         renderReports();
+        renderLoadMoreButton('reports', container, () => loadReports(db, true));
     } catch (error) {
         console.error(error);
         container.innerHTML = `<p style="color:red;">Unable to load reports.<br><small style="color:#c77;">${escapeHtml(error.message || String(error))}</small></p>`;
@@ -410,6 +446,63 @@ export async function updateKycStatus(db, sellerUid, newStatus) {
         cachedKyc = cachedKyc.filter(s => s.id !== sellerUid);
         renderKyc();
         logAdminAction(db, 'verify_kyc', sellerUid, { status: newStatus });
+    } catch (error) {
+        console.error(error);
+        showToast("Error updating KYC status.", 'error');
+    }
+}
+
+// ---------- DELIVERY PARTNER KYC REVIEW ----------
+// Same pattern as seller KYC above, against delivery_profiles /
+// delivery_private_kyc instead of sellers_profiles / seller_private_kyc.
+let cachedDeliveryKyc = [];
+
+function renderDeliveryKyc() {
+    const container = document.getElementById('deliveryKycReviewContainer');
+    if (cachedDeliveryKyc.length === 0) {
+        container.innerHTML = `<div class="admin-no-data">No pending delivery partner KYC submissions.</div>`;
+        return;
+    }
+    container.innerHTML = cachedDeliveryKyc.map(s => `
+        <div class="admin-row-card">
+            <div class="arc-info">
+                <h4>${escapeHtml(s.name || 'Unnamed')}</h4>
+                <p>📞 ${escapeHtml(s.phone || 'N/A')} &nbsp; | &nbsp; PAN: ${escapeHtml(s.kycPan || 'N/A')} &nbsp; | &nbsp; Aadhar: xxxx-xxxx-${escapeHtml(s.kycAadharLast4 || '----')}</p>
+                <p class="uid-tag">UID: ${s.id}</p>
+            </div>
+            <div class="arc-actions">
+                <button class="admin-btn admin-btn-unblock" onclick="approveDeliveryKycMain('${s.id}')">✅ Verify</button>
+                <button class="admin-btn admin-btn-block" onclick="rejectDeliveryKycMain('${s.id}')">❌ Reject</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+export async function loadPendingDeliveryKyc(db) {
+    const container = document.getElementById('deliveryKycReviewContainer');
+    container.innerHTML = "<p>Loading delivery partner KYC submissions...</p>";
+    try {
+        const q = query(collection(db, "delivery_profiles"), where("kycStatus", "==", "Pending"), limit(LIST_FETCH_LIMIT));
+        const snap = await getDocs(q);
+        cachedDeliveryKyc = [];
+        for (const d of snap.docs) {
+            const privSnap = await getDoc(doc(db, "delivery_private_kyc", d.id));
+            const priv = privSnap.exists() ? privSnap.data() : {};
+            cachedDeliveryKyc.push({ id: d.id, ...d.data(), kycPan: priv.pan, kycAadharLast4: priv.aadharLast4 });
+        }
+        renderDeliveryKyc();
+    } catch (error) {
+        console.error(error);
+        container.innerHTML = `<p style="color:red;">Unable to load delivery partner KYC submissions.<br><small style="color:#c77;">${escapeHtml(error.message || String(error))}</small></p>`;
+    }
+}
+
+export async function updateDeliveryKycStatus(db, deliveryUid, newStatus) {
+    try {
+        await updateDoc(doc(db, "delivery_profiles", deliveryUid), { kycStatus: newStatus });
+        cachedDeliveryKyc = cachedDeliveryKyc.filter(s => s.id !== deliveryUid);
+        renderDeliveryKyc();
+        logAdminAction(db, 'verify_delivery_kyc', deliveryUid, { status: newStatus });
     } catch (error) {
         console.error(error);
         showToast("Error updating KYC status.", 'error');
@@ -595,7 +688,7 @@ function renderDeliveryPartners() {
         return `
             <div class="admin-row-card ${blocked ? 'is-blocked' : ''}">
                 <div class="arc-info">
-                    <h4>${escapeHtml(d.name || 'Unnamed')} ${blocked ? '<span class="blocked-tag">BLOCKED</span>' : ''} ${(available && !blocked) ? '<span class="blocked-tag" style="background:#1a7f4b;">🟢 AVAILABLE</span>' : ''}</h4>
+                    <h4>${escapeHtml(d.name || 'Unnamed')} ${blocked ? '<span class="blocked-tag">BLOCKED</span>' : ''} ${(available && !blocked) ? '<span class="blocked-tag" style="background:#1a7f4b;">🟢 AVAILABLE</span>' : ''} ${d.kycStatus === 'Verified' ? '<span class="blocked-tag" style="background:#1a73e8;">✅ VERIFIED</span>' : ''}</h4>
                     <p>📞 ${escapeHtml(d.phone || 'N/A')} &nbsp; 🚲 ${escapeHtml(d.vehicleType || 'N/A')} &nbsp; 💰 ${escapeHtml(feeLabel)}</p>
                     <p>📍 Villages: ${escapeHtml((d.villages || []).join(', ') || 'N/A')}</p>
                     <p class="uid-tag">UID: ${d.id}</p>
@@ -720,14 +813,21 @@ function renderProducts() {
     `).join('');
 }
 
-export async function loadAllProducts(db) {
+export async function loadAllProducts(db, loadMore = false) {
     const container = document.getElementById('productsContainer');
-    container.innerHTML = "<p>Loading all products...</p>";
+    if (!loadMore) container.innerHTML = "<p>Loading all products...</p>";
     try {
-        const snap = await getDocs(query(collection(db, "vendors"), orderBy("createdAt", "desc"), limit(LIST_FETCH_LIMIT)));
-        cachedProducts = [];
+        const q = loadMore && pagination.products.lastDoc
+            ? query(collection(db, "vendors"), orderBy("createdAt", "desc"), startAfter(pagination.products.lastDoc), limit(LIST_FETCH_LIMIT))
+            : query(collection(db, "vendors"), orderBy("createdAt", "desc"), limit(LIST_FETCH_LIMIT));
+        const snap = await getDocs(q);
+        pagination.products.hasMore = snap.docs.length === LIST_FETCH_LIMIT;
+        if (snap.docs.length > 0) pagination.products.lastDoc = snap.docs[snap.docs.length - 1];
+
+        if (!loadMore) cachedProducts = [];
         snap.forEach(d => cachedProducts.push({ id: d.id, ...d.data() }));
         renderProducts();
+        renderLoadMoreButton('products', container, () => loadAllProducts(db, true));
     } catch (error) {
         console.error(error);
         container.innerHTML = `<p style="color:red;">Unable to load products.<br><small style="color:#c77;">${escapeHtml(error.message || String(error))}</small></p>`;
@@ -750,14 +850,22 @@ export async function deleteProductAdmin(db, productId) {
 
 // ---------- ORDERS (read-only view, filter is done in-memory once loaded) ----------
 let cachedAllOrders = [];
+let currentOrdersStatusFilter = 'All';
 
-export async function loadAllOrders(db, statusFilter = 'All') {
+export async function loadAllOrders(db, statusFilter = 'All', loadMore = false) {
     const container = document.getElementById('ordersContainer');
-    container.innerHTML = "<p>Loading orders...</p>";
+    currentOrdersStatusFilter = statusFilter;
+    if (!loadMore && cachedAllOrders.length === 0) container.innerHTML = "<p>Loading orders...</p>";
     try {
-        if (cachedAllOrders.length === 0) {
-            const snap = await getDocs(query(collection(db, "orders"), orderBy("createdAt", "desc"), limit(LIST_FETCH_LIMIT)));
-            cachedAllOrders = [];
+        if (loadMore || cachedAllOrders.length === 0) {
+            const q = loadMore && pagination.orders.lastDoc
+                ? query(collection(db, "orders"), orderBy("createdAt", "desc"), startAfter(pagination.orders.lastDoc), limit(LIST_FETCH_LIMIT))
+                : query(collection(db, "orders"), orderBy("createdAt", "desc"), limit(LIST_FETCH_LIMIT));
+            const snap = await getDocs(q);
+            pagination.orders.hasMore = snap.docs.length === LIST_FETCH_LIMIT;
+            if (snap.docs.length > 0) pagination.orders.lastDoc = snap.docs[snap.docs.length - 1];
+
+            if (!loadMore) cachedAllOrders = [];
             snap.forEach(d => cachedAllOrders.push({ id: d.id, ...d.data() }));
         }
 
@@ -773,7 +881,7 @@ export async function loadAllOrders(db, statusFilter = 'All') {
         }
 
         container.innerHTML = `
-            <p style="font-size:12px; color:#8a94a6; margin-bottom:10px;">Showing the ${LIST_FETCH_LIMIT} most recent orders${statusFilter !== 'All' ? ` (filtered to "${statusFilter}")` : ''}.</p>
+            <p style="font-size:12px; color:#8a94a6; margin-bottom:10px;">Showing ${cachedAllOrders.length} most recent orders${statusFilter !== 'All' ? ` (filtered to "${statusFilter}")` : ''}.</p>
             ${orders.map(o => `
             <div class="admin-row-card">
                 <div class="arc-info">
@@ -783,6 +891,7 @@ export async function loadAllOrders(db, statusFilter = 'All') {
                 </div>
             </div>
         `).join('')}`;
+        renderLoadMoreButton('orders', container, () => loadAllOrders(db, currentOrdersStatusFilter, true));
     } catch (error) {
         console.error(error);
         container.innerHTML = `<p style="color:red;">Unable to load orders.<br><small style="color:#c77;">${escapeHtml(error.message || String(error))}</small></p>`;
