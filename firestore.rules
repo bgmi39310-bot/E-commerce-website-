@@ -1,0 +1,294 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAdmin() {
+      return request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // ---------- USERS ----------
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow delete: if false;
+
+      match /addresses/{addressId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // Shops this user (buyer) follows. Always written by the buyer about
+      // themselves, so plain owner-only read/write is enough.
+      match /following/{sellerId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // This user's notifications (order updates, return updates, new
+      // questions, etc). IMPORTANT: these are written by *other* people —
+      // e.g. a seller writes a notification into the *buyer's* collection
+      // when an order ships, and a buyer writes into the *seller's*
+      // collection when asking a question. So creation can't be restricted
+      // to "only the owner" like other subcollections. Only reading,
+      // marking-as-read, or deleting is restricted to the owner.
+      match /notifications/{notifId} {
+        allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+        allow create: if request.auth != null;
+      }
+    }
+
+    // ---------- SELLER SHOP PROFILES ----------
+    match /sellers_profiles/{sellerId} {
+      allow read: if true;
+      allow create: if request.auth != null && (request.auth.uid == sellerId || isAdmin());
+      allow update: if request.auth != null && (
+        request.auth.uid == sellerId ||
+        isAdmin() ||
+        // Any logged-in buyer may adjust ONLY the followerCount field (via
+        // follow/unfollow) — nothing else on the seller's profile.
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followerCount'])
+      );
+      allow delete: if isAdmin();
+
+      // Buyers who follow this shop. Follower counts are shown publicly
+      // (e.g. on the shop page), but only the buyer themself can create or
+      // remove their own follow record.
+      match /followers/{buyerId} {
+        allow read: if true;
+        allow write: if request.auth != null && request.auth.uid == buyerId;
+      }
+    }
+
+    // ---------- SELLER PRIVATE KYC (PAN / Aadhar) ----------
+    // Deliberately a SEPARATE collection from sellers_profiles, which is
+    // publicly readable (needed for shop pages) — PAN/Aadhar numbers must
+    // never be. Only the seller themselves or an admin may read this.
+    match /seller_private_kyc/{sellerId} {
+      allow read: if request.auth != null && (request.auth.uid == sellerId || isAdmin());
+      allow write: if request.auth != null && request.auth.uid == sellerId;
+    }
+
+    // ---------- DELIVERY PARTNER PROFILES ----------
+    // Publicly readable, same reasoning as sellers_profiles — sellers need
+    // to browse available delivery partners in their village. Only the
+    // delivery partner themselves (or an admin) may create/edit/delete it.
+    match /delivery_profiles/{deliveryUid} {
+      allow read: if true;
+      allow create, update: if request.auth != null && (request.auth.uid == deliveryUid || isAdmin());
+      allow delete: if request.auth != null && (request.auth.uid == deliveryUid || isAdmin());
+    }
+
+    // ---------- DELIVERY PARTNER PRIVATE KYC (PAN / Aadhar) ----------
+    // Same separation as seller_private_kyc above, for the same reason:
+    // delivery_profiles is publicly readable, PAN/Aadhar numbers must never be.
+    match /delivery_private_kyc/{deliveryUid} {
+      allow read: if request.auth != null && (request.auth.uid == deliveryUid || isAdmin());
+      allow write: if request.auth != null && request.auth.uid == deliveryUid;
+    }
+
+    // ---------- PRODUCTS (vendors collection) ----------
+    match /vendors/{productId} {
+      allow read: if true;
+      // Listing a product requires a verified email — the account.html
+      // banner alone didn't stop anything; this is the actual enforcement.
+      // request.auth.token.email_verified is set directly on the ID token
+      // by Firebase Auth itself (true automatically for Google sign-in,
+      // false until verified for email/password sign-up), so this can't be
+      // spoofed by the client.
+      allow create: if request.auth != null && request.auth.token.email_verified == true
+                    && request.resource.data.sellerUid == request.auth.uid;
+      allow update: if request.auth != null && (
+        resource.data.sellerUid == request.auth.uid ||
+        isAdmin() ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views'])
+      );
+      allow delete: if request.auth != null && (resource.data.sellerUid == request.auth.uid || isAdmin());
+    }
+
+    // ---------- CHATS ----------
+    match /chats/{chatId} {
+      allow read, update: if request.auth != null &&
+        (resource.data.buyerUid == request.auth.uid || resource.data.sellerUid == request.auth.uid);
+      allow create: if request.auth != null &&
+        (request.resource.data.buyerUid == request.auth.uid || request.resource.data.sellerUid == request.auth.uid);
+
+      match /messages/{messageId} {
+        allow read: if request.auth != null &&
+          (get(/databases/$(database)/documents/chats/$(chatId)).data.buyerUid == request.auth.uid ||
+           get(/databases/$(database)/documents/chats/$(chatId)).data.sellerUid == request.auth.uid);
+        allow create: if request.auth != null && request.resource.data.senderUid == request.auth.uid;
+      }
+    }
+
+    // ---------- REPORTS ----------
+    match /reports/{reportId} {
+      allow read: if isAdmin();
+      allow create: if request.auth != null && request.resource.data.reporterUid == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // ---------- COUPONS ----------
+    match /coupons/{couponId} {
+      allow read: if true;
+      allow create, update, delete: if request.auth != null &&
+        (request.resource.data.sellerUid == request.auth.uid || resource.data.sellerUid == request.auth.uid || isAdmin());
+      // A buyer applying a coupon at checkout needs to bump usedCount on a
+      // coupon that isn't theirs — mirrors the `views` counter pattern on
+      // vendors above: any signed-in user may touch ONLY this one field.
+      allow update: if request.auth != null &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedCount']);
+    }
+
+    // ---------- BANNERS ----------
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ---------- ADMIN AUDIT LOG ----------
+    // Write-then-read-only from the admin panel's perspective — nobody
+    // (including admins) ever edits or deletes a log entry after the fact,
+    // that would defeat the point of an audit trail.
+    match /adminActionLog/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // ---------- DISPUTES ----------
+    // Only the two people involved in a dispute (whoever raised it, and
+    // whoever it's against) or an admin may read/write it — never a
+    // random third authenticated user who happens to guess/pass a dispute ID.
+    match /disputes/{disputeId} {
+      allow create: if request.auth != null && request.resource.data.raisedByUid == request.auth.uid;
+      allow read, update: if request.auth != null &&
+        (resource.data.raisedByUid == request.auth.uid || resource.data.againstUid == request.auth.uid || isAdmin());
+
+      match /messages/{messageId} {
+        allow read: if request.auth != null &&
+          (get(/databases/$(database)/documents/disputes/$(disputeId)).data.raisedByUid == request.auth.uid ||
+           get(/databases/$(database)/documents/disputes/$(disputeId)).data.againstUid == request.auth.uid ||
+           isAdmin());
+        allow create: if request.auth != null && request.resource.data.senderUid == request.auth.uid &&
+          (get(/databases/$(database)/documents/disputes/$(disputeId)).data.raisedByUid == request.auth.uid ||
+           get(/databases/$(database)/documents/disputes/$(disputeId)).data.againstUid == request.auth.uid ||
+           isAdmin());
+      }
+    }
+
+    // ---------- PRODUCT Q&A ----------
+    match /productQuestions/{questionId} {
+      allow read: if true;
+      allow create: if request.auth != null && request.resource.data.askerUid == request.auth.uid;
+      allow update: if request.auth != null && (resource.data.sellerUid == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // ---------- REVIEWS ----------
+    match /reviews/{reviewId} {
+      allow read: if true;
+      // A review must be tied to a REAL order that (a) actually belongs to
+      // this buyer and (b) hasn't already been reviewed — otherwise anyone
+      // with any signed-in UID (including a throwaway anonymous one) could
+      // write unlimited fake reviews directly via the Firestore SDK,
+      // bypassing the "write a review" button entirely. This is what
+      // actually stops that, not the client-side UI.
+      allow create: if request.auth != null
+        && request.resource.data.buyerUid == request.auth.uid
+        && request.resource.data.orderId is string
+        && get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.buyerUid == request.auth.uid
+        && get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.reviewed != true;
+      allow update, delete: if isAdmin();
+    }
+
+    // ---------- ORDERS ----------
+    // An order's status only ever moves FORWARD through its lifecycle, never
+    // sideways or backward, and never once it's Delivered/Cancelled. These
+    // two functions are the single source of truth for which transitions are
+    // legal — matched by the equivalent client-side check in order-logic.js
+    // and orders.html, but enforced here too since a direct Firestore SDK
+    // call could otherwise skip the client entirely.
+    function sellerCanTransition(before, after) {
+      return (before == 'Pending' && (after == 'Accepted' || after == 'Cancelled')) ||
+             (before == 'Accepted' && (after == 'Shipped' || after == 'Cancelled')) ||
+             (before == 'Shipped' && after == 'Delivered');
+    }
+
+    function buyerCanTransition(before, after) {
+      return before == 'Pending' && after == 'Cancelled';
+    }
+
+    match /orders/{orderId} {
+      // Placing an order requires a verified email — same reasoning and
+      // same token-based check as the product-listing rule above.
+      allow create: if request.auth != null && request.auth.token.email_verified == true
+                    && request.resource.data.buyerUid == request.auth.uid;
+
+      allow read: if request.auth != null
+                  && (resource.data.buyerUid == request.auth.uid
+                      || resource.data.sellerUid == request.auth.uid
+                      || resource.data.deliveryBoyUid == request.auth.uid
+                      // The delivery job board must be readable by delivery
+                      // partners browsing it — but NOT by just anyone who's
+                      // logged in. Without this extra check, any random
+                      // authenticated buyer could query
+                      // orders-where-deliveryRequestStatus-is-open and read
+                      // OTHER buyers' names/phone numbers/addresses, since
+                      // that's an open, un-owned document from their
+                      // perspective. Requiring a real delivery_profiles doc
+                      // (created only via delivery-dashboard.html signup)
+                      // restricts this to people actually registered as
+                      // delivery partners.
+                      || (resource.data.deliveryRequestStatus == 'open'
+                          && exists(/databases/$(database)/documents/delivery_profiles/$(request.auth.uid)))
+                      || isAdmin());
+
+      allow update: if request.auth != null && (
+        isAdmin() ||
+        (
+          resource.data.sellerUid == request.auth.uid &&
+          (
+            // Updates that don't touch "status" at all (e.g. marking
+            // reviewed, storing a returnRequested flag, posting/assigning
+            // delivery) aren't a status transition and don't need to pass
+            // the transition check.
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']) ||
+            sellerCanTransition(resource.data.status, request.resource.data.status)
+          )
+        ) ||
+        (
+          resource.data.buyerUid == request.auth.uid &&
+          (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']) ||
+            buyerCanTransition(resource.data.status, request.resource.data.status)
+          )
+        ) ||
+        (
+          // The delivery partner currently assigned to this order can move
+          // its status forward exactly like a seller would (Accepted ->
+          // Shipped -> Delivered), via the same pickup/delivery OTP flow —
+          // and can freely change delivery-related fields (e.g. to back out
+          // of an assignment) since those aren't a status transition.
+          resource.data.deliveryBoyUid == request.auth.uid &&
+          (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']) ||
+            sellerCanTransition(resource.data.status, request.resource.data.status)
+          )
+        ) ||
+        (
+          // Any signed-in delivery partner may CLAIM an open job-board
+          // order — narrowly: only by setting THEMSELVES as deliveryBoyUid
+          // on an order that is currently open, and only touching
+          // delivery-related fields (never price, status, buyer info, etc).
+          resource.data.deliveryRequestStatus == 'open' &&
+          request.resource.data.deliveryBoyUid == request.auth.uid &&
+          request.resource.data.deliveryRequestStatus == 'assigned' &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['deliveryBoyUid', 'deliveryBoyName', 'deliveryBoyPhone', 'deliveryRequestStatus', 'deliveryFeeType', 'deliveryFeeAmount'])
+        )
+      );
+
+      allow delete: if false;
+    }
+  }
+}
