@@ -1,4 +1,4 @@
-import { collection, getDocs, query, where, doc, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, getDocs, query, where, doc, writeBatch, orderBy, limit, getAggregateFromServer, average, count } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { showToast } from './toast.js';
 import { escapeHtml } from './sanitize.js';
 
@@ -56,30 +56,38 @@ export async function loadProductReviews(db, productId) {
     if (!container) return;
 
     try {
-        const q = query(collection(db, "reviews"), where("productId", "==", productId));
-        const snap = await getDocs(q);
+        const reviewsQuery = query(collection(db, "reviews"), where("productId", "==", productId));
 
-        if (snap.empty) {
+        // The star average and "X reviews" count must reflect EVERY review,
+        // not just the ones we bother to display — so those come from a
+        // Firestore aggregation (average()/count()), which is priced as a
+        // small number of index-entries-scanned rather than one full
+        // document read per review. Only the review LIST below is capped
+        // with limit() — showing the most recent 20 is what actually needs
+        // full documents (comments, reviewer names, etc).
+        const [aggSnap, listSnap] = await Promise.all([
+            getAggregateFromServer(reviewsQuery, { avgRating: average("rating"), total: count() }),
+            getDocs(query(reviewsQuery, orderBy("createdAt", "desc"), limit(20)))
+        ]);
+
+        const total = aggSnap.data().total;
+        if (total === 0) {
             summaryEl.innerHTML = `<span style="color:#767676; font-size:13px;">No reviews yet — be the first to review!</span>`;
             container.innerHTML = '';
             return;
         }
 
-        let reviews = [];
-        snap.forEach(d => reviews.push(d.data()));
-        reviews.sort((a, b) => {
-            const ta = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate() : 0;
-            const tb = b.createdAt && b.createdAt.toDate ? b.createdAt.toDate() : 0;
-            return tb - ta;
-        });
-
-        const avg = reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length;
+        const avg = aggSnap.data().avgRating || 0;
         const fullStars = Math.round(avg);
+
+        let reviews = [];
+        listSnap.forEach(d => reviews.push(d.data()));
+        // Already newest-first from the query's orderBy — no client-side sort needed.
 
         summaryEl.innerHTML = `
             <span style="color:#ff9900; font-size:16px;">${'★'.repeat(fullStars)}${'☆'.repeat(5 - fullStars)}</span>
             <span style="font-weight:bold; margin-left:6px;">${avg.toFixed(1)}</span>
-            <span style="color:#767676; font-size:13px;"> (${reviews.length} review${reviews.length > 1 ? 's' : ''})</span>
+            <span style="color:#767676; font-size:13px;"> (${total} review${total > 1 ? 's' : ''}${total > reviews.length ? `, showing ${reviews.length} most recent` : ''})</span>
         `;
 
         container.innerHTML = reviews.map(r => `
