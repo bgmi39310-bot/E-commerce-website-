@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, query, where, doc, updateDoc, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, addDoc, getDocs, query, where, doc, updateDoc, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { sendNotification } from './notif-logic.js';
 import { showToast } from './toast.js';
 import { escapeHtml } from './sanitize.js';
@@ -40,7 +40,11 @@ export async function loadProductQA(db, productId) {
     if (!container) return;
 
     try {
-        const q = query(collection(db, "productQuestions"), where("productId", "==", productId));
+        // Capped at the most recent 20 — a product with dozens of Q&A
+        // entries doesn't need every single one re-read on every single
+        // visit; there's no running total/average here (unlike reviews)
+        // that would need the full set to stay accurate.
+        const q = query(collection(db, "productQuestions"), where("productId", "==", productId), orderBy("createdAt", "desc"), limit(20));
         const snap = await getDocs(q);
 
         if (snap.empty) {
@@ -50,11 +54,7 @@ export async function loadProductQA(db, productId) {
 
         let items = [];
         snap.forEach(d => items.push({ id: d.id, ...d.data() }));
-        items.sort((a, b) => {
-            const ta = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate() : 0;
-            const tb = b.createdAt && b.createdAt.toDate ? b.createdAt.toDate() : 0;
-            return tb - ta;
-        });
+        // Already newest-first from the query's orderBy — no client-side sort needed.
 
         container.innerHTML = items.map(qa => `
             <div class="qa-item">
