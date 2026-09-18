@@ -306,9 +306,7 @@
     import { onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { getCart, saveCart, migrateLegacyCartData } from './cart-storage.js';
     import { loadProductReviews } from './review-logic.js';
-    import { submitReport } from './report-logic.js';
     import { submitQuestion, loadProductQA } from './qa-logic.js';
-    import { getOrCreateChat } from './chat-logic.js';
     import { decrementStock } from './stock-logic.js';
     import { isFollowingSeller, toggleFollowSeller } from './follow-logic.js';
     import { showToast } from './toast.js';
@@ -316,6 +314,10 @@
     import { resizedImageUrl } from './img-utils.js';
     import { buildVariantKey } from './stock-logic.js';
     import { mountNotificationBell, sendNotification } from './notif-logic.js';
+    // report-logic.js and chat-logic.js are ONLY needed if the person
+    // actually clicks "Report" or "Chat with seller" — most visitors never
+    // do either, so these load on-demand (dynamic import) instead of
+    // being part of every single product page's initial JS payload.
 
     let currentBuyerUid = null;
     let authReadyResolve;
@@ -395,8 +397,19 @@
             // including the one caused by this very write — creating an
             // infinite read/write loop that could run away for as long as
             // the tab stayed open, racking up Firestore usage the whole time.
+            //
+            // Deferred with requestIdleCallback (or a plain timeout as a
+            // fallback) so this non-critical write doesn't compete for the
+            // browser's limited concurrent-connections-per-host with the
+            // image/review/QA requests that matter for what the person
+            // actually sees first.
             if (isFirstProductLoad) {
-                updateDoc(productRef, { views: increment(1) }).catch(() => {});
+                const bumpViews = () => updateDoc(productRef, { views: increment(1) }).catch(() => {});
+                if ('requestIdleCallback' in window) {
+                    requestIdleCallback(bumpViews);
+                } else {
+                    setTimeout(bumpViews, 2000);
+                }
             }
             renderProduct(currentProduct);
 
@@ -598,9 +611,12 @@
                 snap.forEach(d => { if (d.id !== product.id) related.push({ id: d.id, ...d.data() }); });
             }
 
-            // Fallback: fill up with any other products if not enough from same shop
+            // Fallback: fill up with any other products if not enough from same shop.
+            // Capped at 8, not 20 — this page only ever DISPLAYS up to 8
+            // related items, so reading 20 to pick from was pure waste
+            // (extra reads that never appeared on screen at all).
             if (related.length < 4) {
-                const allSnap = await getDocs(query(collection(db, "vendors"), limit(20)));
+                const allSnap = await getDocs(query(collection(db, "vendors"), limit(8)));
                 allSnap.forEach(d => {
                     if (d.id !== product.id && !related.find(r => r.id === d.id)) {
                         related.push({ id: d.id, ...d.data() });
@@ -710,6 +726,7 @@
         try {
             const userSnap = await getDoc(doc(db, "users", currentBuyerUid));
             const buyerName = userSnap.exists() ? userSnap.data().name : 'DesiMarket Buyer';
+            const { getOrCreateChat } = await import('./chat-logic.js');
             const chatId = await getOrCreateChat(db, currentBuyerUid, currentProduct.sellerUid, buyerName, currentProduct.shopName);
             window.location.href = `chat.html?chatId=${chatId}`;
         } catch (error) {
@@ -759,11 +776,12 @@
         document.getElementById('reportModal').classList.remove('active');
     };
 
-    document.getElementById('reportSubmitBtn').addEventListener('click', () => {
+    document.getElementById('reportSubmitBtn').addEventListener('click', async () => {
         const reason = document.getElementById('reportReason').value;
         const details = document.getElementById('reportDetails').value;
         if (!currentProduct) return;
 
+        const { submitReport } = await import('./report-logic.js');
         submitReport(db, {
             productId: currentProduct.id,
             productName: currentProduct.name,
