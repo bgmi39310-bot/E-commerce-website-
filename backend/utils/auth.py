@@ -15,10 +15,13 @@ Both `require_auth` and `require_admin` attach the verified info to Flask's
 """
 
 import os
+import logging
 from functools import wraps
 from flask import request, jsonify, g
 from firebase_admin import auth as firebase_auth
 from utils.firebase_admin_init import db
+
+logger = logging.getLogger(__name__)
 
 
 def _extract_id_token():
@@ -37,7 +40,8 @@ def require_auth(fn):
         try:
             decoded = firebase_auth.verify_id_token(token)
         except Exception as e:
-            return jsonify({"error": "Invalid or expired ID token.", "detail": str(e)}), 401
+            logger.warning("ID token verification failed: %s", e)
+            return jsonify({"error": "Invalid or expired ID token."}), 401
         g.uid = decoded["uid"]
         g.user = decoded
         return fn(*args, **kwargs)
@@ -53,7 +57,8 @@ def require_admin(fn):
         try:
             decoded = firebase_auth.verify_id_token(token)
         except Exception as e:
-            return jsonify({"error": "Invalid or expired ID token.", "detail": str(e)}), 401
+            logger.warning("ID token verification failed: %s", e)
+            return jsonify({"error": "Invalid or expired ID token."}), 401
 
         user_doc = db.collection("users").document(decoded["uid"]).get()
         if not user_doc.exists or not user_doc.to_dict().get("isAdmin"):
@@ -79,4 +84,3 @@ def require_cron_secret(fn):
             return jsonify({"error": "Invalid or missing cron secret."}), 401
         return fn(*args, **kwargs)
     return wrapper
-
