@@ -5,6 +5,13 @@ import { escapeHtml } from './sanitize.js';
 import { restoreStock, buildVariantKey } from './stock-logic.js';
 
 let allOrders = [];
+
+// Lets other modules (like the analytics render, triggered separately from
+// the Orders tab menu) read the CURRENT already-fetched order list without
+// needing their own Firestore query.
+export function getCurrentOrders() {
+    return allOrders;
+}
 let currentStatusFilter = 'Pending';
 let unsubscribeOrders = null;
 
