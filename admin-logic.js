@@ -649,11 +649,22 @@ export async function loadBuyers(db) {
     const container = document.getElementById('buyersContainer');
     container.innerHTML = "<p>Loading buyers...</p>";
     try {
-        // Same reasoning as loadSellers() above — no orderBy, sort after fetching.
-        const q = query(collection(db, "users"), where("role", "==", "customer"), limit(LIST_FETCH_LIMIT));
+        // NOT filtering by role=="customer" here — same lesson as
+        // loadSellers() above: plenty of real accounts (older ones, or ones
+        // created through a path that never set this field) have no role
+        // field at all, so they'd silently vanish from this list. Since
+        // literally any account can place an order in this app (there's no
+        // separate "buyer profile" the way sellers/delivery partners have),
+        // showing every non-admin user here is actually the accurate
+        // picture — a seller or delivery partner account can buy too.
+        const q = query(collection(db, "users"), limit(LIST_FETCH_LIMIT));
         const snap = await getDocs(q);
         cachedBuyers = [];
-        snap.forEach(d => cachedBuyers.push({ id: d.id, ...d.data() }));
+        snap.forEach(d => {
+            const data = d.data();
+            if (data.isAdmin === true) return; // admins aren't "buyers" for this list's purpose
+            cachedBuyers.push({ id: d.id, ...data });
+        });
         cachedBuyers = sortByCreatedAtDesc(cachedBuyers);
         renderBuyers();
     } catch (error) {
