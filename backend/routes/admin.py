@@ -120,9 +120,17 @@ def resolve_report():
     if not report_id:
         return jsonify({"error": "'reportId' is required."}), 400
 
-    db.collection("reports").document(report_id).set({"status": "Resolved"}, merge=True)
+    # Marking the report Resolved and deleting the reported product must
+    # happen together — previously these were two separate writes, so if
+    # the second one failed (network blip, permissions, etc.) after the
+    # first succeeded, the report would sit there marked "Resolved" while
+    # the product it was about was still live on the marketplace. A batch
+    # commits both or neither.
+    batch = db.batch()
+    batch.set(db.collection("reports").document(report_id), {"status": "Resolved"}, merge=True)
     if also_delete_product_id:
-        db.collection("vendors").document(also_delete_product_id).delete()
+        batch.delete(db.collection("vendors").document(also_delete_product_id))
+    batch.commit()
 
     _log_admin_action("resolve_report", report_id, {"deletedProduct": also_delete_product_id})
     return jsonify({"success": True})
