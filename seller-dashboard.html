@@ -514,7 +514,7 @@
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { loadSellerProfileFromFirestore, saveSellerProfile, useMyLocationForShop, refreshShopLocationMap } from './profile-logic.js';
         import { addProductToFirebase, fetchMyListedProducts, saveProductEdits, closeEditProductModal, deleteProduct, stopListeningToMyProducts, generateVariantStockGrid } from './product-logic.js';
-        import { fetchDashboardOrders, filterOrders, updateOrderStatus, markAsShipped, confirmDelivery, stopListeningToOrders } from './order-logic.js';
+        import { fetchDashboardOrders, filterOrders, updateOrderStatus, markAsShipped, confirmDelivery, stopListeningToOrders, getCurrentOrders } from './order-logic.js';
         import { renderAnalyticsFromOrders, downloadSalesReport } from './analytics-logic.js';
         import { bulkUploadProducts } from './bulk-upload-logic.js';
         import { mountNotificationBell } from './notif-logic.js';
@@ -640,11 +640,24 @@
                 ['coupons', 'couponsSection', () => loadMyCoupons(db, uid)],
                 ['payouts', 'payoutSection', () => loadPayoutSummary(db, uid)],
                 ['kyc', 'kycSection', () => loadKycStatus(db, uid)],
-                // Analytics has no reads of its own — it's rendered from the
-                // same order data the (auto-loaded) Orders module already
-                // fetched, so opening it just re-triggers that module if it
-                // somehow hasn't loaded yet rather than paying for a second read.
-                ['analytics', 'analyticsSection', () => loadDashboardModule('orders', 'ordersSection', () => fetchDashboardOrders(db, uid, renderAnalyticsFromOrders))],
+                // Analytics has no Firestore query of its own — it's rendered
+                // from the same order data the (auto-loaded) Orders module
+                // already fetched. Orders is a PRIMARY section, so by the
+                // time a seller opens Analytics from the "⋮" menu, Orders has
+                // almost always already loaded — calling
+                // loadDashboardModule('orders', ...) again in that case used
+                // to be a silent no-op (it's guarded against loading twice),
+                // which left this section stuck showing "Loading..." forever
+                // with nothing left to ever call renderAnalyticsFromOrders()
+                // again. Rendering directly from the data Orders already has
+                // avoids that trap entirely.
+                ['analytics', 'analyticsSection', () => {
+                    if (loadedDashboardModules.has('orders')) {
+                        renderAnalyticsFromOrders(getCurrentOrders());
+                    } else {
+                        fetchDashboardOrders(db, uid, renderAnalyticsFromOrders);
+                    }
+                }],
             ];
         }
 
