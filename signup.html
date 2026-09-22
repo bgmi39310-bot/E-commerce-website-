@@ -113,10 +113,10 @@
         <div class="form-group">
             <label for="password">Password</label>
             <div class="password-wrap">
-                <input type="password" id="password" placeholder="At least 6 characters">
+                <input type="password" id="password" placeholder="At least 8 characters">
                 <span class="toggle-pass" id="togglePass">SHOW</span>
             </div>
-            <div class="hint">Use 6 or more characters with a mix of letters and numbers.</div>
+            <div class="hint">Use 8 or more characters with a mix of letters and numbers.</div>
         </div>
 
         <div class="terms-check">
@@ -184,7 +184,7 @@
         switch (code) {
             case 'auth/email-already-in-use': return 'An account with this email already exists. Try logging in instead.';
             case 'auth/invalid-email': return 'Please enter a valid email address.';
-            case 'auth/weak-password': return 'Password should be at least 6 characters.';
+            case 'auth/weak-password': return 'Password should be at least 8 characters.';
             default: return 'Something went wrong. Please try again.';
         }
     }
@@ -205,6 +205,10 @@
         }
         if (!/^\d{10}$/.test(phone)) {
             showError('Please enter a valid 10-digit mobile number.');
+            return;
+        }
+        if (password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+            showError('Password must be at least 8 characters and include both letters and numbers.');
             return;
         }
         if (!termsChecked) {
