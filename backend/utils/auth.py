@@ -15,6 +15,7 @@ Both `require_auth` and `require_admin` attach the verified info to Flask's
 """
 
 import os
+import hmac
 import logging
 from functools import wraps
 from flask import request, jsonify, g
@@ -80,7 +81,12 @@ def require_cron_secret(fn):
     def wrapper(*args, **kwargs):
         expected = os.environ.get("CRON_SECRET")
         provided = request.headers.get("X-Cron-Secret")
-        if not expected or not provided or provided != expected:
+        # hmac.compare_digest instead of `!=` — a plain string comparison
+        # returns as soon as it finds a mismatched character, so how long
+        # the check takes can leak how many characters of the secret an
+        # attacker guessed correctly. compare_digest always takes the same
+        # time regardless of where (or whether) the strings differ.
+        if not expected or not provided or not hmac.compare_digest(provided, expected):
             return jsonify({"error": "Invalid or missing cron secret."}), 401
         return fn(*args, **kwargs)
     return wrapper
