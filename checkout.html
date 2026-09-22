@@ -139,15 +139,15 @@
 
     <script type="module">
         import { db, auth } from './firebase-config.js';
-        import { collection, addDoc, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { validateCoupon, recordCouponUsage } from './coupon-logic.js';
-        import { decrementStockForCart } from './stock-logic.js';
+        import { validateCoupon } from './coupon-logic.js';
         import { loadAddresses } from './address-logic.js';
         import { showToast } from './toast.js';
         import { escapeHtml } from './sanitize.js';
-        import { mountNotificationBell, sendNotification } from './notif-logic.js';
+        import { mountNotificationBell } from './notif-logic.js';
         import { getCart, clearCart, migrateLegacyCartData } from './cart-storage.js';
+        import { placeOrderViaBackend, BACKEND_BASE_URL } from './order-api.js';
 
         let currentBuyerUid = null;
         let currentBuyerUser = null;
@@ -370,94 +370,26 @@
             }
 
             try {
-                // Reserve stock first — this also hands back the LIVE product
-                // facts (price, sellerUid, shopName, returnWindowDays) read
-                // inside the same transaction, so the order is built from
-                // real Firestore data, never from a cart that could have a
-                // stale or tampered price sitting in localStorage. If any
-                // item is out of stock or short, this throws and we stop
-                // before creating any orders (no half-placed orders).
-                const verifiedItems = await decrementStockForCart(db, cart);
-                let couponWasUsed = false;
+                // Price, seller, shop name and stock are all re-derived
+                // server-side from Firestore by the backend — nothing here
+                // (including whatever price sits in the cart/localStorage)
+                // is trusted for the actual order. One order doc is
+                // created per cart item, each carrying its own sellerUid,
+                // so it reaches the correct seller's dashboard. See
+                // order-api.js / backend/routes/payments.py.
+                const items = cart.map(item => ({
+                    productId: item.id || null,
+                    selectedSize: item.selectedSize || null,
+                    selectedColor: item.selectedColor || null,
+                    quantity: parseInt(item.qty) || 1
+                }));
 
-                const eligibleSubtotal = appliedCoupon
-                    ? cart.reduce((sum, item, idx) => {
-                          const liveSellerUid = verifiedItems[idx]?.sellerUid ?? item.sellerUid;
-                          if (liveSellerUid !== appliedCoupon.sellerUid) return sum;
-                          const livePrice = verifiedItems[idx]?.price ?? (parseFloat(item.price) || 0);
-                          return sum + (parseInt(item.qty) || 1) * livePrice;
-                      }, 0)
-                    : 0;
-
-                // Each cart item becomes its own order, carrying its own sellerUid,
-                // so it reaches the correct seller's dashboard.
-                for (let idx = 0; idx < cart.length; idx++) {
-                    const item = cart[idx];
-                    const verified = verifiedItems[idx]; // live data read from Firestore during stock reservation
-                    const qty = parseInt(item.qty) || 1;
-                    const price = verified ? verified.price : (parseFloat(item.price) || 0);
-                    const sellerUid = verified ? verified.sellerUid : (item.sellerUid || null);
-                    const shopName = verified ? (verified.shopName || 'Local Shop') : (item.shopName || 'Local Shop');
-                    const returnWindowDays = verified && verified.returnWindowDays !== undefined ? verified.returnWindowDays : (item.returnWindowDays !== undefined ? item.returnWindowDays : 7);
-                    const productName = verified ? (verified.name || item.name) : item.name;
-                    let lineTotal = price * qty;
-
-                    // If this item belongs to the coupon's seller, apply its share of the discount
-                    const totalDiscount = appliedCoupon ? Math.min(
-                        appliedCoupon.discountType === 'percent' ? eligibleSubtotal * (appliedCoupon.value / 100) : appliedCoupon.value,
-                        eligibleSubtotal
-                    ) : 0;
-                    if (appliedCoupon && sellerUid === appliedCoupon.sellerUid && eligibleSubtotal > 0) {
-                        const shareOfDiscount = (lineTotal / eligibleSubtotal) * totalDiscount;
-                        lineTotal = Math.max(0, lineTotal - shareOfDiscount);
-                    }
-
-                    await addDoc(collection(db, "orders"), {
-                        productId: item.id || null,
-                        productName: productName,
-                        selectedSize: item.selectedSize || null,
-                        selectedColor: item.selectedColor || null,
-                        price: lineTotal,
-                        quantity: qty,
-                        shopName: shopName,
-                        sellerUid: sellerUid,
-                        returnWindowDays: returnWindowDays,
-                        buyerUid: currentBuyerUid,
-                        buyerName: name,
-                        buyerPhone: phone,
-                        buyerAddress: fullAddress,
-                        buyerCity: city,
-                        paymentMethod: selectedPayment,
-                        couponCode: (appliedCoupon && sellerUid === appliedCoupon.sellerUid) ? appliedCoupon.code : null,
-                        status: 'Pending',
-                        createdAt: new Date()
-                    });
-
-                    if (appliedCoupon && sellerUid === appliedCoupon.sellerUid) {
-                        couponWasUsed = true;
-                    }
-
-                    if (sellerUid) {
-                        sendNotification(db, sellerUid, {
-                            title: `New order: ${productName || 'Item'} (Qty ${qty})`,
-                            body: `From ${name} — ₹${lineTotal.toFixed(0)}`,
-                            type: 'new_order',
-                            link: 'seller-dashboard.html'
-                        });
-                    }
-
-                    // NOTE: stock was already decremented above by
-                    // decrementStockForCart() — do NOT decrement it again
-                    // here (that was a real bug: stock used to be reduced
-                    // twice per order).
-                }
-
-                // Coupon usage is recorded ONCE per checkout (not per line
-                // item) so the usage-limit count reflects actual orders placed.
-                if (couponWasUsed) {
-                    await recordCouponUsage(db, appliedCoupon.id);
-                }
-
+                await placeOrderViaBackend(currentBuyerUser, {
+                    items,
+                    delivery: { name, phone, address: fullAddress, city },
+                    couponCode: appliedCoupon ? appliedCoupon.code : null,
+                    paymentMethod: selectedPayment
+                });
 
                 // Keep a local copy for the buyer's "My Orders" quick view
                 let myOrders = JSON.parse(localStorage.getItem('myOrders')) || [];
@@ -486,13 +418,6 @@
         };
 
         document.getElementById('placeOrderBtn').addEventListener('click', window.placeOrder);
-
-        // ====================================================================
-        // Backend URL for the Flask API (payments/admin/cron) — see
-        // render.yaml. Update this if you ever rename the vande-market-api
-        // service (its URL changes with the name) or move to a custom domain.
-        // ====================================================================
-        const BACKEND_BASE_URL = 'https://vande-market-api.onrender.com';
 
         async function placeOrderViaRazorpay({ name, phone, address, city, btn }) {
             try {
