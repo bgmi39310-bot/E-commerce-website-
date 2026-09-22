@@ -59,6 +59,7 @@
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { showToast } from './toast.js';
+        import { escapeHtml } from './sanitize.js';
 
         let currentUid = null;
 
@@ -69,31 +70,31 @@
 
                 <div class="form-group">
                     <label>First Name:</label>
-                    <input type="text" id="pName" placeholder="Enter first name" value="${existing.name || ''}">
+                    <input type="text" id="pName" placeholder="Enter first name" value="${escapeHtml(existing.name || '')}">
                 </div>
                 <div class="form-group">
                     <label>Surname (Last Name):</label>
-                    <input type="text" id="pSurname" placeholder="Enter surname" value="${existing.surname || ''}">
+                    <input type="text" id="pSurname" placeholder="Enter surname" value="${escapeHtml(existing.surname || '')}">
                 </div>
                 <div class="form-group">
                     <label>Phone Number:</label>
-                    <input type="text" id="pPhone" placeholder="Enter phone number" value="${existing.phone || ''}">
+                    <input type="text" id="pPhone" placeholder="Enter phone number" value="${escapeHtml(existing.phone || '')}">
                 </div>
                 <div class="form-group">
                     <label>State (Pradesh):</label>
-                    <input type="text" id="pState" placeholder="e.g. Uttar Pradesh / Bihar" value="${existing.state || ''}">
+                    <input type="text" id="pState" placeholder="e.g. Uttar Pradesh / Bihar" value="${escapeHtml(existing.state || '')}">
                 </div>
                 <div class="form-group">
                     <label>District (Zila):</label>
-                    <input type="text" id="pDistrict" placeholder="Enter district" value="${existing.district || ''}">
+                    <input type="text" id="pDistrict" placeholder="Enter district" value="${escapeHtml(existing.district || '')}">
                 </div>
                 <div class="form-group">
                     <label>City / Village:</label>
-                    <input type="text" id="pCity" placeholder="Enter city or village" value="${existing.city || ''}">
+                    <input type="text" id="pCity" placeholder="Enter city or village" value="${escapeHtml(existing.city || '')}">
                 </div>
                 <div class="form-group">
                     <label>Profile Photo Link (Postimages / Image URL):</label>
-                    <input type="url" id="pPhoto" placeholder="https://i.postimg.cc/..." value="${existing.photo || ''}">
+                    <input type="url" id="pPhoto" placeholder="https://i.postimg.cc/..." value="${escapeHtml(existing.photo || '')}">
                 </div>
 
                 <button class="btn-save" id="saveBtn">Save Profile</button>
