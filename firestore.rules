@@ -219,26 +219,22 @@ service cloud.firestore {
     }
 
     match /orders/{orderId} {
-      // Placing an order requires a verified email — same reasoning and
-      // same token-based check as the product-listing rule above.
-      allow create: if request.auth != null && request.auth.token.email_verified == true
-                    && request.resource.data.buyerUid == request.auth.uid;
+      // Orders are created ONLY by the backend now (POST /api/payments/
+      // verify-and-place-order for Razorpay, POST /api/payments/place-order
+      // for COD/UPI) using firebase-admin, which bypasses these rules
+      // entirely — so this being `false` doesn't stop real orders from
+      // being placed. What it DOES stop: a buyer writing an order doc
+      // directly via the client SDK with a price/stock nobody re-checked.
+      // Previously this rule only checked `buyerUid`, which meant anyone
+      // could set ANY price on their own order — the backend now re-derives
+      // price, seller and stock from Firestore itself for every order, and
+      // this `false` makes that the only way in.
+      allow create: if false;
 
       allow read: if request.auth != null
                   && (resource.data.buyerUid == request.auth.uid
                       || resource.data.sellerUid == request.auth.uid
                       || resource.data.deliveryBoyUid == request.auth.uid
-                      // The delivery job board must be readable by delivery
-                      // partners browsing it — but NOT by just anyone who's
-                      // logged in. Without this extra check, any random
-                      // authenticated buyer could query
-                      // orders-where-deliveryRequestStatus-is-open and read
-                      // OTHER buyers' names/phone numbers/addresses, since
-                      // that's an open, un-owned document from their
-                      // perspective. Requiring a real delivery_profiles doc
-                      // (created only via delivery-dashboard.html signup)
-                      // restricts this to people actually registered as
-                      // delivery partners.
                       || (resource.data.deliveryRequestStatus == 'open'
                           && exists(/databases/$(database)/documents/delivery_profiles/$(request.auth.uid)))
                       || isAdmin());
@@ -248,10 +244,6 @@ service cloud.firestore {
         (
           resource.data.sellerUid == request.auth.uid &&
           (
-            // Updates that don't touch "status" at all (e.g. marking
-            // reviewed, storing a returnRequested flag, posting/assigning
-            // delivery) aren't a status transition and don't need to pass
-            // the transition check.
             !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']) ||
             sellerCanTransition(resource.data.status, request.resource.data.status)
           )
@@ -264,11 +256,6 @@ service cloud.firestore {
           )
         ) ||
         (
-          // The delivery partner currently assigned to this order can move
-          // its status forward exactly like a seller would (Accepted ->
-          // Shipped -> Delivered), via the same pickup/delivery OTP flow —
-          // and can freely change delivery-related fields (e.g. to back out
-          // of an assignment) since those aren't a status transition.
           resource.data.deliveryBoyUid == request.auth.uid &&
           (
             !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']) ||
@@ -276,10 +263,6 @@ service cloud.firestore {
           )
         ) ||
         (
-          // Any signed-in delivery partner may CLAIM an open job-board
-          // order — narrowly: only by setting THEMSELVES as deliveryBoyUid
-          // on an order that is currently open, and only touching
-          // delivery-related fields (never price, status, buyer info, etc).
           resource.data.deliveryRequestStatus == 'open' &&
           request.resource.data.deliveryBoyUid == request.auth.uid &&
           request.resource.data.deliveryRequestStatus == 'assigned' &&
