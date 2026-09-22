@@ -6,3 +6,5 @@ requests==2.32.3
 gunicorn==22.0.0
 python-dotenv==1.0.1
 setuptools==75.6.0
+redis==5.0.8
+Flask-Limiter==3.8.0
