@@ -1,5 +1,6 @@
 import { collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { showToast } from './toast.js';
+import { escapeHtml } from './sanitize.js';
 
 // This is only called when the seller explicitly clicks "Download Report" —
 // a one-time on-demand read is fine here since it's a deliberate user action,
@@ -80,7 +81,7 @@ export function renderAnalyticsFromOrders(orders) {
     const fulfillmentRate = totalOrders > 0 ? ((counts.Delivered / totalOrders) * 100).toFixed(0) : 0;
     const cancellationRate = totalOrders > 0 ? ((counts.Cancelled / totalOrders) * 100).toFixed(0) : 0;
     const topProductEntry = Object.entries(productFrequency).sort((a, b) => b[1] - a[1])[0];
-    const topProduct = topProductEntry ? `${topProductEntry[0]} (${topProductEntry[1]} sold)` : 'N/A';
+    const topProduct = topProductEntry ? `${escapeHtml(topProductEntry[0])} (${topProductEntry[1]} sold)` : 'N/A';
 
     const maxCount = Math.max(...Object.values(counts), 1);
 
