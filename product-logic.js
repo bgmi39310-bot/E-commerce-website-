@@ -222,7 +222,7 @@ export function fetchMyListedProducts(db, uid, onLowStockUpdate) {
             html += `
                 <div class="product-item-card">
                     <div style="display: flex; gap: 15px; align-items: center;">
-                        <img src="${prod.image || 'https://via.placeholder.com/60'}" class="product-thumb" alt="Product">
+                        <img src="${escapeHtml(prod.image || 'https://via.placeholder.com/60')}" class="product-thumb" alt="Product">
                         <div class="product-info">
                             <h4>${escapeHtml(prod.name)} ${stockTag}</h4>
                             <p><strong>Price:</strong> ₹${prod.price} (${escapeHtml(prod.unit || 'Per Piece')})</p>
