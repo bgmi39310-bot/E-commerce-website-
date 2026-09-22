@@ -302,18 +302,18 @@
 
 <script type="module">
     import { db, auth } from './firebase-config.js';
-    import { doc, getDoc, addDoc, collection, getDocs, query, where, limit, updateDoc, increment, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { doc, getDoc, updateDoc, increment, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     import { onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { getCart, saveCart, migrateLegacyCartData } from './cart-storage.js';
     import { loadProductReviews } from './review-logic.js';
     import { submitQuestion, loadProductQA } from './qa-logic.js';
-    import { decrementStock } from './stock-logic.js';
     import { isFollowingSeller, toggleFollowSeller } from './follow-logic.js';
     import { showToast } from './toast.js';
     import { escapeHtml } from './sanitize.js';
     import { resizedImageUrl } from './img-utils.js';
     import { buildVariantKey } from './stock-logic.js';
-    import { mountNotificationBell, sendNotification } from './notif-logic.js';
+    import { mountNotificationBell } from './notif-logic.js';
+    import { placeOrderViaBackend, BACKEND_BASE_URL } from './order-api.js';
     // report-logic.js and chat-logic.js are ONLY needed if the person
     // actually clicks "Report" or "Chat with seller" — most visitors never
     // do either, so these load on-demand (dynamic import) instead of
@@ -602,26 +602,32 @@
         const scrollEl = document.getElementById('relatedScroll');
 
         try {
+            // Pulled from the SAME cached list the homepage uses (see
+            // backend/routes/products.py) — one shared fetch, filtered
+            // here in the browser, instead of two separate Firestore
+            // queries per product-page view. This is a "browse more"
+            // widget, not something that needs live-accurate stock/price
+            // the way the main product above it does.
+            const res = await fetch(`${BACKEND_BASE_URL}/api/products`);
+            if (!res.ok) throw new Error(`Backend returned ${res.status}`);
+            const data = await res.json();
+            const all = data.products || [];
+
             let related = [];
 
             // First try: other products from the same shop
             if (product.shopName) {
-                const q = query(collection(db, "vendors"), where("shopName", "==", product.shopName), limit(8));
-                const snap = await getDocs(q);
-                snap.forEach(d => { if (d.id !== product.id) related.push({ id: d.id, ...d.data() }); });
+                related = all.filter(p => p.id !== product.id && p.shopName === product.shopName).slice(0, 8);
             }
 
             // Fallback: fill up with any other products if not enough from same shop.
-            // Capped at 8, not 20 — this page only ever DISPLAYS up to 8
-            // related items, so reading 20 to pick from was pure waste
-            // (extra reads that never appeared on screen at all).
             if (related.length < 4) {
-                const allSnap = await getDocs(query(collection(db, "vendors"), limit(8)));
-                allSnap.forEach(d => {
-                    if (d.id !== product.id && !related.find(r => r.id === d.id)) {
-                        related.push({ id: d.id, ...d.data() });
+                for (const p of all) {
+                    if (related.length >= 8) break;
+                    if (p.id !== product.id && !related.find(r => r.id === p.id)) {
+                        related.push(p);
                     }
-                });
+                }
             }
 
             related = related.slice(0, 8);
@@ -933,43 +939,24 @@
         try {
             const fullAddress = `${address}, ${city}, ${state} ${pincode ? '- ' + pincode : ''}`;
 
-            // Reserve stock first — throws if not enough is available
-            await decrementStock(db, currentProduct.id, currentQty);
-
-            await addDoc(collection(db, "orders"), {
-                productId: currentProduct.id,
-                productName: currentProduct.name,
-                selectedSize: selectedVariants.size || null,
-                selectedColor: selectedVariants.color || null,
-                price: (parseFloat(currentProduct.price) || 0) * currentQty,
-                quantity: currentQty,
-                shopName: currentProduct.shopName || 'Local Shop',
-                sellerUid: currentProduct.sellerUid || null,
-                returnWindowDays: currentProduct.returnWindowDays !== undefined ? currentProduct.returnWindowDays : 7,
-                buyerUid: currentBuyerUid,
-                buyerName: name,
-                buyerPhone: phone,
-                buyerAddress: fullAddress,
-                paymentMethod: payment,
-                status: 'Pending',
-                createdAt: new Date()
+            // Price, seller, shop name and stock are all re-derived
+            // server-side from Firestore by the backend — nothing here
+            // (including currentProduct.price, which could have been
+            // edited client-side) is trusted for the actual order. This
+            // also reserves stock atomically, so there's no separate
+            // stock-decrement step needed here anymore. See order-api.js /
+            // backend/routes/payments.py.
+            await placeOrderViaBackend(auth.currentUser, {
+                items: [{
+                    productId: currentProduct.id,
+                    selectedSize: selectedVariants.size || null,
+                    selectedColor: selectedVariants.color || null,
+                    quantity: currentQty
+                }],
+                delivery: { name, phone, address: fullAddress, city },
+                couponCode: null,
+                paymentMethod: payment
             });
-
-            if (currentProduct.sellerUid) {
-                sendNotification(db, currentProduct.sellerUid, {
-                    title: `New order: ${currentProduct.name || 'Item'} (Qty ${currentQty})`,
-                    body: `From ${name} — ₹${((parseFloat(currentProduct.price) || 0) * currentQty).toFixed(0)}`,
-                    type: 'new_order',
-                    link: 'seller-dashboard.html'
-                });
-            }
-
-            // Reduce stock live so it's accurate for everyone browsing right now
-            try {
-                await updateDoc(doc(db, "vendors", currentProduct.id), { stock: increment(-currentQty) });
-            } catch (stockErr) {
-                console.error('Stock update failed:', stockErr);
-            }
 
             let myOrders = JSON.parse(localStorage.getItem('myOrders')) || [];
             myOrders.unshift({
