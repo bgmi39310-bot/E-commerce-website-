@@ -26,6 +26,17 @@ belong in a differently-filtered list?) is fiddly and easy to get subtly
 wrong. Deleting the list and letting the next request rebuild it costs one
 Firestore query — but only for the first visitor after a change, not
 every visitor, which is the whole point of caching it.
+
+IMPORTANT — "views" and "unitsSold" are deliberately ignored when deciding
+whether to invalidate the two listing caches (see _COSMETIC_FIELDS below).
+Both tick up on essentially every visit/order — product.html bumps `views`
+on every single page view, and stock reservation bumps `unitsSold` on
+every order — and neither is ever shown on a listing card (only on the
+seller's own product-management list). Invalidating homepage/shop caches
+on every one of those would mean the listing cache almost never stays
+warm under real traffic, defeating most of the point of caching it. A
+real content change (price, stock, name, image, etc.) still invalidates
+immediately, same as before.
 """
 
 import json
@@ -45,6 +56,20 @@ _PRODUCT_TTL_SECONDS = 6 * 60 * 60  # 6 hours
 
 _HOMEPAGE_CACHE_KEY = "homepage:products"
 
+# Fields that change constantly but never appear on a listing card — see
+# the module docstring. Ignored when deciding whether a change is
+# "significant" enough to invalidate the homepage/shop listing caches.
+_COSMETIC_FIELDS = {"views", "unitsSold"}
+
+# In-memory, per-worker-process record of the last non-cosmetic field set
+# seen for each product, used only to detect "did anything that actually
+# shows up on a listing card change?". Deliberately NOT stored in Redis —
+# it's fine (just slightly less optimal, never incorrect) if this resets on
+# a worker restart: the first change seen for a product after a restart is
+# always treated as significant, so caches never go stale from this, they
+# can only be invalidated a bit more often right after a deploy/restart.
+_last_known = {}
+
 
 def _product_key(product_id):
     return f"product:{product_id}"
@@ -54,12 +79,23 @@ def _shop_key(seller_uid):
     return f"shop:{seller_uid}:products"
 
 
+def _is_significant_change(product_id, new_data):
+    """True if this change could affect what a LISTING page shows (so the
+    homepage/shop caches should be invalidated), False if only cosmetic
+    fields like `views`/`unitsSold` moved."""
+    comparable = {k: v for k, v in new_data.items() if k not in _COSMETIC_FIELDS}
+    previous = _last_known.get(product_id)
+    _last_known[product_id] = comparable
+    return previous is None or previous != comparable
+
+
 def _on_vendors_change(col_snapshot, changes, read_time):
     r = get_redis()
     if r is None:
         return
 
     touched_sellers = set()
+    listings_dirty = False
 
     try:
         pipe = r.pipeline()
@@ -70,24 +106,30 @@ def _on_vendors_change(col_snapshot, changes, read_time):
 
             if change.type.name == "REMOVED":
                 pipe.delete(key)
+                _last_known.pop(product_id, None)
+                listings_dirty = True  # a removed product always changes a listing
             else:
                 data = doc.to_dict() or {}
                 data["id"] = product_id
                 pipe.set(key, json.dumps(data, default=str), ex=_PRODUCT_TTL_SECONDS)
-                seller_uid = data.get("sellerUid")
-                if seller_uid:
-                    touched_sellers.add(seller_uid)
 
-        # Any change at all can affect what belongs in the homepage listing
-        # (a new product, a deleted one, a price/stock edit) — simplest
-        # correct thing is to drop that cache and let the next request
-        # rebuild it from Firestore.
-        pipe.delete(_HOMEPAGE_CACHE_KEY)
-        for seller_uid in touched_sellers:
-            pipe.delete(_shop_key(seller_uid))
+                is_new = change.type.name == "ADDED"
+                if is_new or _is_significant_change(product_id, data):
+                    listings_dirty = True
+                    seller_uid = data.get("sellerUid")
+                    if seller_uid:
+                        touched_sellers.add(seller_uid)
+
+        if listings_dirty:
+            pipe.delete(_HOMEPAGE_CACHE_KEY)
+            for seller_uid in touched_sellers:
+                pipe.delete(_shop_key(seller_uid))
 
         pipe.execute()
-        logger.info("Synced %d Firestore vendor change(s) to Redis.", len(changes))
+        logger.info(
+            "Synced %d Firestore vendor change(s) to Redis (listings invalidated: %s).",
+            len(changes), listings_dirty,
+        )
     except Exception:
         logger.exception("Failed to sync a Firestore vendors change into Redis")
 
