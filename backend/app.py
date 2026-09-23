@@ -1,5 +1,6 @@
 import os
 import logging
+import threading
 from flask import Flask, jsonify
 from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -56,9 +57,18 @@ def create_app():
     app.register_blueprint(products_bp)
 
     # Starts the live Firestore -> Redis product cache sync (a no-op if
-    # REDIS_URL isn't set — see utils/product_sync.py). Safe to call once
-    # per worker process; app.py is only ever imported/run once per worker.
-    start_product_sync()
+    # REDIS_URL isn't set — see utils/product_sync.py). Run in a background
+    # thread, NOT inline here: connecting to Firestore's watch API + doing
+    # the initial sync of every product is a network call that can take a
+    # few seconds, and doing it inline delayed create_app() from returning
+    # — which delayed this whole worker from being ready to answer
+    # anything, including Render's own health check (which only waits 5
+    # seconds). Starting it in the background lets Flask begin answering
+    # requests immediately; the product cache just finishes warming up a
+    # few seconds later instead of blocking startup on it. Safe to call
+    # once per worker process; app.py is only ever imported/run once per
+    # worker.
+    threading.Thread(target=start_product_sync, daemon=True).start()
 
     @app.route("/")
     @app.route("/api/health")
