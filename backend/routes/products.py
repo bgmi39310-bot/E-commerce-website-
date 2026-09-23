@@ -55,6 +55,21 @@ def _doc_to_dict(doc):
     return d
 
 
+def _cache_get(r, key):
+    """Reads+decodes a cache entry, or returns None on ANY problem (key
+    missing, Redis connection drop, corrupt JSON, etc) so callers can
+    always just fall back to Firestore rather than needing their own
+    try/except at every call site."""
+    if r is None:
+        return None
+    try:
+        cached = r.get(key)
+        return json.loads(cached) if cached is not None else None
+    except Exception:
+        logger.exception("Redis read failed for key=%s (falling back to Firestore)", key)
+        return None
+
+
 @products_bp.route("", methods=["GET"])
 def list_products():
     """The full product listing for the homepage. Replaces index.html's old
@@ -62,10 +77,9 @@ def list_products():
     same 500-item cap, just served from Redis on every visit after the
     first."""
     r = get_redis()
-    if r is not None:
-        cached = r.get(_HOMEPAGE_CACHE_KEY)
-        if cached is not None:
-            return jsonify({"products": json.loads(cached), "cached": True})
+    cached = _cache_get(r, _HOMEPAGE_CACHE_KEY)
+    if cached is not None:
+        return jsonify({"products": cached, "cached": True})
 
     products = [_doc_to_dict(d) for d in db.collection("vendors").limit(_PRODUCT_LIMIT).stream()]
 
@@ -84,10 +98,9 @@ def list_shop_products(seller_uid):
     `query(collection(db, "vendors"), where("sellerUid", "==", sellerUid))`."""
     r = get_redis()
     cache_key = _shop_key(seller_uid)
-    if r is not None:
-        cached = r.get(cache_key)
-        if cached is not None:
-            return jsonify({"products": json.loads(cached), "cached": True})
+    cached = _cache_get(r, cache_key)
+    if cached is not None:
+        return jsonify({"products": cached, "cached": True})
 
     products = [_doc_to_dict(d) for d in db.collection("vendors").where("sellerUid", "==", seller_uid).stream()]
 
@@ -109,10 +122,9 @@ def get_product(product_id):
     """
     r = get_redis()
     cache_key = _product_key(product_id)
-    if r is not None:
-        cached = r.get(cache_key)
-        if cached is not None:
-            return jsonify({"product": json.loads(cached), "cached": True})
+    cached = _cache_get(r, cache_key)
+    if cached is not None:
+        return jsonify({"product": cached, "cached": True})
 
     doc = db.collection("vendors").document(product_id).get()
     if not doc.exists:
@@ -126,4 +138,3 @@ def get_product(product_id):
             logger.exception("Could not write product %s to Redis (continuing without caching it)", product_id)
 
     return jsonify({"product": data, "cached": False})
-
