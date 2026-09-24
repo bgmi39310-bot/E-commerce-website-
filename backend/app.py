@@ -11,6 +11,7 @@ from routes.cron import cron_bp
 from routes.uploads import uploads_bp
 from routes.account import account_bp
 from routes.products import products_bp
+from utils.cache import init_redis
 from utils.limiter import limiter
 from utils.product_sync import start_product_sync
 
@@ -56,19 +57,27 @@ def create_app():
     app.register_blueprint(account_bp)
     app.register_blueprint(products_bp)
 
-    # Starts the live Firestore -> Redis product cache sync (a no-op if
-    # REDIS_URL isn't set — see utils/product_sync.py). Run in a background
-    # thread, NOT inline here: connecting to Firestore's watch API + doing
-    # the initial sync of every product is a network call that can take a
-    # few seconds, and doing it inline delayed create_app() from returning
-    # — which delayed this whole worker from being ready to answer
-    # anything, including Render's own health check (which only waits 5
-    # seconds). Starting it in the background lets Flask begin answering
-    # requests immediately; the product cache just finishes warming up a
-    # few seconds later instead of blocking startup on it. Safe to call
-    # once per worker process; app.py is only ever imported/run once per
-    # worker.
-    threading.Thread(target=start_product_sync, daemon=True).start()
+    def _startup_background_tasks():
+        # Both of these do blocking network I/O (connecting to Redis, then
+        # attaching the Firestore watch) — run them here, in ONE background
+        # thread, one after the other, so:
+        #   1. Neither can ever block gunicorn from answering a request —
+        #      including its own health check — while the app is starting.
+        #      A previous version connected to Redis lazily, INSIDE the
+        #      first request that needed it; when that connection hung,
+        #      the whole request hung with it, and gunicorn's worker
+        #      timeout eventually SIGKILLed the worker outright (seen as
+        #      "Internal Server Error" on every /api/products request).
+        #      See utils/cache.py's module docstring for the full story.
+        #   2. start_product_sync() runs AFTER init_redis() finishes (not
+        #      in a separate, racing thread) so it always sees Redis's
+        #      final connected/not-connected state, rather than possibly
+        #      checking get_redis() before the connection attempt (which
+        #      can take a couple of seconds) has completed.
+        init_redis()
+        start_product_sync()
+
+    threading.Thread(target=_startup_background_tasks, daemon=True).start()
 
     @app.route("/")
     @app.route("/api/health")
