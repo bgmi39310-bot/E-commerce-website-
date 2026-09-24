@@ -21,12 +21,21 @@ import os
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
+_redis_url = os.environ.get("REDIS_URL")
+
 limiter = Limiter(
     key_func=get_remote_address,
-    storage_uri=os.environ.get("REDIS_URL") or "memory://",
+    storage_uri=_redis_url or "memory://",
+    # Bounds how long Flask-Limiter's OWN Redis connection (separate from
+    # the one in utils/cache.py) can take to connect/respond. Without this,
+    # a slow/unreachable REDIS_URL could hang the first rate-limited
+    # request for however long the OS takes to give up — the same failure
+    # mode that got a gunicorn worker SIGKILLed when this happened inside
+    # utils/cache.py's old lazy-connect (see that file's docstring). A
+    # bounded few-second wait can't trigger that.
+    storage_options={"socket_connect_timeout": 3, "socket_timeout": 3} if _redis_url else {},
     # No default_limits — each route opts in explicitly with its own
     # @limiter.limit(...) so this can't silently throttle an endpoint
     # nobody intended to rate-limit.
     default_limits=[],
 )
-
