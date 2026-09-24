@@ -153,9 +153,14 @@
     .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; }
     .form-row { display: flex; gap: 10px; }
     .form-row .form-group { flex: 1; }
-    .order-summary { background: #f8f9fa; border-radius: 6px; padding: 10px 12px; font-size: 13.5px; margin-bottom: 14px; display: flex; justify-content: space-between; }
+    .order-summary { background: #f8f9fa; border-radius: 6px; padding: 10px 12px; font-size: 13.5px; margin-bottom: 14px; display: flex; flex-wrap: wrap; justify-content: space-between; }
     .btn-submit-order { width: 100%; background: #fa8900; color: white; border: none; padding: 13px; border-radius: 6px; font-weight: bold; font-size: 15px; cursor: pointer; margin-top: 6px; }
     .btn-submit-order:disabled { opacity: 0.6; }
+    .saved-addr-card { border: 1.5px solid #ddd; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; cursor: pointer; font-size: 13px; }
+    .saved-addr-card.selected { border-color: #fa8900; background: #fff8ee; }
+    .saved-addr-card strong { font-size: 13.5px; }
+    .saved-addr-card .default-tag { background: #d4edda; color: #1a7f4b; font-size: 10px; padding: 1px 7px; border-radius: 8px; margin-left: 6px; }
+    .new-addr-link { font-size: 12.5px; color: #007185; cursor: pointer; text-decoration: underline; display: inline-block; margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -199,10 +204,10 @@
 </div>
 
 <div class="container" style="padding-top:0;">
-    <div class="reviews-card">
+    <div class="reviews-card" id="reviewsCard">
         <h3>⭐ Customer Reviews</h3>
         <div id="reviewsSummary" style="margin-bottom:14px;"></div>
-        <div id="reviewsContainer"></div>
+        <div id="reviewsContainer"><p style="color:#888; font-size:13px;">Scroll down to load reviews</p></div>
     </div>
 
     <div class="fbt-card" id="fbtCard" style="display:none;">
@@ -215,9 +220,9 @@
         </div>
     </div>
 
-    <div class="qa-card">
+    <div class="qa-card" id="qaCard">
         <h3>💬 Customer Questions & Answers</h3>
-        <div id="qaContainer"><p style="color:#888; font-size:13px;">Loading questions...</p></div>
+        <div id="qaContainer"><p style="color:#888; font-size:13px;">Scroll down to load questions</p></div>
         <div class="ask-question-box">
             <input type="text" id="questionInput" placeholder="Ask a question about this product...">
             <button id="askQuestionBtn" onclick="askQuestion()">Ask</button>
@@ -260,6 +265,8 @@
 
         <div class="order-summary" id="orderSummary"></div>
 
+        <div id="buySavedAddressList" style="margin-bottom:14px;"></div>
+
         <div class="form-group">
             <label>Full Name</label>
             <input type="text" id="buyName" placeholder="Your name">
@@ -289,6 +296,15 @@
             </div>
         </div>
         <div class="form-group">
+            <label>Have a coupon code?</label>
+            <div style="display:flex; gap:8px;">
+                <input type="text" id="buyCouponInput" placeholder="Enter coupon code" style="flex-grow:1; text-transform:uppercase;">
+                <button type="button" onclick="applyBuyCouponCode()" style="background:#232f3e; color:white; border:none; padding:0 18px; border-radius:5px; font-weight:bold; cursor:pointer; font-size:13.5px;">Apply</button>
+            </div>
+            <div id="buyCouponMsg" style="font-size:12.5px; margin-top:6px; display:none;"></div>
+        </div>
+
+        <div class="form-group">
             <label>Payment Method</label>
             <select id="buyPayment">
                 <option value="COD">Cash on Delivery</option>
@@ -314,6 +330,8 @@
     import { buildVariantKey } from './stock-logic.js';
     import { mountNotificationBell } from './notif-logic.js';
     import { placeOrderViaBackend, BACKEND_BASE_URL } from './order-api.js';
+    import { loadAddresses } from './address-logic.js';
+    import { validateCoupon } from './coupon-logic.js';
     // report-logic.js and chat-logic.js are ONLY needed if the person
     // actually clicks "Report" or "Chat with seller" — most visitors never
     // do either, so these load on-demand (dynamic import) instead of
@@ -887,17 +905,113 @@
         showToast(`${currentQty} x ${currentProduct.name} added to cart! 🛍️`);
     };
 
+    let appliedBuyCoupon = null; // { id, code, sellerUid, discountType, value }
+
+    function buyOrderTotal() {
+        const subtotal = (parseFloat(currentProduct.price) || 0) * currentQty;
+        if (!appliedBuyCoupon) return { subtotal, discount: 0, total: subtotal };
+        const discount = appliedBuyCoupon.discountType === 'percent'
+            ? Math.min(subtotal * (appliedBuyCoupon.value / 100), subtotal)
+            : Math.min(appliedBuyCoupon.value, subtotal);
+        return { subtotal, discount, total: subtotal - discount };
+    }
+
+    function renderBuyOrderSummary() {
+        const { subtotal, discount, total } = buyOrderTotal();
+        document.getElementById('orderSummary').innerHTML = `
+            <span>${currentQty} x ${currentProduct.name}</span>
+            <strong>₹${subtotal.toFixed(0)}</strong>
+            ${discount > 0 ? `
+                <div style="width:100%; display:flex; justify-content:space-between; color:#28a745; font-size:13px; margin-top:4px;">
+                    <span>Coupon discount</span><span>-₹${discount.toFixed(0)}</span>
+                </div>
+                <div style="width:100%; display:flex; justify-content:space-between; font-weight:bold; margin-top:4px;">
+                    <span>Total</span><span>₹${total.toFixed(0)}</span>
+                </div>
+            ` : ''}
+        `;
+    }
+
+    window.applyBuyCouponCode = async function() {
+        const code = document.getElementById('buyCouponInput').value;
+        const msgEl = document.getElementById('buyCouponMsg');
+        if (!code.trim()) return;
+
+        const coupon = await validateCoupon(db, code);
+        msgEl.style.display = 'block';
+
+        if (!coupon) {
+            appliedBuyCoupon = null;
+            msgEl.style.color = '#dc3545';
+            msgEl.innerText = '❌ Invalid or expired coupon code.';
+            renderBuyOrderSummary();
+            return;
+        }
+        if (coupon.sellerUid !== currentProduct.sellerUid) {
+            appliedBuyCoupon = null;
+            msgEl.style.color = '#dc3545';
+            msgEl.innerText = "❌ This coupon isn't valid for this shop.";
+            renderBuyOrderSummary();
+            return;
+        }
+
+        appliedBuyCoupon = coupon;
+        msgEl.style.color = '#28a745';
+        msgEl.innerText = `✅ Coupon "${coupon.code}" applied!`;
+        renderBuyOrderSummary();
+    };
+
+    window.selectBuySavedAddress = function(addr, cardEl) {
+        document.querySelectorAll('#buySavedAddressList .saved-addr-card').forEach(c => c.classList.remove('selected'));
+        if (cardEl) cardEl.classList.add('selected');
+
+        document.getElementById('buyName').value = addr.name || '';
+        document.getElementById('buyPhone').value = addr.phone || '';
+        document.getElementById('buyPincode').value = addr.pincode || '';
+        document.getElementById('buyAddress').value = addr.addressLine || '';
+        document.getElementById('buyCity').value = addr.city || '';
+        document.getElementById('buyState').value = addr.state || '';
+    };
+
+    window.clearBuyAddressSelection = function() {
+        document.querySelectorAll('#buySavedAddressList .saved-addr-card').forEach(c => c.classList.remove('selected'));
+        ['buyName', 'buyPhone', 'buyPincode', 'buyAddress', 'buyCity', 'buyState'].forEach(id => document.getElementById(id).value = '');
+    };
+
+    async function loadBuySavedAddresses() {
+        const listEl = document.getElementById('buySavedAddressList');
+        listEl.innerHTML = '';
+        if (!currentBuyerUid) return;
+
+        const addresses = await loadAddresses(db, currentBuyerUid);
+        if (addresses.length === 0) return; // fall back to whatever prefill already ran (see openBuyModal)
+
+        listEl.innerHTML = addresses.map((a, i) => `
+            <div class="saved-addr-card ${i === 0 ? 'selected' : ''}" onclick='selectBuySavedAddress(${JSON.stringify(a).replace(/'/g, "&#39;")}, this)'>
+                <strong>${escapeHtml(a.label || 'Address')}</strong> ${a.isDefault ? '<span class="default-tag">DEFAULT</span>' : ''}<br>
+                ${escapeHtml(a.name)}, ${escapeHtml(a.phone)}<br>
+                ${escapeHtml(a.addressLine)}, ${escapeHtml(a.city)}, ${escapeHtml(a.state)} ${a.pincode ? '- ' + escapeHtml(a.pincode) : ''}
+            </div>
+        `).join('') + `<div class="new-addr-link" style="font-size:13px; color:#0066c0; cursor:pointer; margin-top:6px;" onclick="clearBuyAddressSelection()">+ Enter a different address</div>`;
+
+        // Auto-fill using the default (or first) saved address — overrides
+        // the lighter localStorage-profile prefill openBuyModal already did.
+        selectBuySavedAddress(addresses[0], listEl.querySelector('.saved-addr-card'));
+    }
+
     window.openBuyModal = async function() {
         if (!currentProduct) return;
         if (!variantsSelected()) return;
         await ensureAuthenticated();
-        const total = (parseFloat(currentProduct.price) || 0) * currentQty;
-        document.getElementById('orderSummary').innerHTML = `
-            <span>${currentQty} x ${currentProduct.name}</span>
-            <strong>₹${total.toFixed(0)}</strong>
-        `;
 
-        // Pre-fill from saved profile if available
+        appliedBuyCoupon = null;
+        document.getElementById('buyCouponInput').value = '';
+        document.getElementById('buyCouponMsg').style.display = 'none';
+        renderBuyOrderSummary();
+
+        // Pre-fill from the lighter saved-profile data first (instant, no
+        // extra Firestore read) — loadBuySavedAddresses() below overrides
+        // this with a real saved address a moment later if the buyer has one.
         const user = JSON.parse(localStorage.getItem('currentUser'));
         if (user) {
             document.getElementById('buyName').value = (user.name || '') + (user.surname ? ' ' + user.surname : '');
@@ -905,9 +1019,17 @@
             document.getElementById('buyAddress').value = '';
             document.getElementById('buyCity').value = user.city || '';
             document.getElementById('buyState').value = user.state || '';
+        } else {
+            document.getElementById('buyName').value = '';
+            document.getElementById('buyPhone').value = '';
+            document.getElementById('buyPincode').value = '';
+            document.getElementById('buyAddress').value = '';
+            document.getElementById('buyCity').value = '';
+            document.getElementById('buyState').value = '';
         }
 
         document.getElementById('buyModal').classList.add('active');
+        loadBuySavedAddresses();
     };
 
     window.closeBuyModal = function() {
@@ -954,7 +1076,7 @@
                     quantity: currentQty
                 }],
                 delivery: { name, phone, address: fullAddress, city },
-                couponCode: null,
+                couponCode: appliedBuyCoupon ? appliedBuyCoupon.code : null,
                 paymentMethod: payment
             });
 
@@ -982,8 +1104,25 @@
         loadProduct();
         updateCartBadge();
         if (productId) {
-            loadProductReviews(db, productId);
-            loadProductQA(db, productId);
+            // Reviews and Q&A are loaded LAZILY — only once the visitor
+            // actually scrolls down to that section, not on every product
+            // page view. A lot of visitors look at the photo/price and
+            // either buy or leave without ever reading reviews/Q&A; this
+            // means those Firestore reads only happen for people who
+            // actually engage with that section, instead of every visit.
+            const lazyLoadOnce = (elId, loadFn) => {
+                const el = document.getElementById(elId);
+                if (!el) return;
+                const observer = new IntersectionObserver((entries) => {
+                    if (entries[0].isIntersecting) {
+                        loadFn(db, productId);
+                        observer.disconnect();
+                    }
+                }, { rootMargin: '200px' }); // start loading a bit before it's fully on-screen, so it feels instant
+                observer.observe(el);
+            };
+            lazyLoadOnce('reviewsCard', loadProductReviews);
+            lazyLoadOnce('qaCard', loadProductQA);
         }
     };
 </script>
