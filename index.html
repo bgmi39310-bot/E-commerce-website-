@@ -292,7 +292,7 @@
         import { db, auth } from './firebase-config.js';
         import { applyTranslations, toggleLanguage, t } from './i18n.js';
         import { loadActiveBanners } from './banner-logic.js';
-        import { collection, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFollowedSellers, toggleFollowSeller } from './follow-logic.js';
         import { mountNotificationBell } from './notif-logic.js';
@@ -667,9 +667,16 @@
                     return;
                 }
 
-                const snap = await getDocs(collection(db, "sellers_profiles"));
-                allSellers = [];
-                snap.forEach(d => allSellers.push({ id: d.id, ...d.data() }));
+                // Backed by the Redis-cached backend endpoint (see
+                // backend/routes/sellers.py) instead of a direct Firestore
+                // read — shared across every visitor, not just repeat
+                // visits from this browser, and kept fresh live (a seller
+                // editing their shop invalidates it within ~1 second; see
+                // backend/utils/seller_sync.py).
+                const res = await fetch(`${BACKEND_BASE_URL}/api/sellers`);
+                if (!res.ok) throw new Error(`Backend returned ${res.status}`);
+                const data = await res.json();
+                allSellers = data.sellers || [];
 
                 await authReady; // wait for Firebase to report existing session (if any) — never force-create one here
                 const followed = await getFollowedSellers(db, currentBuyerUid);
