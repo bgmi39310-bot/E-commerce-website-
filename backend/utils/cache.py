@@ -12,14 +12,22 @@ every caller is expected to check for that AND wrap their actual get/set
 calls in try/except (a connection can drop between "get_redis() returned a
 client" and the next line actually using it).
 
-The connection itself is made LAZILY, on the first call to get_redis(),
-not when this module is imported. Connecting is a network call (DNS +
-TLS handshake to Upstash) that can take a couple of seconds — doing that
-at import time meant it happened on Render before the app had even started
-answering requests, on the critical path of Render's own 5-second startup
-health check. Deferring it means the app can start answering requests
-immediately; the very first request that needs Redis pays a small one-time
-connection cost instead of every worker's boot doing so up front.
+CRITICAL — connecting happens ONLY via init_redis(), called ONCE from a
+background thread at app startup (see app.py). get_redis() NEVER attempts
+a connection itself; it only ever returns whatever is already there.
+
+This is not just an optimization — it's what keeps the app from crashing.
+An earlier version connected lazily, inside get_redis() itself, the first
+time any request needed Redis. Connecting is a network call (DNS + TLS
+handshake to Upstash) that can hang far longer than its own configured
+timeout if something's wrong (a bad REDIS_URL, a network path that silently
+drops packets instead of refusing the connection, etc). Because that
+lazy-connect ran INSIDE the request handler, a hung connection attempt hung
+the whole request — and when it ran past gunicorn's worker timeout,
+gunicorn killed the worker outright (SIGKILL), turning "Redis is slow to
+connect" into "the whole site 500s". Doing the one connection attempt in a
+background thread at startup means a slow/hanging Redis can never affect
+an HTTP request at all — worst case, caching just silently stays off.
 """
 
 import os
@@ -31,7 +39,6 @@ import redis
 logger = logging.getLogger(__name__)
 
 _client = None
-_connect_attempted = False
 _lock = threading.Lock()
 
 
@@ -60,17 +67,29 @@ def _connect():
         return None
 
 
+def init_redis():
+    """
+    Makes the ONE connection attempt to Redis. Call this exactly once, from
+    a background thread, at app startup (see app.py) — NEVER from inside a
+    request handler. See the module docstring for why: this does blocking
+    network I/O that must never sit on the critical path of answering an
+    HTTP request.
+    """
+    global _client
+    client = _connect()
+    with _lock:
+        _client = client
+
+
 def get_redis():
-    """Returns the shared Redis client, or None if Redis isn't configured
-    or isn't reachable. ALWAYS check for None before using the result —
-    every part of this app must keep working with Redis absent, and every
-    actual .get()/.set() call on the returned client should still be
-    wrapped in its own try/except, since a working connection can still
-    drop later."""
-    global _client, _connect_attempted
-    if not _connect_attempted:
-        with _lock:
-            if not _connect_attempted:  # re-check inside the lock
-                _client = _connect()
-                _connect_attempted = True
-    return _client
+    """
+    Returns the shared Redis client, or None if Redis isn't configured,
+    isn't reachable, or init_redis() (see above) hasn't finished yet.
+    Deliberately does NOT attempt a connection itself — safe to call from
+    anywhere, including inside a request handler, with zero risk of
+    blocking on network I/O. ALWAYS check for None before using the
+    result, and wrap actual .get()/.set() calls in their own try/except
+    too, since a working connection can still drop later.
+    """
+    with _lock:
+        return _client
