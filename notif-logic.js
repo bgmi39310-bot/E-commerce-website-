@@ -1,4 +1,4 @@
-import { collection, addDoc, doc, updateDoc, onSnapshot, query, orderBy, limit, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, addDoc, doc, updateDoc, getDocs, getCountFromServer, onSnapshot, query, where, orderBy, limit, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { escapeHtml } from './sanitize.js';
 
 // ============================================================================
@@ -8,8 +8,28 @@ import { escapeHtml } from './sanitize.js';
 //
 // Any part of the app (buyer or seller side) can call sendNotification() to
 // notify a user. Any page can call mountNotificationBell() once to get a
-// fully working bell icon + unread badge + dropdown panel, wired to a live
-// Firestore listener — no per-page boilerplate needed.
+// working bell icon + unread badge + dropdown panel.
+//
+// READ COST — this used to keep ONE live Firestore listener open reading
+// the most recent 30 notifications, on EVERY page, for every signed-in
+// visitor — re-paid in full on every page load/refresh site-wide, which
+// made it the single biggest source of Firestore reads in the app. It's
+// now split into three pieces, each doing only the minimum it needs to:
+//
+//   1. On mount: one cheap aggregate COUNT query (unread notifications
+//      only) for the badge number — billed as ~1 read no matter how many
+//      match, instead of reading up to 30 full documents just for a count.
+//   2. A SECOND, genuinely live listener — but scoped to
+//      `where('createdAt', '>', mountTime)`, i.e. "only notifications
+//      created after this page opened". At the moment it attaches, NOTHING
+//      matches that filter yet, so its first snapshot is empty (0 reads).
+//      From then on it costs exactly 1 read each time a new notification
+//      actually arrives — which is what you WANT to pay for (a real
+//      event), not for re-reading 30 already-seen ones on every page load.
+//      This is what makes new notifications still show up instantly with
+//      a chime, same as before.
+//   3. The full 30-item history is only fetched (one-time, not live) the
+//      first time the visitor actually opens the panel.
 // ============================================================================
 
 const TYPE_ICON = {
@@ -102,8 +122,8 @@ export function mountNotificationBell(db, uid, containerId) {
     const container = document.getElementById(containerId);
     if (!container || !uid) return;
 
-    // Ask for OS notification permission once, quietly (matches the existing
-    // seller-dashboard pattern already used elsewhere in this app).
+    // Ask for OS notification permission once, quietly — only meaningful
+    // now that new notifications are live-pushed again (see below).
     if ("Notification" in window && Notification.permission === "default") {
         Notification.requestPermission();
     }
@@ -133,13 +153,14 @@ export function mountNotificationBell(db, uid, containerId) {
     const markReadEl = document.getElementById(`${containerId}_markread`);
 
     let notifications = [];
-    let isFirstSnapshot = true;
+    let listLoaded = false;
+    let unreadCount = 0;
 
-    function updateBadge() {
-        const unread = notifications.filter(n => !n.read).length;
-        if (unread > 0) {
+    function setUnreadCount(n) {
+        unreadCount = n;
+        if (unreadCount > 0) {
             badgeEl.style.display = 'flex';
-            badgeEl.innerText = unread > 99 ? '99+' : unread;
+            badgeEl.innerText = unreadCount > 99 ? '99+' : unreadCount;
         } else {
             badgeEl.style.display = 'none';
         }
@@ -153,7 +174,7 @@ export function mountNotificationBell(db, uid, containerId) {
         listEl.innerHTML = notifications.map(n => {
             const icon = TYPE_ICON[n.type] || TYPE_ICON.default;
             const color = TYPE_COLOR[n.type] || TYPE_COLOR.default;
-            const when = n.createdAt && n.createdAt.toDate ? timeAgo(n.createdAt.toDate()) : '';
+            const when = n.createdAt && n.createdAt.toDate ? timeAgo(n.createdAt.toDate()) : (n.createdAt instanceof Date ? timeAgo(n.createdAt) : '');
             return `
                 <div data-notif-id="${escapeHtml(n.id)}" data-notif-link="${escapeHtml(n.link || '')}"
                      onclick="window.__dmNotifClick_${containerId}(this.dataset.notifId, this.dataset.notifLink)"
@@ -173,6 +194,8 @@ export function mountNotificationBell(db, uid, containerId) {
     window[`__dmNotifClick_${containerId}`] = async function(notifId, link) {
         const n = notifications.find(x => x.id === notifId);
         if (n && !n.read) {
+            n.read = true; // optimistic — updates the badge instantly rather than waiting on the write
+            setUnreadCount(Math.max(0, unreadCount - 1));
             try {
                 await updateDoc(doc(db, "users", uid, "notifications", notifId), { read: true });
             } catch (e) { console.error(e); }
@@ -180,9 +203,32 @@ export function mountNotificationBell(db, uid, containerId) {
         if (link) window.location.href = link;
     };
 
+    async function loadList() {
+        if (listLoaded) return; // fetched once per page visit — reopening the panel just reuses it
+        listEl.innerHTML = `<p style="text-align:center; color:#888; font-size:12.5px; padding:24px 10px;">Loading...</p>`;
+        try {
+            const q = query(collection(db, "users", uid, "notifications"), orderBy("createdAt", "desc"), limit(30));
+            const snap = await getDocs(q);
+            const fetched = [];
+            snap.forEach(d => fetched.push({ id: d.id, ...d.data() }));
+            // Merge in anything the live "new notifications" listener already
+            // added since page load, so a notification that arrived live
+            // doesn't get duplicated once the full history loads too.
+            const seenIds = new Set(fetched.map(n => n.id));
+            const liveOnly = notifications.filter(n => !seenIds.has(n.id));
+            notifications = [...liveOnly, ...fetched];
+            listLoaded = true;
+            renderList();
+        } catch (e) {
+            console.error("Notification list error:", e);
+            listEl.innerHTML = `<p style="text-align:center; color:#c00; font-size:12px; padding:20px 10px;">Unable to load notifications.</p>`;
+        }
+    }
+
     bellEl.addEventListener('click', () => {
         const isOpen = panelEl.style.display === 'block';
         panelEl.style.display = isOpen ? 'none' : 'block';
+        if (!isOpen) loadList(); // the full 30-item history is only ever fetched once someone actually opens the panel
     });
 
     document.addEventListener('click', (e) => {
@@ -195,39 +241,54 @@ export function mountNotificationBell(db, uid, containerId) {
         if (unread.length === 0) return;
         try {
             const batch = writeBatch(db);
-            unread.forEach(n => batch.update(doc(db, "users", uid, "notifications", n.id), { read: true }));
+            unread.forEach(n => {
+                batch.update(doc(db, "users", uid, "notifications", n.id), { read: true });
+                n.read = true;
+            });
             await batch.commit();
+            setUnreadCount(0);
+            renderList();
         } catch (err) {
             console.error("markAllRead error:", err);
         }
     });
 
-    const q = query(collection(db, "users", uid, "notifications"), orderBy("createdAt", "desc"), limit(30));
-    const unsubscribe = onSnapshot(q, (snap) => {
-        notifications = [];
-        const freshlyAdded = [];
-        snap.forEach(d => {
-            const data = { id: d.id, ...d.data() };
-            notifications.push(data);
-        });
-        snap.docChanges().forEach(change => {
-            if (change.type === 'added' && !isFirstSnapshot) {
-                freshlyAdded.push({ id: change.doc.id, ...change.doc.data() });
-            }
-        });
-
-        updateBadge();
-        renderList();
-
-        if (!isFirstSnapshot && freshlyAdded.length > 0) {
-            playChime();
-            freshlyAdded.forEach(showBrowserNotification);
+    // Piece 1: cheap unread COUNT for the badge's starting number — covers
+    // everything unread from BEFORE this page opened.
+    (async () => {
+        try {
+            const unreadQuery = query(collection(db, "users", uid, "notifications"), where("read", "==", false));
+            const countSnap = await getCountFromServer(unreadQuery);
+            setUnreadCount(countSnap.data().count);
+        } catch (e) {
+            console.error("Notification count error:", e);
         }
-        isFirstSnapshot = false;
+    })();
+
+    // Piece 2: a genuinely LIVE listener for anything created from this
+    // moment forward. Its first snapshot matches nothing (0 reads) since
+    // nothing has createdAt > mountedAt yet — after that it costs exactly
+    // 1 read per real new notification, which is when a chime + browser
+    // notification should fire, same as before this change.
+    const mountedAt = new Date();
+    const liveQuery = query(
+        collection(db, "users", uid, "notifications"),
+        where("createdAt", ">", mountedAt)
+    );
+    const unsubscribeLive = onSnapshot(liveQuery, (snap) => {
+        snap.docChanges().forEach(change => {
+            if (change.type !== 'added') return;
+            const n = { id: change.doc.id, ...change.doc.data() };
+            if (notifications.some(existing => existing.id === n.id)) return; // already have it (e.g. list was opened after it arrived)
+            notifications.unshift(n);
+            if (!n.read) setUnreadCount(unreadCount + 1);
+            if (listLoaded) renderList();
+            playChime();
+            showBrowserNotification(n);
+        });
     }, (error) => {
-        console.error("Notification listener error:", error);
-        listEl.innerHTML = `<p style="text-align:center; color:#c00; font-size:12px; padding:20px 10px;">Unable to load notifications.</p>`;
+        console.error("Live notification listener error:", error);
     });
 
-    return unsubscribe;
+    return unsubscribeLive;
 }
