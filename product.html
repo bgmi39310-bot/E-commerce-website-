@@ -207,7 +207,9 @@
     <div class="reviews-card" id="reviewsCard">
         <h3>⭐ Customer Reviews</h3>
         <div id="reviewsSummary" style="margin-bottom:14px;"></div>
-        <div id="reviewsContainer"><p style="color:#888; font-size:13px;">Scroll down to load reviews</p></div>
+        <div id="reviewsContainer">
+            <button onclick="loadReviewsOnDemand()" style="width:100%; background:#f0f2f2; border:1px solid #d5d9d9; border-radius:8px; padding:12px; font-size:13.5px; font-weight:bold; color:#0f1111; cursor:pointer;">⭐ Show Reviews</button>
+        </div>
     </div>
 
     <div class="fbt-card" id="fbtCard" style="display:none;">
@@ -222,7 +224,9 @@
 
     <div class="qa-card" id="qaCard">
         <h3>💬 Customer Questions & Answers</h3>
-        <div id="qaContainer"><p style="color:#888; font-size:13px;">Scroll down to load questions</p></div>
+        <div id="qaContainer">
+            <button onclick="loadQAOnDemand()" style="width:100%; background:#f0f2f2; border:1px solid #d5d9d9; border-radius:8px; padding:12px; font-size:13.5px; font-weight:bold; color:#0f1111; cursor:pointer;">💬 Show Questions & Answers</button>
+        </div>
         <div class="ask-question-box">
             <input type="text" id="questionInput" placeholder="Ask a question about this product...">
             <button id="askQuestionBtn" onclick="askQuestion()">Ask</button>
@@ -1103,27 +1107,25 @@
     window.onload = function() {
         loadProduct();
         updateCartBadge();
-        if (productId) {
-            // Reviews and Q&A are loaded LAZILY — only once the visitor
-            // actually scrolls down to that section, not on every product
-            // page view. A lot of visitors look at the photo/price and
-            // either buy or leave without ever reading reviews/Q&A; this
-            // means those Firestore reads only happen for people who
-            // actually engage with that section, instead of every visit.
-            const lazyLoadOnce = (elId, loadFn) => {
-                const el = document.getElementById(elId);
-                if (!el) return;
-                const observer = new IntersectionObserver((entries) => {
-                    if (entries[0].isIntersecting) {
-                        loadFn(db, productId);
-                        observer.disconnect();
-                    }
-                }, { rootMargin: '200px' }); // start loading a bit before it's fully on-screen, so it feels instant
-                observer.observe(el);
-            };
-            lazyLoadOnce('reviewsCard', loadProductReviews);
-            lazyLoadOnce('qaCard', loadProductQA);
-        }
+        // Reviews and Q&A are NOT loaded automatically at all — not even on
+        // scroll. A short page (few reviews, small screen) can put that
+        // section within view almost immediately, which made scroll-based
+        // lazy loading fire about as often as loading it upfront — so
+        // instead there's just a button (see loadReviewsOnDemand /
+        // loadQAOnDemand below); those Firestore reads only happen when a
+        // visitor deliberately taps to see them.
+    };
+
+    window.loadReviewsOnDemand = function() {
+        if (!productId) return;
+        document.getElementById('reviewsContainer').innerHTML = '<p style="color:#888; font-size:13px;">Loading reviews...</p>';
+        loadProductReviews(db, productId);
+    };
+
+    window.loadQAOnDemand = function() {
+        if (!productId) return;
+        document.getElementById('qaContainer').innerHTML = '<p style="color:#888; font-size:13px;">Loading questions...</p>';
+        loadProductQA(db, productId);
     };
 </script>
 </body>
