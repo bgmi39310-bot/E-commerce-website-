@@ -102,6 +102,9 @@ export async function loadProductReviews(db, productId) {
     } catch (error) {
         console.error("Error loading reviews:", error);
         summaryEl.innerHTML = '';
-        container.innerHTML = `<p style="color:#888; font-size:13px;">Unable to load reviews right now.</p>`;
+        // TEMPORARY: showing the real error message on screen (not just a
+        // generic one) so the exact cause can be diagnosed from a
+        // screenshot alone, without needing browser devtools access.
+        container.innerHTML = `<p style="color:#c00; font-size:12px; word-break:break-word;">Debug error: ${escapeHtml(error.code || '')} ${escapeHtml(error.message || String(error))}</p>`;
     }
 }
