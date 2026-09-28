@@ -1,4 +1,4 @@
-import { collection, getDocs, query, where, doc, writeBatch, orderBy, limit, getAggregateFromServer, average, count } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, getDocs, query, where, doc, writeBatch, orderBy, limit, getAggregateFromServer, average, count, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { showToast } from './toast.js';
 import { escapeHtml } from './sanitize.js';
 
@@ -39,7 +39,7 @@ export async function submitReview(db, { orderId, productId, sellerUid, buyerUid
             comment: (comment || '').trim(),
             createdAt: new Date()
         });
-        batch.update(doc(db, "orders", orderId), { reviewed: true });
+        batch.update(doc(db, "orders", orderId), { reviewed: true, updatedAt: serverTimestamp() });
         await batch.commit();
 
         showToast("Thank you for your review! ⭐");
@@ -102,9 +102,6 @@ export async function loadProductReviews(db, productId) {
     } catch (error) {
         console.error("Error loading reviews:", error);
         summaryEl.innerHTML = '';
-        // TEMPORARY: showing the real error message on screen (not just a
-        // generic one) so the exact cause can be diagnosed from a
-        // screenshot alone, without needing browser devtools access.
-        container.innerHTML = `<p style="color:#c00; font-size:12px; word-break:break-word;">Debug error: ${escapeHtml(error.code || '')} ${escapeHtml(error.message || String(error))}</p>`;
+        container.innerHTML = `<p style="color:#888; font-size:13px;">Unable to load reviews right now.</p>`;
     }
 }
