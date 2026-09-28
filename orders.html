@@ -45,6 +45,7 @@
         .status-Shipped { background: #cce5ff; color: #004085; }
         .status-Delivered { background: #e2d9f3; color: #4b2e83; }
         .status-Cancelled { background: #f8d7da; color: #842029; }
+        .status-Returned { background: #e2e3e5; color: #41464b; }
 
         .progress-track { display: flex; align-items: center; margin: 12px 0 4px; }
         .progress-step { flex: 1; height: 4px; background: #eee; border-radius: 2px; margin: 0 2px; }
@@ -125,7 +126,7 @@
 
     <script type="module">
         import { db, auth } from './firebase-config.js';
-        import { collection, getDocs, query, where, doc, updateDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { collection, getDocs, query, where, doc, updateDoc, getDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { submitReview } from './review-logic.js';
         import { submitReturnRequest } from './return-logic.js';
@@ -151,7 +152,8 @@
                     <div class="progress-step cancelled"></div>
                 </div>`;
             }
-            const currentIndex = STEPS.indexOf(status);
+            // A Returned order went through every step (it was delivered first), so show the full track
+            const currentIndex = status === 'Returned' ? STEPS.length - 1 : STEPS.indexOf(status);
             let html = '<div class="progress-track">';
             STEPS.forEach((s, i) => {
                 html += `<div class="progress-step ${i <= currentIndex ? 'done' : ''}"></div>`;
@@ -416,7 +418,7 @@
                     return;
                 }
 
-                await updateDoc(orderRef, { status: 'Cancelled', cancelledAt: new Date(), cancelledBy: 'buyer' });
+                await updateDoc(orderRef, { status: 'Cancelled', cancelledAt: new Date(), cancelledBy: 'buyer', updatedAt: serverTimestamp() });
 
                 // Give the reserved stock back now that the order won't be fulfilled.
                 await restoreStock(db, freshOrder.productId, freshOrder.quantity || 1, buildVariantKey(freshOrder.selectedSize, freshOrder.selectedColor));
