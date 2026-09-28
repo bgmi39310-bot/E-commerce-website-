@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { isPremiumSeller, countSellerProducts, FREE_TIER_LIMITS } from './premium-logic.js';
 import { showToast } from './toast.js';
 import { escapeHtml } from './sanitize.js';
@@ -134,7 +134,8 @@ export async function addProductToFirebase(db, currentLoggedInUser, fetchProduct
             colors: colorsVal ? colorsVal.split(',').map(c => c.trim()).filter(c => c) : [],
             variantStock: variantStock, // null = not tracked per-variant, just uses overall stock
             returnWindowDays: Number(document.getElementById('pReturnWindow').value),
-            createdAt: new Date()
+            createdAt: new Date(),
+            updatedAt: serverTimestamp()
         });
 
         showToast("Product Added Successfully to Database! 🎉");
@@ -334,7 +335,8 @@ export async function saveProductEdits(db, uid, fetchProductsCallback) {
             sizes: sizesVal ? sizesVal.split(',').map(s => s.trim()).filter(s => s) : [],
             colors: colorsVal ? colorsVal.split(',').map(c => c.trim()).filter(c => c) : [],
             variantStock: variantStock,
-            returnWindowDays: Number(document.getElementById('epReturnWindow').value)
+            returnWindowDays: Number(document.getElementById('epReturnWindow').value),
+            updatedAt: serverTimestamp()
         });
         showToast("Product updated successfully! 🎉");
         closeEditProductModal();
