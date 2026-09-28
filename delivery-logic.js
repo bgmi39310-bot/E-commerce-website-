@@ -1,6 +1,6 @@
 import {
     doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, limit, orderBy,
-    getCountFromServer
+    getCountFromServer, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { showToast } from './toast.js';
 import { sendNotification } from './notif-logic.js';
@@ -215,7 +215,8 @@ export async function claimDeliveryJob(db, orderId, deliveryBoy) {
             deliveryBoyPhone: deliveryBoy.phone,
             deliveryRequestStatus: 'assigned',
             deliveryFeeType: deliveryBoy.feeType || 'per_order',
-            deliveryFeeAmount: deliveryBoy.feeAmount || 0
+            deliveryFeeAmount: deliveryBoy.feeAmount || 0,
+            updatedAt: serverTimestamp()
         });
         const order = snap.data();
         if (order.sellerUid) {
@@ -273,7 +274,8 @@ export async function declineDeliveryAssignment(db, orderId) {
             deliveryBoyUid: null,
             deliveryBoyName: null,
             deliveryBoyPhone: null,
-            deliveryRequestStatus: 'open'
+            deliveryRequestStatus: 'open',
+            updatedAt: serverTimestamp()
         });
         showToast("Assignment declined — it's back on the job board for someone else.");
     } catch (error) {
@@ -395,7 +397,8 @@ export async function postOrderToJobBoard(db, orderId) {
             deliveryRequestStatus: 'open',
             deliveryBoyUid: null,
             deliveryBoyName: null,
-            deliveryBoyPhone: null
+            deliveryBoyPhone: null,
+            updatedAt: serverTimestamp()
         });
         showToast("Posted to the delivery job board. 📋");
     } catch (error) {
@@ -415,7 +418,8 @@ export async function assignOrderToDeliveryBoy(db, orderId, deliveryBoy) {
             deliveryBoyPhone: deliveryBoy.phone,
             deliveryRequestStatus: 'assigned',
             deliveryFeeType: deliveryBoy.feeType || 'per_order',
-            deliveryFeeAmount: deliveryBoy.feeAmount || 0
+            deliveryFeeAmount: deliveryBoy.feeAmount || 0,
+            updatedAt: serverTimestamp()
         });
         sendNotification(db, deliveryBoy.id, {
             title: 'New delivery assignment',
@@ -437,7 +441,8 @@ export async function cancelDeliveryRequest(db, orderId) {
             deliveryRequestStatus: null,
             deliveryBoyUid: null,
             deliveryBoyName: null,
-            deliveryBoyPhone: null
+            deliveryBoyPhone: null,
+            updatedAt: serverTimestamp()
         });
         showToast("Delivery request cancelled — this order is back to self-delivery.");
     } catch (error) {
