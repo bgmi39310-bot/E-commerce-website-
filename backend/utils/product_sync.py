@@ -59,7 +59,7 @@ _HOMEPAGE_CACHE_KEY = "homepage:products"
 # Fields that change constantly but never appear on a listing card — see
 # the module docstring. Ignored when deciding whether a change is
 # "significant" enough to invalidate the homepage/shop listing caches.
-_COSMETIC_FIELDS = {"views", "unitsSold"}
+_COSMETIC_FIELDS = {"views", "unitsSold", "updatedAt"}
 
 # In-memory, per-worker-process record of the last non-cosmetic field set
 # seen for each product, used only to detect "did anything that actually
