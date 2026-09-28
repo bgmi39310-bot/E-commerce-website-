@@ -15,7 +15,7 @@ export async function loadPayoutSummary(db, uid) {
             const o = d.data();
             const amount = Number(o.price) || 0;
             if (o.status === 'Delivered') delivered += amount;
-            else if (o.status === 'Cancelled') cancelled += amount;
+            else if (o.status === 'Cancelled' || o.status === 'Returned') cancelled += amount;
             else inTransit += amount; // Pending / Accepted / Shipped
         });
 
