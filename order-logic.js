@@ -1,4 +1,4 @@
-import { collection, onSnapshot, doc, updateDoc, getDoc, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, onSnapshot, doc, updateDoc, getDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { sendNotification } from './notif-logic.js';
 import { showToast } from './toast.js';
 import { escapeHtml } from './sanitize.js';
@@ -55,6 +55,7 @@ export function filterOrders(status) {
     if(status === 'Shipped') document.getElementById('tabShipped').classList.add('active');
     if(status === 'Delivered') document.getElementById('tabDelivered').classList.add('active');
     if(status === 'Cancelled') document.getElementById('tabCancelled').classList.add('active');
+    if(status === 'Returned') document.getElementById('tabReturned').classList.add('active');
 
     displayDashboardOrders();
 }
@@ -169,7 +170,7 @@ export async function updateOrderStatus(db, orderId, newStatus) {
         }
 
         const orderRef = doc(db, "orders", orderId);
-        await updateDoc(orderRef, { status: newStatus, [newStatus.toLowerCase() + 'At']: new Date() });
+        await updateDoc(orderRef, { status: newStatus, [newStatus.toLowerCase() + 'At']: new Date(), updatedAt: serverTimestamp() });
 
         // A cancelled order shouldn't keep its stock reserved forever.
         if (newStatus === 'Cancelled' && order) {
@@ -201,7 +202,7 @@ export async function markAsShipped(db, orderId) {
 
         const otp = Math.floor(1000 + Math.random() * 9000).toString();
         const orderRef = doc(db, "orders", orderId);
-        await updateDoc(orderRef, { status: 'Shipped', shippedAt: new Date(), deliveryOTP: otp });
+        await updateDoc(orderRef, { status: 'Shipped', shippedAt: new Date(), deliveryOTP: otp, updatedAt: serverTimestamp() });
         showToast("Order marked as Shipped! 🚚\n\nThe buyer will now see a Delivery OTP on their Orders page. Ask them for it when you hand over the package, to confirm delivery.");
 
         if (order && order.buyerUid) {
@@ -240,7 +241,7 @@ export async function confirmDelivery(db, orderId) {
 
     try {
         const orderRef = doc(db, "orders", orderId);
-        await updateDoc(orderRef, { status: 'Delivered', deliveredAt: new Date() });
+        await updateDoc(orderRef, { status: 'Delivered', deliveredAt: new Date(), updatedAt: serverTimestamp() });
         showToast("✅ Delivery confirmed! Order marked as Delivered.");
 
         if (order.buyerUid) {
