@@ -61,7 +61,7 @@ export function renderAnalyticsFromOrders(orders) {
         return;
     }
 
-    const counts = { Pending: 0, Accepted: 0, Shipped: 0, Delivered: 0, Cancelled: 0 };
+    const counts = { Pending: 0, Accepted: 0, Shipped: 0, Delivered: 0, Cancelled: 0, Returned: 0 };
     let totalRevenue = 0;
     const productFrequency = {};
 
@@ -69,7 +69,7 @@ export function renderAnalyticsFromOrders(orders) {
         const status = o.status || 'Pending';
         if (counts[status] !== undefined) counts[status]++;
 
-        if (status !== 'Cancelled') {
+        if (status !== 'Cancelled' && status !== 'Returned') {
             totalRevenue += Number(o.price) || 0;
         }
 
@@ -112,7 +112,7 @@ export function renderAnalyticsFromOrders(orders) {
         <div class="top-product-box">🏆 Best Selling Product: <strong>${topProduct}</strong></div>
 
         <div class="bar-chart">
-            ${['Pending', 'Accepted', 'Shipped', 'Delivered', 'Cancelled'].map(status => `
+            ${['Pending', 'Accepted', 'Shipped', 'Delivered', 'Cancelled', 'Returned'].map(status => `
                 <div class="bar-row">
                     <span class="bar-label">${status}</span>
                     <div class="bar-track">
