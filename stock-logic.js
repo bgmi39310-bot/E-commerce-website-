@@ -1,4 +1,4 @@
-import { doc, runTransaction } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { doc, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // Canonical key for a size/color combination, used to look things up in a
 // product's `variantStock` map. Both empty means "no variant" (returns
@@ -106,7 +106,7 @@ export async function restoreStock(db, productId, qty, variantKey) {
             const data = snap.data();
             const currentSold = data.unitsSold || 0;
             const currentStock = data.stock !== undefined ? data.stock : 0;
-            const update = { stock: currentStock + qty, unitsSold: Math.max(0, currentSold - qty) };
+            const update = { stock: currentStock + qty, unitsSold: Math.max(0, currentSold - qty), updatedAt: serverTimestamp() };
 
             const variantStock = data.variantStock && typeof data.variantStock === 'object' ? { ...data.variantStock } : null;
             if (variantStock && variantKey && Object.prototype.hasOwnProperty.call(variantStock, variantKey)) {
