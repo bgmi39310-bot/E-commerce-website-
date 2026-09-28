@@ -295,6 +295,7 @@ def _reserve_stock(verified_items):
             update = {
                 "stock": firestore.Increment(-i["quantity"]),
                 "unitsSold": firestore.Increment(i["quantity"]),
+                "updatedAt": firestore.SERVER_TIMESTAMP,  # so the seller's delta-synced product list notices the stock change
             }
 
             # If this product tracks stock per size/color combination, check
@@ -353,6 +354,7 @@ def _create_orders(verified_items, buyer_uid, delivery, coupon_code, coupon_sell
             "paymentMethod": payment_method,
             "status": "Pending",
             "createdAt": now,
+            "updatedAt": now,  # delta-sync (seller dashboard / My Orders) asks "what changed since X" via this field
         }
         if extra_order_fields:
             order_data.update(extra_order_fields)
