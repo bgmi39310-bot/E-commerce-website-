@@ -1,4 +1,4 @@
-import { collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { isPremiumSeller } from './premium-logic.js';
 import { showToast } from './toast.js';
 
@@ -75,7 +75,8 @@ export async function bulkUploadProducts(db, currentLoggedInUser, shopName, file
                     category: (category || 'other').trim().toLowerCase(),
                     shopName: shopName,
                     sellerUid: currentLoggedInUser.uid,
-                    createdAt: new Date()
+                    createdAt: new Date(),
+                    updatedAt: serverTimestamp()
                 });
                 successCount++;
             } catch (err) {
