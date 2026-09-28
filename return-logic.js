@@ -1,4 +1,4 @@
-import { doc, updateDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { doc, updateDoc, collection, getDocs, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { sendNotification } from './notif-logic.js';
 import { showToast } from './toast.js';
 import { escapeHtml } from './sanitize.js';
@@ -13,7 +13,8 @@ export async function submitReturnRequest(db, orderId, reason) {
             returnRequested: true,
             returnReason: reason,
             returnStatus: 'Pending',
-            returnRequestedAt: new Date()
+            returnRequestedAt: new Date(),
+            updatedAt: serverTimestamp()
         });
         showToast("Return request submitted. The seller will review it shortly.");
     } catch (error) {
@@ -86,7 +87,7 @@ export async function loadReturnRequests(db, sellerUid) {
 export async function updateReturnStatus(db, orderId, newReturnStatus) {
     try {
         const order = cachedReturns.find(o => o.id === orderId);
-        const updateData = { returnStatus: newReturnStatus };
+        const updateData = { returnStatus: newReturnStatus, updatedAt: serverTimestamp() };
         if (newReturnStatus === 'Approved') updateData.status = 'Returned';
         await updateDoc(doc(db, "orders", orderId), updateData);
 
