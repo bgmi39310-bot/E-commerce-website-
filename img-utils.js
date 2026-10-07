@@ -21,7 +21,7 @@
 // `width` should be roughly 2x the CSS display width, so the image still
 // looks sharp on high-density (retina) phone screens.
 export function resizedImageUrl(url, width) {
-    if (!url || typeof url !== 'string') return url;
+    if (!url || typeof url !== 'string') return NO_IMAGE_PLACEHOLDER;
     // Already a local/placeholder image, or a data URL — nothing to proxy.
     if (url.startsWith('data:') || url.startsWith('/') || url.startsWith('./')) return url;
 
@@ -32,4 +32,17 @@ export function resizedImageUrl(url, width) {
         return url; // if anything about the URL is unexpected, just use it as-is
     }
 }
+
+// A plain "no image" box, as a data: URI — this loads with ZERO network
+// requests, so it can never be the slow/rate-limited/down third party that
+// images.weserv.nl turned out to be (see the note above). Used everywhere
+// an <img> needs a fallback: as the initial src when there's no image URL
+// at all (see above), and as the onerror target when a real image URL
+// fails to load. No single or double quotes inside it on purpose, so it's
+// safe to drop into either onerror="this.src='...'" or src="...".
+export const NO_IMAGE_PLACEHOLDER =
+    'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"%3E' +
+    '%3Crect width="200" height="200" fill="%23f0f0f0"/%3E' +
+    '%3Ctext x="50%25" y="50%25" font-family="sans-serif" font-size="16" fill="%23999" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E' +
+    '%3C/svg%3E';
 
