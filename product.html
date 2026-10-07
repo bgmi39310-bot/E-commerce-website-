@@ -166,7 +166,7 @@
      out the seller info and reset the Follow button's state on every update. -->
 <div class="container" style="padding-top:0; padding-bottom:0;">
     <div class="seller-card" id="sellerCard" style="display:none;">
-        <img class="seller-logo" src="https://via.placeholder.com/60" id="sellerLogo" alt="Seller">
+        <img class="seller-logo" src="data:image/svg+xml,%3Csvg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 200 200&quot;%3E%3Crect width=&quot;200&quot; height=&quot;200&quot; fill=&quot;%23f0f0f0&quot;/%3E%3Ctext x=&quot;50%25&quot; y=&quot;50%25&quot; font-family=&quot;sans-serif&quot; font-size=&quot;16&quot; fill=&quot;%23999&quot; text-anchor=&quot;middle&quot; dy=&quot;.3em&quot;%3ENo Image%3C/text%3E%3C/svg%3E" id="sellerLogo" alt="Seller">
         <div class="seller-info">
             <h4 id="sellerName">Loading seller info...<span class="verified-tick">✔️</span></h4>
             <p id="sellerAddress"></p>
@@ -292,7 +292,7 @@
     import { isFollowingSeller, toggleFollowSeller } from './follow-logic.js';
     import { showToast } from './toast.js';
     import { escapeHtml } from './sanitize.js';
-    import { resizedImageUrl } from './img-utils.js';
+    import { resizedImageUrl, NO_IMAGE_PLACEHOLDER } from './img-utils.js';
     import { buildVariantKey } from './stock-logic.js';
     import { mountNotificationBell } from './notif-logic.js';
     import { placeOrderViaBackend } from './order-api.js';
@@ -438,7 +438,7 @@
         content.innerHTML = `
             <div class="product-layout">
                 <div class="gallery">
-                    <img class="main-img" id="mainProductImg" src="${resizedImageUrl(imageList[0], 800)}" alt="${escapeHtml(p.name || 'Product')}" onerror="this.src='https://via.placeholder.com/400?text=No+Image'">
+                    <img class="main-img" id="mainProductImg" src="${resizedImageUrl(imageList[0], 800)}" alt="${escapeHtml(p.name || 'Product')}" onerror="this.src='${NO_IMAGE_PLACEHOLDER}'">
                     ${imageList.length > 1 ? `
                         <div class="thumb-strip">
                             ${imageList.map((img, i) => `<img src="${resizedImageUrl(img, 110)}" data-full="${img.replace(/"/g, '&quot;')}" loading="lazy" class="${i === 0 ? 'active' : ''}" onclick="switchMainImage(this.dataset.full, this)" onerror="this.style.display='none'">`).join('')}
@@ -529,7 +529,7 @@
             if (snap.exists()) {
                 const seller = snap.data();
                 currentSellerData = seller;
-                document.getElementById('sellerLogo').src = seller.logo || 'https://via.placeholder.com/60';
+                document.getElementById('sellerLogo').src = seller.logo || NO_IMAGE_PLACEHOLDER;
                 document.getElementById('sellerName').innerHTML = `${escapeHtml(seller.shopName || 'Local Seller')} ${seller.kycStatus === 'Verified' ? '<span class="verified-tick">✔️ Verified</span>' : ''} ${seller.isPremium ? '<span style="background:linear-gradient(135deg,#ffd700,#ff9900); color:#111; font-size:10px; font-weight:bold; padding:2px 8px; border-radius:10px; margin-left:4px;">🌟 PREMIUM</span>' : ''}`;
                 document.getElementById('sellerAddress').innerText = '📍 ' + (seller.city ? seller.city + ' — ' : '') + (seller.address || 'Address not provided');
                 document.getElementById('sellerPhone').innerText = '📞 Contact after order confirmation';
