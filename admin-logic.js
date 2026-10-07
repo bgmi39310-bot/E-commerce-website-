@@ -1,4 +1,5 @@
 import { auth } from './firebase-config.js';
+import { NO_IMAGE_PLACEHOLDER } from './img-utils.js';
 import { showToast } from './toast.js';
 import { escapeHtml } from './sanitize.js';
 import {
@@ -95,11 +96,11 @@ export async function loadDashboardCharts(db, renderCallback) {
 
     // ---- Exact platform-wide counts via Firestore's count() aggregation.
     let totalSellers = 0, totalBuyers = 0, totalDeliveryPartners = 0, totalProducts = 0, totalOrders = 0;
-    let statusCounts = { Pending: 0, Accepted: 0, Shipped: 0, Delivered: 0, Cancelled: 0 };
+    let statusCounts = { Pending: 0, Accepted: 0, Shipped: 0, Delivered: 0, Cancelled: 0, Returned: 0 };
     try {
         const [
             sellersCountSnap, buyersCountSnap, deliveryCountSnap, productsCountSnap, ordersCountSnap,
-            pendingCountSnap, acceptedCountSnap, shippedCountSnap, deliveredCountSnap, cancelledCountSnap,
+            pendingCountSnap, acceptedCountSnap, shippedCountSnap, deliveredCountSnap, cancelledCountSnap, returnedCountSnap,
         ] = await Promise.all([
             getCountFromServer(query(collection(db, "users"), where("role", "==", "seller"))),
             getCountFromServer(query(collection(db, "users"), where("role", "==", "customer"))),
@@ -115,6 +116,7 @@ export async function loadDashboardCharts(db, renderCallback) {
             getCountFromServer(query(collection(db, "orders"), where("status", "==", "Shipped"))),
             getCountFromServer(query(collection(db, "orders"), where("status", "==", "Delivered"))),
             getCountFromServer(query(collection(db, "orders"), where("status", "==", "Cancelled"))),
+            getCountFromServer(query(collection(db, "orders"), where("status", "==", "Returned"))),
         ]);
         totalSellers = sellersCountSnap.data().count;
         totalBuyers = buyersCountSnap.data().count;
@@ -127,6 +129,7 @@ export async function loadDashboardCharts(db, renderCallback) {
             Shipped: shippedCountSnap.data().count,
             Delivered: deliveredCountSnap.data().count,
             Cancelled: cancelledCountSnap.data().count,
+            Returned: returnedCountSnap.data().count,
         };
     } catch (error) {
         console.error("Dashboard: count queries failed —", error);
@@ -142,7 +145,7 @@ export async function loadDashboardCharts(db, renderCallback) {
     let totalRevenue = 0;
     try {
         const revenueSnap = await getAggregateFromServer(
-            query(collection(db, "orders"), where("status", "!=", "Cancelled")),
+            query(collection(db, "orders"), where("status", "not-in", ["Cancelled", "Returned"])),
             { totalRevenue: sum("price") }
         );
         totalRevenue = revenueSnap.data().totalRevenue || 0;
@@ -169,7 +172,7 @@ export async function loadDashboardCharts(db, renderCallback) {
         recentSnap.forEach(d => recentOrdersAll.push({ id: d.id, ...d.data() }));
 
         recentOrdersAll.forEach(o => {
-            if (o.status === 'Cancelled') return;
+            if (o.status === 'Cancelled' || o.status === 'Returned') return;
             const created = o.createdAt && o.createdAt.toDate ? o.createdAt.toDate() : null;
             if (!created) return;
             const diffDays = Math.floor((new Date().setHours(0,0,0,0) - new Date(created).setHours(0,0,0,0)) / 86400000);
@@ -180,7 +183,7 @@ export async function loadDashboardCharts(db, renderCallback) {
 
         const sellerRevenue = {};
         recentOrdersAll.forEach(o => {
-            if (o.status === 'Cancelled') return;
+            if (o.status === 'Cancelled' || o.status === 'Returned') return;
             const shop = o.shopName || 'Unknown Shop';
             sellerRevenue[shop] = (sellerRevenue[shop] || 0) + (Number(o.price) || 0);
         });
@@ -811,7 +814,7 @@ function renderProducts() {
     }
     container.innerHTML = filtered.map(p => `
         <div class="admin-row-card">
-            <img class="arc-thumb" src="${escapeHtml(p.image || 'https://via.placeholder.com/60')}" alt="">
+            <img class="arc-thumb" src="${escapeHtml(p.image || NO_IMAGE_PLACEHOLDER)}" alt="">
             <div class="arc-info">
                 <h4>${escapeHtml(p.name || 'Unnamed product')}</h4>
                 <p>₹${p.price || 0} &nbsp; 🏪 ${escapeHtml(p.shopName || 'N/A')}</p>
