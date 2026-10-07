@@ -1,8 +1,9 @@
-import { collection, onSnapshot, doc, updateDoc, getDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { doc, updateDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { sendNotification } from './notif-logic.js';
 import { showToast } from './toast.js';
 import { escapeHtml } from './sanitize.js';
 import { restoreStock, buildVariantKey } from './stock-logic.js';
+import { deltaSync } from './delta-sync-logic.js';
 
 let allOrders = [];
 
@@ -13,39 +14,36 @@ export function getCurrentOrders() {
     return allOrders;
 }
 let currentStatusFilter = 'Pending';
-let unsubscribeOrders = null;
 
-// Live listener — once set up, order list AND status changes update automatically
-// on screen without ever needing to re-fetch. This is the #1 fix for excess reads.
-export function fetchDashboardOrders(db, uid, onOrdersUpdate) {
+// Delta-synced (see delta-sync-logic.js) — a seller with a long order
+// history used to have their ENTIRE history re-read via a live listener
+// every single time this loaded, and again on every status change while
+// the tab stayed open. This instead only re-reads orders that changed
+// since the last sync, cached in localStorage. The trade-off: a new order
+// or status change from elsewhere (another tab, the buyer, a delivery
+// partner) now shows up on the next reload/tab-revisit rather than
+// instantly — same trade-off already made for the notification bell.
+export async function fetchDashboardOrders(db, uid, onOrdersUpdate) {
     const container = document.getElementById('dashboardOrdersContainer');
-
-    if (unsubscribeOrders) {
-        unsubscribeOrders();
-        unsubscribeOrders = null;
-    }
-
-    const q = query(collection(db, "orders"), where("sellerUid", "==", uid));
-
-    unsubscribeOrders = onSnapshot(q, (querySnapshot) => {
-        allOrders = [];
-        querySnapshot.forEach((docSnap) => {
-            allOrders.push({ id: docSnap.id, ...docSnap.data() });
+    try {
+        allOrders = await deltaSync(db, {
+            collectionPath: 'orders',
+            whereField: 'sellerUid',
+            whereValue: uid,
+            storageKey: `orders:seller:${uid}`
         });
         displayDashboardOrders();
         if (onOrdersUpdate) onOrdersUpdate(allOrders); // lets analytics recompute from the same data, no extra reads
-    }, (error) => {
+    } catch (error) {
         console.error("Error fetching orders: ", error);
-        container.innerHTML = "<p style='color:red;'>Error loading orders.</p>";
-    });
-}
-
-export function stopListeningToOrders() {
-    if (unsubscribeOrders) {
-        unsubscribeOrders();
-        unsubscribeOrders = null;
+        if (container) container.innerHTML = "<p style='color:red;'>Error loading orders.</p>";
     }
 }
+
+// Kept as a no-op so existing callers (seller-dashboard.html's pagehide
+// cleanup) don't need to change — there's no live listener to tear down
+// anymore, delta-sync is just a one-time fetch per call.
+export function stopListeningToOrders() {}
 
 export function filterOrders(status) {
     currentStatusFilter = status;
