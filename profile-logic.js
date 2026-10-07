@@ -1,4 +1,5 @@
 import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { NO_IMAGE_PLACEHOLDER } from './img-utils.js';
 import { showToast } from './toast.js';
 import { initPickerMap } from './map-utils.js';
 
@@ -71,7 +72,7 @@ export async function loadSellerProfileFromFirestore(db, uid) {
             document.getElementById('dispOwnerName').innerText = profile.ownerName || 'N/A';
             document.getElementById('dispPhone').innerText = profile.phone || 'N/A';
             document.getElementById('dispAddress').innerText = profile.address || 'N/A';
-            document.getElementById('dispLogo').src = profile.logo || 'https://via.placeholder.com/80';
+            document.getElementById('dispLogo').src = profile.logo || NO_IMAGE_PLACEHOLDER;
             const dispCityEl = document.getElementById('dispCity');
             if (dispCityEl) dispCityEl.innerText = profile.city || 'N/A';
             const dispVillagesEl = document.getElementById('dispVillages');
