@@ -290,6 +290,7 @@
     <!-- Firebase Live Fetch Logic -->
     <script type="module">
         import { db, auth } from './firebase-config.js';
+        import { NO_IMAGE_PLACEHOLDER } from './img-utils.js';
         import { applyTranslations, toggleLanguage, t } from './i18n.js';
         import { loadActiveBanners } from './banner-logic.js';
         import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -453,7 +454,7 @@
                     ${outOfStock ? '<span class="out-of-stock-badge">Out of Stock</span>' : ''}
                     <button class="wishlist-btn ${isWishlisted ? 'active' : ''}" onclick="event.stopPropagation(); toggleWishlist('${product.id}', this)">${isWishlisted ? '❤️' : '🤍'}</button>
                     <div class="product-img-wrap">
-                        <img src="${pImage}" alt="${pName}" loading="lazy" onerror="this.src='https://via.placeholder.com/300?text=No+Image'">
+                        <img src="${pImage}" alt="${pName}" loading="lazy" onerror="this.src='${NO_IMAGE_PLACEHOLDER}'">
                     </div>
                     <div class="product-body">
                         <div class="product-title">${pName}</div>
@@ -819,7 +820,7 @@
                     : '';
                 return `
                     <div class="seller-card-mini">
-                        <img src="${escapeHtml(s.logo || 'https://via.placeholder.com/56')}" alt="${shopName}" loading="lazy" onerror="this.src='https://via.placeholder.com/56'">
+                        <img src="${escapeHtml(s.logo || NO_IMAGE_PLACEHOLDER)}" alt="${shopName}" loading="lazy" onerror="this.src='${NO_IMAGE_PLACEHOLDER}'">
                         <div class="s-name">${shopName}</div>
                         <div class="s-city">📍 ${city}</div>
                         ${distanceBadge}
@@ -889,7 +890,7 @@
             wrap.style.display = 'block';
             scrollEl.innerHTML = followedProducts.slice(0, 12).map(p => `
                 <div style="flex-shrink:0; width:130px; cursor:pointer;" onclick="window.location.href='product.html?id=${p.id}'">
-                    <img src="${escapeHtml(p.image || 'https://via.placeholder.com/130')}" loading="lazy" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:8px; background:#f5f5f5;" onerror="this.src='https://via.placeholder.com/130?text=No+Image'">
+                    <img src="${escapeHtml(p.image || NO_IMAGE_PLACEHOLDER)}" loading="lazy" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:8px; background:#f5f5f5;" onerror="this.src='${NO_IMAGE_PLACEHOLDER}'">
                     <div style="font-size:11.5px; margin-top:4px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${escapeHtml(p.name || 'Product')}</div>
                     <div style="font-size:10.5px; color:#777;">🏪 ${escapeHtml(p.shopName || 'Local Shop')}</div>
                     <div style="font-size:12.5px; font-weight:bold; color:#B12704;">₹${(parseFloat(p.price) || 0).toFixed(0)}</div>
