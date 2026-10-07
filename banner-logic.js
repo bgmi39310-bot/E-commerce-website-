@@ -1,4 +1,5 @@
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { NO_IMAGE_PLACEHOLDER } from './img-utils.js';
 import { showToast } from './toast.js';
 import { escapeHtml } from './sanitize.js';
 
@@ -36,7 +37,7 @@ export async function loadAllBanners(db) {
 
         container.innerHTML = banners.map(b => `
             <div class="admin-row-card ${!b.active ? 'is-blocked' : ''}">
-                <img class="arc-thumb" src="${b.imageUrl || 'https://via.placeholder.com/80x50'}" alt="" style="width:80px; height:50px; border-radius:6px; object-fit:cover;">
+                <img class="arc-thumb" src="${b.imageUrl || NO_IMAGE_PLACEHOLDER}" alt="" style="width:80px; height:50px; border-radius:6px; object-fit:cover;">
                 <div class="arc-info">
                     <h4>${escapeHtml(b.title || 'Untitled Banner')} ${!b.active ? '<span class="blocked-tag">INACTIVE</span>' : ''}</h4>
                     <p>${escapeHtml(b.subtitle || '')}</p>
