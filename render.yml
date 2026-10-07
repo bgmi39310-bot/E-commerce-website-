@@ -21,7 +21,7 @@ services:
         value: "geolocation=(), microphone=(), camera=(), usb=(), interest-cohort=()"
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.googletagmanager.com https://checkout.razorpay.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' https: data:; font-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://vande-market-api.onrender.com https://api.razorpay.com https://lumberjack.razorpay.com https://images.weserv.nl https://www.google-analytics.com https://www.googletagmanager.com https://nominatim.openstreetmap.org https://*.tile.openstreetmap.org; frame-src https://checkout.razorpay.com https://api.razorpay.com; object-src 'none'; base-uri 'self'; form-action 'self'"
+        value: "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.googletagmanager.com https://checkout.razorpay.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' https: data:; font-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://vande-market-api.onrender.com https://api.razorpay.com https://lumberjack.razorpay.com https://wsrv.nl https://www.google-analytics.com https://www.googletagmanager.com https://nominatim.openstreetmap.org https://*.tile.openstreetmap.org; frame-src https://checkout.razorpay.com https://api.razorpay.com; object-src 'none'; base-uri 'self'; form-action 'self'"
       - path: /*.png
         name: Cache-Control
         value: public, max-age=604800, immutable
@@ -36,7 +36,19 @@ services:
     plan: free
     rootDir: backend
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn app:app"
+    # --workers 2: two separate processes, so one slow/stuck request in one
+    #   worker doesn't take down the only worker answering requests (which is
+    #   exactly what "gunicorn app:app" — 1 worker by default — let happen
+    #   before: Render's health check had nothing else to talk to while that
+    #   worker was busy, and got treated as a full outage).
+    # --threads 4 --worker-class gthread: each of those 2 processes can also
+    #   handle several requests concurrently via threads, which uses far less
+    #   RAM than adding more full worker processes would — a real constraint
+    #   on Render's free tier.
+    # --timeout 60: raised from gunicorn's default 30s, so a genuinely slow
+    #   (not stuck) request — a cold Firestore connection, a slow Redis call —
+    #   has more room before its worker gets killed.
+    startCommand: "gunicorn --workers 2 --threads 4 --worker-class gthread --timeout 60 --graceful-timeout 30 app:app"
     envVars:
       - key: FIREBASE_SERVICE_ACCOUNT_JSON
         sync: false      # paste the full service-account JSON in the Render dashboard — never in this file
