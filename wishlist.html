@@ -64,6 +64,7 @@
 
 <script type="module">
     import { db, auth } from './firebase-config.js';
+    import { NO_IMAGE_PLACEHOLDER } from './img-utils.js';
     import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { escapeHtml } from './sanitize.js';
@@ -107,7 +108,7 @@
                 <div class="wish-card" onclick="window.location.href='product.html?id=${p.id}'">
                     <button class="remove-wish-btn" onclick="event.stopPropagation(); removeFromWishlist('${p.id}')">🗑️</button>
                     <div class="wish-img-wrap">
-                        <img src="${p.image || 'https://via.placeholder.com/300'}" alt="${escapeHtml(p.name || 'Product')}" loading="lazy" onerror="this.src='https://via.placeholder.com/300?text=No+Image'">
+                        <img src="${p.image || NO_IMAGE_PLACEHOLDER}" alt="${escapeHtml(p.name || 'Product')}" loading="lazy" onerror="this.src='${NO_IMAGE_PLACEHOLDER}'">
                     </div>
                     <div class="wish-body">
                         <div class="wish-title">${escapeHtml(p.name || 'Product')}</div>
