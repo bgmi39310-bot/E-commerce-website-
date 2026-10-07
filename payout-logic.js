@@ -1,23 +1,38 @@
-import { collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, query, where, getAggregateFromServer, sum } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
+// Used to read EVERY order a seller has ever received just to add up three
+// totals — for a seller with hundreds/thousands of orders over time, that's
+// hundreds/thousands of Firestore reads every single time this card loads.
+// Firestore's sum() aggregation computes the total server-side and bills
+// each query as ~1 read, regardless of how many orders match it — so this
+// is now 3 reads total (one per bucket below) no matter how much order
+// history a seller has built up.
 export async function loadPayoutSummary(db, uid) {
     const container = document.getElementById('payoutContainer');
     if (!container) return;
     container.innerHTML = "<p>Loading earnings...</p>";
 
     try {
-        const q = query(collection(db, "orders"), where("sellerUid", "==", uid));
-        const snap = await getDocs(q);
+        const base = collection(db, "orders");
 
-        let delivered = 0, inTransit = 0, cancelled = 0;
+        const [deliveredSnap, cancelledSnap, inTransitSnap] = await Promise.all([
+            getAggregateFromServer(
+                query(base, where("sellerUid", "==", uid), where("status", "==", "Delivered")),
+                { total: sum("price") }
+            ),
+            getAggregateFromServer(
+                query(base, where("sellerUid", "==", uid), where("status", "in", ["Cancelled", "Returned"])),
+                { total: sum("price") }
+            ),
+            getAggregateFromServer(
+                query(base, where("sellerUid", "==", uid), where("status", "in", ["Pending", "Accepted", "Shipped"])),
+                { total: sum("price") }
+            ),
+        ]);
 
-        snap.forEach(d => {
-            const o = d.data();
-            const amount = Number(o.price) || 0;
-            if (o.status === 'Delivered') delivered += amount;
-            else if (o.status === 'Cancelled' || o.status === 'Returned') cancelled += amount;
-            else inTransit += amount; // Pending / Accepted / Shipped
-        });
+        const delivered = deliveredSnap.data().total || 0;
+        const cancelled = cancelledSnap.data().total || 0;
+        const inTransit = inTransitSnap.data().total || 0;
 
         container.innerHTML = `
             <div class="payout-grid">
@@ -41,4 +56,3 @@ export async function loadPayoutSummary(db, uid) {
         container.innerHTML = `<p style="color:red;">Unable to load earnings right now.</p>`;
     }
 }
-
