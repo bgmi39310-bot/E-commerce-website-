@@ -1,8 +1,10 @@
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, addDoc, doc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { NO_IMAGE_PLACEHOLDER } from './img-utils.js';
 import { isPremiumSeller, countSellerProducts, FREE_TIER_LIMITS } from './premium-logic.js';
 import { showToast } from './toast.js';
 import { escapeHtml } from './sanitize.js';
 import { buildVariantKey } from './stock-logic.js';
+import { deltaSync, removeFromDeltaSyncCache } from './delta-sync-logic.js';
 
 // Builds the list of size/color combinations a seller can optionally set
 // per-variant stock for. If both sizes and colors are given, every
@@ -64,10 +66,6 @@ function collectVariantStock(prefix) {
     });
     return any ? result : null;
 }
-
-// Keeps track of the active listener so we never stack up duplicate onSnapshot
-// subscriptions (which would waste Firestore reads) if this gets called more than once.
-let unsubscribeMyProducts = null;
 
 const LOW_STOCK_THRESHOLD = 5;
 // Tracks each product's previous stock level so we only alert ONCE when it
@@ -163,86 +161,93 @@ export async function addProductToFirebase(db, currentLoggedInUser, fetchProduct
     }
 }
 
-export function stopListeningToMyProducts() {
-    if (unsubscribeMyProducts) {
-        unsubscribeMyProducts();
-        unsubscribeMyProducts = null;
-    }
-}
+// Kept as a no-op so existing callers don't need to change — there's no
+// live listener to tear down anymore, delta-sync is just a one-time fetch
+// per call (see fetchMyListedProducts below).
+export function stopListeningToMyProducts() {}
 
-export function fetchMyListedProducts(db, uid, onLowStockUpdate) {
+// Delta-synced (see delta-sync-logic.js) — a seller's own product list used
+// to be re-read via a live listener on every dashboard visit, AND again on
+// every single views/stock change while the tab stayed open (views bump on
+// every product-page visit from any buyer, anywhere). This instead only
+// re-reads products that changed since the last sync, cached in
+// localStorage. Trade-off: the "stock just crossed into low-stock" browser
+// notification now only fires on the next reload/tab-revisit that happens
+// to catch the crossing, not the instant it happens — same trade-off made
+// for the notification bell and seller dashboard orders.
+export async function fetchMyListedProducts(db, uid, onLowStockUpdate) {
     const container = document.getElementById('myProductsContainer');
     container.innerHTML = "<p>Loading your products...</p>";
 
-    // Stop any previous listener before starting a new one
-    if (unsubscribeMyProducts) {
-        unsubscribeMyProducts();
-        unsubscribeMyProducts = null;
-    }
-
-    const q = query(collection(db, "vendors"), where("sellerUid", "==", uid));
-
-    unsubscribeMyProducts = onSnapshot(q, (querySnapshot) => {
-        if (querySnapshot.empty) {
-            container.innerHTML = "<div class='no-data'>No products listed by you yet.</div>";
-            if (onLowStockUpdate) onLowStockUpdate([]);
-            return;
-        }
-
-        let html = "";
-        const lowStockList = [];
-
-        querySnapshot.forEach((docSnap) => {
-            const prod = docSnap.data();
-            const stock = prod.stock !== undefined ? prod.stock : 10;
-            const outOfStock = stock <= 0;
-            const isLow = stock > 0 && stock <= LOW_STOCK_THRESHOLD;
-
-            let stockTag;
-            if (outOfStock) stockTag = '<span class="stock-tag out">Out of Stock</span>';
-            else if (isLow) stockTag = `<span class="stock-tag low">⚠️ Only ${stock} left</span>`;
-            else stockTag = `<span class="stock-tag in">${stock} in stock</span>`;
-
-            if (outOfStock || isLow) {
-                lowStockList.push({ id: docSnap.id, name: prod.name, stock });
-            }
-
-            // Fire a one-time browser notification only when stock NEWLY crosses
-            // into low/out territory (not on every re-render of the same value).
-            const prevStock = previousStockLevels[docSnap.id];
-            if (prevStock !== undefined && prevStock > LOW_STOCK_THRESHOLD && (outOfStock || isLow)) {
-                if ("Notification" in window && Notification.permission === "granted") {
-                    new Notification("⚠️ Low Stock Alert", {
-                        body: `${prod.name} is ${outOfStock ? 'out of stock' : 'running low (' + stock + ' left)'}.`
-                    });
-                }
-            }
-            previousStockLevels[docSnap.id] = stock;
-            myProductsCache[docSnap.id] = { id: docSnap.id, ...prod };
-
-            html += `
-                <div class="product-item-card">
-                    <div style="display: flex; gap: 15px; align-items: center;">
-                        <img src="${escapeHtml(prod.image || 'https://via.placeholder.com/60')}" class="product-thumb" alt="Product">
-                        <div class="product-info">
-                            <h4>${escapeHtml(prod.name)} ${stockTag}</h4>
-                            <p><strong>Price:</strong> ₹${prod.price} (${escapeHtml(prod.unit || 'Per Piece')})</p>
-                            <p style="font-size:12px; color:#888;">👁️ ${prod.views || 0} views &nbsp; | &nbsp; 🛒 ${prod.unitsSold || 0} sold</p>
-                        </div>
-                    </div>
-                    <div class="btn-group">
-                        <button class="btn-edit" onclick="openEditProductFromCache('${docSnap.id}')">✏️ Edit</button>
-                        <button class="btn-delete" onclick="deleteProduct('${docSnap.id}')">🗑️ Delete</button>
-                    </div>
-                </div>
-            `;
+    let products;
+    try {
+        products = await deltaSync(db, {
+            collectionPath: 'vendors',
+            whereField: 'sellerUid',
+            whereValue: uid,
+            storageKey: `vendors:seller:${uid}`
         });
-        container.innerHTML = html;
-        if (onLowStockUpdate) onLowStockUpdate(lowStockList);
-    }, (error) => {
+    } catch (error) {
         console.error("Error loading products: ", error);
         container.innerHTML = "<p style='color:red;'>Error loading your products.</p>";
+        return;
+    }
+
+    if (products.length === 0) {
+        container.innerHTML = "<div class='no-data'>No products listed by you yet.</div>";
+        if (onLowStockUpdate) onLowStockUpdate([]);
+        return;
+    }
+
+    let html = "";
+    const lowStockList = [];
+
+    products.forEach((prod) => {
+        const stock = prod.stock !== undefined ? prod.stock : 10;
+        const outOfStock = stock <= 0;
+        const isLow = stock > 0 && stock <= LOW_STOCK_THRESHOLD;
+
+        let stockTag;
+        if (outOfStock) stockTag = '<span class="stock-tag out">Out of Stock</span>';
+        else if (isLow) stockTag = `<span class="stock-tag low">⚠️ Only ${stock} left</span>`;
+        else stockTag = `<span class="stock-tag in">${stock} in stock</span>`;
+
+        if (outOfStock || isLow) {
+            lowStockList.push({ id: prod.id, name: prod.name, stock });
+        }
+
+        // Fire a one-time browser notification only when stock NEWLY crosses
+        // into low/out territory (not on every re-render of the same value).
+        const prevStock = previousStockLevels[prod.id];
+        if (prevStock !== undefined && prevStock > LOW_STOCK_THRESHOLD && (outOfStock || isLow)) {
+            if ("Notification" in window && Notification.permission === "granted") {
+                new Notification("⚠️ Low Stock Alert", {
+                    body: `${prod.name} is ${outOfStock ? 'out of stock' : 'running low (' + stock + ' left)'}.`
+                });
+            }
+        }
+        previousStockLevels[prod.id] = stock;
+        myProductsCache[prod.id] = prod;
+
+        html += `
+            <div class="product-item-card">
+                <div style="display: flex; gap: 15px; align-items: center;">
+                    <img src="${escapeHtml(prod.image || NO_IMAGE_PLACEHOLDER)}" class="product-thumb" alt="Product">
+                    <div class="product-info">
+                        <h4>${escapeHtml(prod.name)} ${stockTag}</h4>
+                        <p><strong>Price:</strong> ₹${prod.price} (${escapeHtml(prod.unit || 'Per Piece')})</p>
+                        <p style="font-size:12px; color:#888;">👁️ ${prod.views || 0} views &nbsp; | &nbsp; 🛒 ${prod.unitsSold || 0} sold</p>
+                    </div>
+                </div>
+                <div class="btn-group">
+                    <button class="btn-edit" onclick="openEditProductFromCache('${prod.id}')">✏️ Edit</button>
+                    <button class="btn-delete" onclick="deleteProduct('${prod.id}')">🗑️ Delete</button>
+                </div>
+            </div>
+        `;
     });
+    container.innerHTML = html;
+    if (onLowStockUpdate) onLowStockUpdate(lowStockList);
 }
 
 // Keeps the seller's own products around in module scope so the Edit button
@@ -350,6 +355,7 @@ export async function deleteProduct(db, productId, uid, fetchProductsCallback) {
     if (confirm("Are you sure you want to delete this product?")) {
         try {
             await deleteDoc(doc(db, "vendors", productId));
+            removeFromDeltaSyncCache(`vendors:seller:${uid}`, productId);
             showToast("Product deleted successfully!");
             fetchProductsCallback(uid);
         } catch (error) {
