@@ -27,6 +27,8 @@ import logging
 
 from flask import Blueprint, jsonify
 
+from firebase_admin import firestore
+
 from utils.cache import get_redis
 from utils.firebase_admin_init import db
 
@@ -81,7 +83,16 @@ def list_products():
     if cached is not None:
         return jsonify({"products": cached, "cached": True})
 
-    products = [_doc_to_dict(d) for d in db.collection("vendors").limit(_PRODUCT_LIMIT).stream()]
+    # Ordered newest-first: if there are ever more than _PRODUCT_LIMIT
+    # products, this guarantees the cap drops the OLDEST listings, not an
+    # arbitrary slice — without an explicit order, a seller's brand-new
+    # product could simply never appear once the catalog passed the cap.
+    # No composite index needed (a plain orderBy with no where-filter uses
+    # Firestore's automatic single-field index).
+    products = [
+        _doc_to_dict(d)
+        for d in db.collection("vendors").order_by("createdAt", direction=firestore.Query.DESCENDING).limit(_PRODUCT_LIMIT).stream()
+    ]
 
     if r is not None:
         try:
