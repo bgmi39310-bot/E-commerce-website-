@@ -1,126 +1,1000 @@
-import { collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { showToast } from './toast.js';
-import { escapeHtml } from './sanitize.js';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Google Analytics (GA4) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-SKX86X8V6K"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-SKX86X8V6K');
+    </script>
+    <title>Seller Hub - DesiMarket</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#232f3e">
+    <link rel="icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="stylesheet" href="shared-ui.css">
+    <script src="pwa-init.js" defer></script>
+    <script src="click-guard.js" defer></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
+        header { background-color: #232f3e; color: white; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 998; }
+        .header-title { font-size: 18px; font-weight: bold; }
+        .menu-icon { cursor: pointer; display: flex; flex-direction: column; gap: 5px; }
+        .menu-icon span { width: 25px; height: 3px; background-color: white; border-radius: 2px; }
+        .side-menu { height: 100%; width: 0; position: fixed; z-index: 2000; top: 0; right: 0; background-color: #232f3e; overflow-x: hidden; transition: 0.3s; padding-top: 60px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); }
+        .side-menu a { padding: 12px 25px; text-decoration: none; font-size: 18px; color: white; display: block; transition: 0.2s; }
+        .side-menu a:hover { background-color: #37475a; }
+        .side-menu .close-btn { position: absolute; top: 10px; right: 20px; font-size: 30px; margin-left: 50px; }
+        .container { max-width: 900px; margin: 20px auto; padding: 20px; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        /* Perf: sections below the fold skip layout/paint work until scrolled
+           near (content-visibility), and fade in gently once their data loads
+           via the IntersectionObserver lazy-loading below. */
+        .module-loading { color: #666; padding: 12px 0; }
+        .module-error { color: #b42318; background: #fff1f0; border-radius: 6px; padding: 10px 12px; }
+        .card { content-visibility: auto; contain-intrinsic-size: 260px; transition: opacity .2s ease, transform .2s ease; }
+        .card:not(:first-child) { animation: dashboard-enter .35s ease both; }
+        @keyframes dashboard-enter { from { opacity: .72; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 
-// This is only called when the seller explicitly clicks "Download Report" —
-// a one-time on-demand read is fine here since it's a deliberate user action,
-// not something that should run automatically on every page interaction.
-export async function downloadSalesReport(db, uid) {
-    try {
-        const q = query(collection(db, "orders"), where("sellerUid", "==", uid));
-        const snap = await getDocs(q);
+        /* Edit Product modal */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; align-items: flex-end; justify-content: center; }
+        .modal-overlay.active { display: flex; }
+        .modal-box { background: white; width: 100%; max-width: 520px; border-radius: 14px 14px 0 0; padding: 20px 20px 25px; max-height: 90vh; overflow-y: auto; }
+        @media(min-width: 600px) { .modal-overlay { align-items: center; } .modal-box { border-radius: 12px; } }
+        .modal-box h3 { margin: 0 0 4px; }
+        .modal-close { float: right; font-size: 22px; cursor: pointer; color: #767676; }
+        .modal-box .form-grid { margin-top: 12px; }
 
-        if (snap.empty) {
-            showToast("No orders yet to generate a report.", 'info');
-            return;
-        }
+        /* "⋮" overflow menu for secondary dashboard sections */
+        .dots-menu-panel { display:none; position:absolute; right:0; top:32px; background:white; border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,0.25); z-index:3000; min-width:220px; overflow:hidden; text-align:left; }
+        .dots-menu-panel.active { display:block; }
+        .dots-menu-panel a { display:block; padding:12px 16px; color:#232f3e; text-decoration:none; font-size:13.5px; cursor:pointer; border-bottom:1px solid #f0f0f0; }
+        .dots-menu-panel a:last-child { border-bottom:none; }
+        .dots-menu-panel a:hover { background:#f5f5f5; }
+        .card.dash-hidden-section { display:none; }
+        h2 { color: #232f3e; margin-top: 0; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        input, textarea, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; background: #fff; }
+        .full-width { grid-column: span 2; }
+        .file-upload-box { border: 1px solid #ddd; padding: 12px; border-radius: 5px; background: #fafafa; }
+        .file-upload-box label { font-size: 13px; color: #666; display: block; margin-bottom: 5px; font-weight: bold; }
+        .img-upload-row { display: flex; gap: 8px; align-items: center; }
+        .img-upload-row input[type="url"] { flex-grow: 1; }
+        .upload-btn { flex-shrink: 0; background: #232f3e; color: white; padding: 10px 14px; border-radius: 5px; cursor: pointer; font-size: 16px; display: flex; align-items: center; }
+        .upload-btn:hover { background: #37475a; }
+        .upload-status { font-size: 11.5px; display: block; margin-top: 4px; min-height: 14px; }
+        button.action-btn { background-color: #ffd814; color: #111; border: 1px solid #fcd200; padding: 12px 20px; font-weight: bold; border-radius: 5px; cursor: pointer; width: 100%; font-size: 15px; }
+        button.action-btn:hover { background-color: #f7ca00; }
+        .success-msg { color: green; font-weight: bold; margin-bottom: 10px; display: none; }
+        .profile-display-card { display: flex; align-items: center; gap: 20px; }
+        .profile-info h3 { margin: 0 0 5px 0; color: #232f3e; }
+        .profile-info p { margin: 3px 0; color: #555; font-size: 14px; }
 
-        let orders = [];
-        snap.forEach(d => orders.push(d.data()));
-        orders.sort((a, b) => {
-            const ta = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate() : 0;
-            const tb = b.createdAt && b.createdAt.toDate ? b.createdAt.toDate() : 0;
-            return tb - ta;
-        });
+        /* Redesigned profile view */
+        .profile-banner { position: relative; text-align: center; padding: 50px 16px 18px; margin-bottom: 4px; }
+        .profile-banner-bg { position: absolute; top: 0; left: -20px; right: -20px; height: 76px; background: linear-gradient(135deg, #232f3e, #3a4d63); border-radius: 10px 10px 0 0; }
+        .profile-logo { position: relative; width: 88px; height: 88px; object-fit: cover; border-radius: 50%; border: 4px solid white; box-shadow: 0 3px 10px rgba(0,0,0,0.2); cursor: zoom-in; background: #eee; }
+        .profile-shop-name { margin: 12px 0 2px; color: #232f3e; font-size: 19px; }
+        .profile-owner-line { margin: 0 0 10px; color: #777; font-size: 13px; }
+        .profile-badges { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+        .profile-badge { background: #fff3e0; color: #c7511f; font-weight: bold; font-size: 12px; padding: 5px 12px; border-radius: 20px; }
+        .profile-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+        .profile-info-item { background: #f8f9fa; border: 1px solid #eee; border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; }
+        .profile-info-item.full-width { grid-column: 1 / -1; }
+        .pii-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.3px; font-weight: 600; }
+        .pii-value { font-size: 13.5px; color: #232f3e; font-weight: 500; word-break: break-word; }
+        @media (max-width: 500px) { .profile-info-grid { grid-template-columns: 1fr; } }
+        .btn-group-profile { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+        .btn-edit { background-color: #232f3e; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        .btn-view { background-color: #007bff; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        .order-card, .product-item-card { background: #fff; border: 1px solid #ddd; border-left: 5px solid #ffd814; border-radius: 6px; padding: 15px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap; }
+        .order-info h4, .product-info h4 { margin: 0 0 5px 0; color: #333; }
+        .order-info p, .product-info p { margin: 4px 0; color: #555; font-size: 14px; }
+        .product-thumb { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #ccc; }
+        .btn-group { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+        .dash-action-btn { padding: 6px 12px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 13px; color: white; }
+        .btn-accept { background-color: #28a745; }
+        .btn-ship { background-color: #007bff; }
+        .btn-delivered { background-color: #6f42c1; }
+        .btn-cancel { background-color: #dc3545; }
+        .btn-delete { background-color: #dc3545; border: none; padding: 6px 12px; border-radius: 4px; color: white; font-weight: bold; font-size: 13px; cursor: pointer; }
+        .call-btn { background-color: #17a2b8; text-decoration: none; display: inline-block; padding: 6px 12px; border-radius: 4px; color: white; font-weight: bold; font-size: 13px; }
+        .no-data { text-align: center; color: #777; padding: 20px; font-size: 15px; }
+        .coupon-card { background: #fff9ec; border: 1px dashed #ffb300; border-radius: 8px; padding: 12px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .coupon-card.inactive { background: #f5f5f5; border-color: #ccc; opacity: 0.75; }
+        .coupon-code { font-family: monospace; font-weight: bold; font-size: 15px; background: #232f3e; color: white; padding: 3px 10px; border-radius: 4px; margin-right: 10px; }
+        .coupon-discount { font-weight: bold; color: #c7511f; }
+        .coupon-off-tag { font-size: 11px; background: #dc3545; color: white; padding: 2px 8px; border-radius: 10px; margin-left: 8px; }
 
-        const escapeCsv = (val) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+        .payout-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 12px; }
+        .payout-card { border-radius: 8px; padding: 16px 10px; text-align: center; }
+        .payout-card.earned { background: #eafaf1; }
+        .payout-card.pending { background: #fff8ee; }
+        .payout-card.lost { background: #fdecea; }
+        .payout-value { font-size: 20px; font-weight: bold; }
+        .payout-card.earned .payout-value { color: #1a7f4b; }
+        .payout-card.pending .payout-value { color: #c7511f; }
+        .payout-card.lost .payout-value { color: #c0392b; }
+        .payout-label { font-size: 11.5px; color: #666; margin-top: 4px; }
+        .payout-note { font-size: 12px; color: #888; margin: 0; }
 
-        const header = ['Date', 'Product', 'Quantity', 'Amount (₹)', 'Buyer Name', 'Buyer Phone', 'Payment Method', 'Status'];
-        const rows = orders.map(o => {
-            const d = o.createdAt && o.createdAt.toDate ? o.createdAt.toDate().toLocaleDateString('en-IN') : '';
-            return [d, o.productName || '', o.quantity || 1, o.price || 0, o.buyerName || '', o.buyerPhone || '', o.paymentMethod || '', o.status || 'Pending']
-                .map(escapeCsv).join(',');
-        });
+        .kyc-status-box { padding: 12px 14px; border-radius: 8px; font-size: 13.5px; }
+        .kyc-status-box.verified { background: #eafaf1; color: #1a7f4b; }
+        .kyc-status-box.pending { background: #fff8ee; color: #c7511f; }
+        .kyc-status-box.rejected { background: #fdecea; color: #c0392b; margin-bottom: 14px; }
+        .stock-tag { font-size: 11px; font-weight: bold; padding: 2px 8px; border-radius: 10px; margin-left: 6px; vertical-align: middle; }
+        .stock-tag.in { background: #d4edda; color: #1a7f4b; }
+        .stock-tag.out { background: #f8d7da; color: #842029; }
+        .stock-tag.low { background: #fff3cd; color: #8a6800; }
 
-        const csvContent = [header.map(escapeCsv).join(','), ...rows].join('\r\n');
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
+        .low-stock-alert-card { background: #fff8ee; border: 1.5px dashed #fa8900; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; }
+        .low-stock-alert-card h3 { margin: 0 0 8px; font-size: 15px; color: #c7511f; }
+        .low-stock-item { display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0; border-bottom: 1px solid #ffe0a3; }
+        .low-stock-item:last-child { border-bottom: none; }
+        .low-stock-item .warn-count { font-weight: bold; color: #dc3545; }
+        .tab-buttons { display: flex; gap: 5px; margin-bottom: 15px; overflow-x: auto; }
+        .tab-btn { padding: 8px 12px; background: #eee; border: none; font-weight: bold; cursor: pointer; border-radius: 5px; font-size: 12px; white-space: nowrap; }
+        .tab-btn.active { background: #232f3e; color: white; }
 
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `DesiMarket_Sales_Report_${new Date().toISOString().slice(0, 10)}.csv`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-    } catch (error) {
-        console.error("Error generating sales report:", error);
-        showToast("Unable to generate report right now.", 'error');
-    }
-}
+        /* Notification Bell */
+        .bell-wrap { position: relative; cursor: pointer; font-size: 20px; }
+        .notif-badge { position: absolute; top: -6px; right: -8px; background: #ff4d4d; color: white; font-size: 10px; font-weight: bold; border-radius: 50%; width: 17px; height: 17px; display: none; align-items: center; justify-content: center; }
 
-// Pure render function — takes the orders array that order-logic.js's live
-// listener already fetched, and just recomputes/redraws stats from it.
-// NO Firestore query happens here anymore — this is the key read-saving change.
-export function renderAnalyticsFromOrders(orders) {
-    const container = document.getElementById('analyticsContainer');
-    if (!container) return;
+        /* Analytics */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 16px; }
+        .stat-card { background: #f8f9fa; border: 1px solid #eee; border-radius: 8px; padding: 14px 10px; text-align: center; }
+        .stat-value { font-size: 20px; font-weight: bold; color: #232f3e; }
+        .stat-label { font-size: 11.5px; color: #666; margin-top: 3px; }
+        .top-product-box { background: #fff3e0; color: #c7511f; padding: 10px 14px; border-radius: 6px; font-size: 13.5px; margin-bottom: 18px; }
+        .bar-chart { display: flex; flex-direction: column; gap: 10px; }
+        .bar-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+        .bar-label { width: 75px; flex-shrink: 0; color: #444; }
+        .bar-track { flex-grow: 1; background: #eee; border-radius: 4px; height: 12px; overflow: hidden; }
+        .bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+        .bar-Pending { background: #ffc107; }
+        .bar-Accepted { background: #17a2b8; }
+        .bar-Shipped { background: #007bff; }
+        .bar-Delivered { background: #6f42c1; }
+        .bar-Cancelled { background: #dc3545; }
+        .bar-Returned { background: #6c757d; }
+        .bar-count { width: 22px; text-align: right; font-weight: bold; color: #333; }
+    </style>
+</head>
+<body>
 
-    if (!orders || orders.length === 0) {
-        container.innerHTML = `<div class="no-data">No orders yet. Once buyers start ordering, your shop analytics will appear here.</div>`;
-        return;
-    }
-
-    const counts = { Pending: 0, Accepted: 0, Shipped: 0, Delivered: 0, Cancelled: 0, Returned: 0 };
-    let totalRevenue = 0;
-    const productFrequency = {};
-
-    orders.forEach(o => {
-        const status = o.status || 'Pending';
-        if (counts[status] !== undefined) counts[status]++;
-
-        if (status !== 'Cancelled' && status !== 'Returned') {
-            totalRevenue += Number(o.price) || 0;
-        }
-
-        const pname = o.productName || 'Unknown';
-        productFrequency[pname] = (productFrequency[pname] || 0) + (Number(o.quantity) || 1);
-    });
-
-    const totalOrders = orders.length;
-    const fulfillmentRate = totalOrders > 0 ? ((counts.Delivered / totalOrders) * 100).toFixed(0) : 0;
-    const cancellationRate = totalOrders > 0 ? ((counts.Cancelled / totalOrders) * 100).toFixed(0) : 0;
-    const topProductEntry = Object.entries(productFrequency).sort((a, b) => b[1] - a[1])[0];
-    const topProduct = topProductEntry ? `${escapeHtml(topProductEntry[0])} (${topProductEntry[1]} sold)` : 'N/A';
-
-    const maxCount = Math.max(...Object.values(counts), 1);
-
-    container.innerHTML = `
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-value">₹${totalRevenue.toFixed(0)}</div>
-                <div class="stat-label">Total Revenue</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">${totalOrders}</div>
-                <div class="stat-label">Total Orders</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">${counts.Pending}</div>
-                <div class="stat-label">Pending Right Now</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" style="color:#28a745;">${fulfillmentRate}%</div>
-                <div class="stat-label">Fulfillment Rate</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" style="color:${cancellationRate > 15 ? '#dc3545' : '#232f3e'};">${cancellationRate}%</div>
-                <div class="stat-label">Cancellation Rate</div>
-            </div>
+    <header>
+        <div style="display:flex; align-items:center; gap:12px;">
+            <a href="index.html" style="color:white; font-size:20px; text-decoration:none; line-height:1;" title="Back to Home">⬅️</a>
+            <div class="header-title">Seller Hub & Dashboard</div>
         </div>
-
-        <div class="top-product-box">🏆 Best Selling Product: <strong>${topProduct}</strong></div>
-
-        <div class="bar-chart">
-            ${['Pending', 'Accepted', 'Shipped', 'Delivered', 'Cancelled', 'Returned'].map(status => `
-                <div class="bar-row">
-                    <span class="bar-label">${status}</span>
-                    <div class="bar-track">
-                        <div class="bar-fill bar-${status}" style="width:${(counts[status] / maxCount * 100).toFixed(0)}%"></div>
-                    </div>
-                    <span class="bar-count">${counts[status]}</span>
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <div id="notifBellMount" title="Notifications"></div>
+            <div class="dots-menu-wrap" style="position:relative;">
+                <div onclick="toggleDotsMenu()" style="cursor:pointer; font-size:22px; color:white; line-height:1; padding:2px 4px;">⋮</div>
+                <div id="dotsMenuPanel" class="dots-menu-panel">
+                    <a onclick="showDashboardSection('shopProfileSection')">👤 Shop Profile</a>
+                    <a onclick="showDashboardSection('addProductSection')">📦 Add New Product</a>
+                    <a onclick="showDashboardSection('productsSection')">📋 My Listed Products</a>
+                    <a onclick="showDashboardSection('bulkUploadSection')">📤 Bulk Upload</a>
+                    <a onclick="showDashboardSection('analyticsSection')">📊 Shop Analytics</a>
+                    <a onclick="showDashboardSection('couponsSection')">🎟️ Discount Coupons</a>
+                    <a onclick="showDashboardSection('payoutSection')">💰 Earnings Summary</a>
+                    <a onclick="showDashboardSection('kycSection')">🪪 KYC Verification</a>
                 </div>
-            `).join('')}
+            </div>
+            <button onclick="logoutSeller()" style="background:#dc3545; color:white; border:none; padding:6px 10px; border-radius:4px; cursor:pointer; font-weight:bold;">Logout</button>
         </div>
-    `;
-}
+    </header>
+
+    <div class="container">
+        <button id="backToDashboardBtn" onclick="backToDashboard()" style="display:none; background:#232f3e; color:white; border:none; padding:10px 16px; border-radius:6px; font-size:13.5px; font-weight:bold; cursor:pointer; margin-bottom:16px;">⬅️ Back to Dashboard</button>
+
+        <!-- 1. Shop Profile Section -->
+        <div class="card dash-hidden-section" id="shopProfileSection">
+            <h2>1. Seller / Shop Profile</h2>
+            <div id="sellerIdDisplay" style="background: #e9ecef; padding: 10px; border-radius: 5px; margin-bottom: 15px; font-weight: bold; color: #333; border: 1px dashed #232f3e; font-size: 14px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                <span id="sellerIdText">Unique Seller ID: Loading...</span>
+                <button onclick="copySellerId()" style="background:#232f3e; color:white; border:none; padding:6px 10px; border-radius:5px; font-size:12px; cursor:pointer; white-space:nowrap;">📋 Copy</button>
+            </div>
+            <div id="premiumStatusBox" style="padding: 10px; border-radius: 5px; margin-bottom: 15px; font-size: 13px; display:none;"></div>
+            <div id="profileMsg" class="success-msg">Profile Saved Successfully!</div>
+
+            <div id="profileDisplay" style="display: none;">
+                <div class="profile-banner">
+                    <div class="profile-banner-bg"></div>
+                    <img id="dispLogo" src="" alt="Shop Logo" class="profile-logo" onclick="viewLogoFullscreen()" title="Tap to view full size">
+                    <h3 id="dispShopName" class="profile-shop-name"></h3>
+                    <p class="profile-owner-line">👤 <span id="dispOwnerName"></span></p>
+                    <div class="profile-badges">
+                        <span class="profile-badge" id="dispFollowerCount">👥 0 Followers</span>
+                    </div>
+                </div>
+                <div class="profile-info-grid">
+                    <div class="profile-info-item"><span class="pii-label">📞 Phone</span><span class="pii-value" id="dispPhone"></span></div>
+                    <div class="profile-info-item"><span class="pii-label">📍 City / Area</span><span class="pii-value" id="dispCity"></span></div>
+                    <div class="profile-info-item full-width"><span class="pii-label">🏠 Address</span><span class="pii-value" id="dispAddress"></span></div>
+                    <div class="profile-info-item full-width"><span class="pii-label">🚚 Delivers to Villages</span><span class="pii-value" id="dispVillages"></span></div>
+                </div>
+                <div class="btn-group-profile">
+                    <button class="btn-edit" onclick="enableEditMode()">✏️ Edit Profile</button>
+                    <button class="btn-view" onclick="viewMyShopPage()">🏪 View My Shop Page</button>
+                </div>
+            </div>
+
+            <div id="profileForm" class="form-grid" style="margin-top: 15px;">
+                <input type="text" id="shopName" placeholder="Shop Name">
+                <input type="text" id="ownerName" placeholder="Owner Name">
+                <input type="text" id="shopPhone" placeholder="Contact Number">
+                <input type="text" id="shopCity" placeholder="City / Area (e.g. Indore, MG Road) — shown under 'Sellers Near You'">
+                <input type="text" id="shopVillages" placeholder="Villages you deliver to (comma-separated: Rampur, Shivpur, Ganeshpur)" class="full-width">
+                <input type="text" id="shopUpiId" placeholder="UPI ID (e.g. yourname@okhdfcbank)">
+                <div class="file-upload-box">
+                    <label>Shop Logo:</label>
+                    <div class="img-upload-row">
+                        <input type="url" id="shopLogoFile" placeholder="https://i.postimg.cc/... or upload →">
+                        <label class="upload-btn">📤<input type="file" id="shopLogoFileUpload" accept="image/*" hidden></label>
+                    </div>
+                    <span class="upload-status" id="shopLogoStatus"></span>
+                </div>
+                <textarea id="shopAddress" placeholder="Complete Shop Address" class="full-width" rows="2"></textarea>
+                <div class="full-width">
+                    <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">📍 Shop Location (optional — helps buyers find you on the map)</label>
+                    <button type="button" onclick="window.useMyLocationForShop()" class="action-btn" style="margin-bottom:8px;">📍 Use My Current Location</button>
+                    <div id="shopLocationMap" style="height:220px; border-radius:8px; overflow:hidden; margin-bottom:8px;"></div>
+                    <p id="shopLocationStatus" style="font-size:12px; color:#666; margin:0 0 8px;">Tap on the map, or drag the pin, to set your shop's exact location.</p>
+                </div>
+                <button onclick="saveSellerProfileMain()" class="action-btn full-width">Save Shop Profile</button>
+            </div>
+        </div>
+
+        <!-- 2. Add New Product Section -->
+        <div class="card dash-hidden-section" id="addProductSection">
+            <h2>2. Add New Product</h2>
+            <div class="form-grid">
+                <input type="text" id="pName" placeholder="Product Name">
+                <input type="number" id="pPrice" placeholder="Price per unit (₹)">
+                <select id="pCategory">
+                    <option value="">Select Category</option>
+                    <option value="grocery">🛒 Grocery</option>
+                    <option value="vegetables">🥦 Vegetables & Fruits</option>
+                    <option value="clothing">👕 Clothing</option>
+                    <option value="electronics">🔌 Electronics</option>
+                    <option value="home">🏠 Home & Kitchen</option>
+                    <option value="beauty">💄 Beauty & Personal Care</option>
+                    <option value="other">📦 Other</option>
+                </select>
+                <select id="pUnit">
+                    <option value="Per Piece">Per Piece</option>
+                    <option value="Per Kg">Per Kg</option>
+                    <option value="Per 250g">Per 250g</option>
+                    <option value="Per Litre">Per Litre</option>
+                    <option value="Per Packet">Per Packet</option>
+                    <option value="Per Dozen">Per Dozen</option>
+                </select>
+                <input type="text" id="pMaterial" placeholder="Material (e.g. Cotton)">
+                <input type="text" id="pWarranty" placeholder="Warranty / Validity">
+                <select id="pReturnWindow" title="How many days after delivery can a buyer request a return for this item?">
+                    <option value="7" selected>↩️ Returnable within 7 days</option>
+                    <option value="3">↩️ Returnable within 3 days</option>
+                    <option value="15">↩️ Returnable within 15 days</option>
+                    <option value="0">❌ No returns accepted</option>
+                </select>
+                <input type="number" id="pStock" placeholder="Stock Quantity (e.g. 50)" min="0">
+                <input type="text" id="pSizes" placeholder="Sizes (optional, comma-separated: S,M,L,XL)">
+                <input type="text" id="pColors" placeholder="Colors (optional, comma-separated: Red,Blue,Green)">
+                <button type="button" onclick="window.generateVariantStockGrid('p')" class="action-btn" style="grid-column: 1 / -1;">⚙️ Set stock per size/color (optional)</button>
+                <div id="pVariantStockContainer" style="grid-column: 1 / -1;"></div>
+                <div class="file-upload-box full-width">
+                    <label>Product Photos (up to 4):</label>
+                    <div class="img-upload-row">
+                        <input type="url" id="pImageFile" placeholder="Main photo URL, or upload →">
+                        <label class="upload-btn">📤<input type="file" id="pImageFileUpload" accept="image/*" hidden></label>
+                    </div>
+                    <span class="upload-status" id="pImageStatus"></span>
+                    <div class="img-upload-row" style="margin-top:8px;">
+                        <input type="url" id="pImageFile2" placeholder="Photo 2 (optional)">
+                        <label class="upload-btn">📤<input type="file" id="pImageFile2Upload" accept="image/*" hidden></label>
+                    </div>
+                    <span class="upload-status" id="pImage2Status"></span>
+                    <div class="img-upload-row" style="margin-top:8px;">
+                        <input type="url" id="pImageFile3" placeholder="Photo 3 (optional)">
+                        <label class="upload-btn">📤<input type="file" id="pImageFile3Upload" accept="image/*" hidden></label>
+                    </div>
+                    <span class="upload-status" id="pImage3Status"></span>
+                    <div class="img-upload-row" style="margin-top:8px;">
+                        <input type="url" id="pImageFile4" placeholder="Photo 4 (optional)">
+                        <label class="upload-btn">📤<input type="file" id="pImageFile4Upload" accept="image/*" hidden></label>
+                    </div>
+                    <span class="upload-status" id="pImage4Status"></span>
+                </div>
+                <textarea id="pDesc" placeholder="Full Details Description" class="full-width" rows="3"></textarea>
+                <button onclick="addProductMain()" class="action-btn full-width">List Product on Market</button>
+            </div>
+        </div>
+
+        <!-- 2b. Bulk Upload via CSV -->
+        <div class="card dash-hidden-section" id="bulkUploadSection">
+            <h2>2b. 📑 Bulk Upload Products (CSV)</h2>
+            <p style="font-size:13px; color:#666; margin-top:0;">
+                Upload many products at once using a CSV file. Columns required (in this exact order):<br>
+                <code style="background:#f0f2f2; padding:2px 6px; border-radius:4px;">name,price,unit,stock,material,warranty,image,description,category</code>
+            </p>
+            <input type="file" id="csvFileInput" accept=".csv" style="margin-bottom:10px;">
+            <button onclick="bulkUploadMain()" class="action-btn">⬆️ Upload CSV</button>
+            <div id="bulkUploadStatus" style="margin-top:10px; font-size:13px;"></div>
+        </div>
+
+        <!-- 3. Customer Orders Management Section -->
+        <div class="card" id="ordersSection">
+            <h2>3. Customer Orders Management</h2>
+            <div class="tab-buttons">
+                <button class="tab-btn active" onclick="filterOrdersMain('Pending')" id="tabPending">⏳ Pending</button>
+                <button class="tab-btn" onclick="filterOrdersMain('Accepted')" id="tabAccepted">✅ Accepted</button>
+                <button class="tab-btn" onclick="filterOrdersMain('Shipped')" id="tabShipped">🚚 Shipped</button>
+                <button class="tab-btn" onclick="filterOrdersMain('Delivered')" id="tabDelivered">✅ Delivered</button>
+                <button class="tab-btn" onclick="filterOrdersMain('Cancelled')" id="tabCancelled">❌ Cancelled</button>
+                <button class="tab-btn" onclick="filterOrdersMain('Returned')" id="tabReturned">↩️ Returned</button>
+            </div>
+            <div id="dashboardOrdersContainer"><p>Loading database orders...</p></div>
+        </div>
+
+        <!-- Low Stock Alerts -->
+        <div class="low-stock-alert-card" id="lowStockAlertCard" style="display:none;">
+            <h3>⚠️ Low Stock Alerts</h3>
+            <div id="lowStockList"></div>
+        </div>
+
+        <!-- 4. My Listed Products Hub -->
+        <div class="card dash-hidden-section" id="productsSection">
+            <h2>4. My Listed Products Hub (Manage Your Inventory)</h2>
+            <div id="myProductsContainer"><p>Loading your listed products...</p></div>
+        </div>
+
+        <!-- 5. Shop Analytics -->
+        <div class="card dash-hidden-section" id="analyticsSection">
+            <h2>5. 📊 Shop Analytics</h2>
+            <button onclick="downloadReportMain()" class="action-btn" style="width:auto; padding:8px 16px; margin-bottom:14px; font-size:13px;">⬇️ Download Sales Report (CSV)</button>
+            <div id="analyticsContainer"><p>Loading analytics...</p></div>
+        </div>
+
+        <!-- 6. Discount Coupons -->
+        <div class="card dash-hidden-section" id="couponsSection">
+            <h2>6. 🎟️ Discount Coupons</h2>
+            <div class="form-grid" style="margin-bottom:16px;">
+                <input type="text" id="couponCode" placeholder="Coupon Code (e.g. SAVE20)" style="text-transform:uppercase;">
+                <select id="couponType">
+                    <option value="percent">Percentage Off (%)</option>
+                    <option value="flat">Flat Amount Off (₹)</option>
+                </select>
+                <input type="number" id="couponValue" placeholder="Discount value" min="1">
+                <input type="date" id="couponExpiry" title="Expiry date (optional — leave blank for no expiry)">
+                <input type="number" id="couponUsageLimit" placeholder="Usage limit (blank = unlimited)" min="1">
+                <button onclick="addCouponMain()" class="action-btn">➕ Create Coupon</button>
+            </div>
+            <div id="couponsContainer"><p>Loading coupons...</p></div>
+        </div>
+
+        <!-- 7. Return / Refund Requests -->
+        <div class="card" id="returnsSection">
+            <h2>7. ↩️ Return / Refund Requests</h2>
+            <div id="returnsContainer"><p>Loading return requests...</p></div>
+        </div>
+
+        <!-- 8. Earnings / Payout Summary -->
+        <div class="card dash-hidden-section" id="payoutSection">
+            <h2>8. 💰 Earnings Summary</h2>
+            <div id="payoutContainer"><p>Loading earnings...</p></div>
+        </div>
+
+        <!-- 9. Seller Verification (KYC) -->
+        <div class="card dash-hidden-section" id="kycSection">
+            <h2>9. 🪪 Seller Verification (KYC)</h2>
+            <div id="kycContainer"><p>Loading verification status...</p></div>
+        </div>
+
+        <!-- 10. Customer Questions -->
+        <div class="card" id="questionsSection">
+            <h2>10. 💬 Customer Questions</h2>
+            <div id="qaSellerContainer"><p>Loading questions...</p></div>
+        </div>
+    </div>
+
+    <!-- Full-screen logo viewer -->
+    <div class="modal-overlay" id="logoViewerModal" onclick="closeLogoViewer()" style="align-items:center; background:rgba(0,0,0,0.85);">
+        <img id="logoViewerImg" src="" alt="Shop Logo" style="max-width:90vw; max-height:85vh; border-radius:8px; object-fit:contain;">
+    </div>
+
+    <!-- Edit Product modal -->
+    <div class="modal-overlay" id="editProductModal">
+        <div class="modal-box">
+            <span class="modal-close" onclick="closeEditProductModal()">&times;</span>
+            <h3>✏️ Edit Product</h3>
+            <p class="modal-sub" style="font-size:12.5px; color:#767676;">Update any details — name, category, price, stock, photos, and more.</p>
+            <div class="form-grid">
+                <input type="hidden" id="epId">
+                <input type="text" id="epName" placeholder="Product Name">
+                <input type="number" id="epPrice" placeholder="Price per unit (₹)">
+                <select id="epCategory">
+                    <option value="">Select Category</option>
+                    <option value="grocery">🛒 Grocery</option>
+                    <option value="vegetables">🥦 Vegetables & Fruits</option>
+                    <option value="clothing">👕 Clothing</option>
+                    <option value="electronics">🔌 Electronics</option>
+                    <option value="home">🏠 Home & Kitchen</option>
+                    <option value="beauty">💄 Beauty & Personal Care</option>
+                    <option value="other">📦 Other</option>
+                </select>
+                <select id="epUnit">
+                    <option value="Per Piece">Per Piece</option>
+                    <option value="Per Kg">Per Kg</option>
+                    <option value="Per 250g">Per 250g</option>
+                    <option value="Per Litre">Per Litre</option>
+                    <option value="Per Packet">Per Packet</option>
+                    <option value="Per Dozen">Per Dozen</option>
+                </select>
+                <input type="text" id="epMaterial" placeholder="Material (e.g. Cotton)">
+                <input type="text" id="epWarranty" placeholder="Warranty / Validity">
+                <select id="epReturnWindow" title="How many days after delivery can a buyer request a return for this item?">
+                    <option value="7">↩️ Returnable within 7 days</option>
+                    <option value="3">↩️ Returnable within 3 days</option>
+                    <option value="15">↩️ Returnable within 15 days</option>
+                    <option value="0">❌ No returns accepted</option>
+                </select>
+                <input type="number" id="epStock" placeholder="Stock Quantity" min="0">
+                <input type="text" id="epSizes" placeholder="Sizes (comma-separated: S,M,L,XL)">
+                <input type="text" id="epColors" placeholder="Colors (comma-separated: Red,Blue,Green)">
+                <button type="button" onclick="window.generateVariantStockGrid('ep')" class="action-btn" style="grid-column: 1 / -1;">⚙️ Set stock per size/color (optional)</button>
+                <div id="epVariantStockContainer" style="grid-column: 1 / -1;"></div>
+                <div class="file-upload-box full-width">
+                    <label>Product Photos (up to 4):</label>
+                    <div class="img-upload-row">
+                        <input type="url" id="epImageFile" placeholder="Main photo URL">
+                        <label class="upload-btn">📤<input type="file" id="epImageFileUpload" accept="image/*" hidden></label>
+                    </div>
+                    <span class="upload-status" id="epImageStatus"></span>
+                    <div class="img-upload-row" style="margin-top:8px;">
+                        <input type="url" id="epImageFile2" placeholder="Photo 2 (optional)">
+                        <label class="upload-btn">📤<input type="file" id="epImageFile2Upload" accept="image/*" hidden></label>
+                    </div>
+                    <span class="upload-status" id="epImage2Status"></span>
+                    <div class="img-upload-row" style="margin-top:8px;">
+                        <input type="url" id="epImageFile3" placeholder="Photo 3 (optional)">
+                        <label class="upload-btn">📤<input type="file" id="epImageFile3Upload" accept="image/*" hidden></label>
+                    </div>
+                    <span class="upload-status" id="epImage3Status"></span>
+                    <div class="img-upload-row" style="margin-top:8px;">
+                        <input type="url" id="epImageFile4" placeholder="Photo 4 (optional)">
+                        <label class="upload-btn">📤<input type="file" id="epImageFile4Upload" accept="image/*" hidden></label>
+                    </div>
+                    <span class="upload-status" id="epImage4Status"></span>
+                </div>
+                <textarea id="epDesc" placeholder="Full Details Description" class="full-width" rows="3"></textarea>
+                <button onclick="saveProductEditsMain()" class="action-btn full-width">💾 Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="reportBuyerModal">
+        <div class="modal-box">
+            <span class="modal-close" onclick="window.closeReportBuyerModal()">&times;</span>
+            <h3>🚩 Report Buyer</h3>
+            <p class="modal-sub" style="font-size:12.5px; color:#767676;">Reporting <strong id="reportBuyerNameDisplay"></strong>. This goes to DesiMarket admins for review.</p>
+            <select id="reportBuyerReason" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px; margin-bottom:10px;">
+                <option value="">Select a reason</option>
+                <option value="Refused to pay / fake COD order">Refused to pay / fake COD order</option>
+                <option value="Abusive or threatening behaviour">Abusive or threatening behaviour</option>
+                <option value="False claim about the order">False claim about the order (e.g. "never delivered")</option>
+                <option value="Other">Other</option>
+            </select>
+            <textarea id="reportBuyerDetails" rows="3" placeholder="Additional details (optional)" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px; margin-bottom:10px; box-sizing:border-box;"></textarea>
+            <button class="action-btn full-width" onclick="window.submitReportBuyerMain()">Submit Report</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="deliveryOptionsModal">
+        <div class="modal-box">
+            <span class="modal-close" onclick="window.closeDeliveryOptions()">&times;</span>
+            <h3>🚚 Get Delivery Help</h3>
+            <p class="modal-sub" style="font-size:12.5px; color:#767676;">Post this order for any delivery partner nearby to pick up, or assign it directly to someone specific.</p>
+            <input type="hidden" id="deliveryOrderId">
+            <button class="action-btn full-width" style="margin-bottom:14px;" onclick="window.postToJobBoardMain()">📋 Post to Job Board (anyone nearby can claim it)</button>
+            <div style="display:flex; gap:8px; margin-bottom:8px;">
+                <h4 style="font-size:13.5px; margin:0; flex:1;">Or assign directly:</h4>
+                <button type="button" style="font-size:12px; background:none; border:none; color:#007185; font-weight:600; cursor:pointer;" onclick="window.showAllDeliveryBoysMain()">🌐 Browse all live partners</button>
+            </div>
+            <div id="deliveryBoysListContainer"><p style="font-size:13px; color:#888;">Loading available delivery partners...</p></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { auth, db } from './firebase-config.js';
+        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { loadSellerProfileFromFirestore, saveSellerProfile, useMyLocationForShop, refreshShopLocationMap } from './profile-logic.js';
+        import { addProductToFirebase, fetchMyListedProducts, saveProductEdits, closeEditProductModal, deleteProduct, stopListeningToMyProducts, generateVariantStockGrid } from './product-logic.js';
+        import { fetchDashboardOrders, filterOrders, updateOrderStatus, markAsShipped, confirmDelivery, stopListeningToOrders, getCurrentOrders } from './order-logic.js';
+        import { renderAnalyticsFromOrders, downloadSalesReport } from './analytics-logic.js';
+        import { bulkUploadProducts } from './bulk-upload-logic.js';
+        import { mountNotificationBell } from './notif-logic.js';
+        import { escapeHtml } from './sanitize.js';
+        import { wireImageUpload } from './image-upload.js';
+        import { addCoupon, loadMyCoupons, toggleCouponActive, deleteCoupon } from './coupon-logic.js';
+        import { loadReturnRequests, updateReturnStatus } from './return-logic.js';
+        import { loadPayoutSummary } from './payout-logic.js';
+        import { loadKycStatus } from './kyc-logic.js';
+        import { isPremiumSeller } from './premium-logic.js';
+        import { loadSellerQuestions, submitAnswer } from './qa-logic.js';
+        import { getFollowerCount } from './follow-logic.js';
+        import { showToast } from './toast.js';
+        import { findAvailableDeliveryBoys, postOrderToJobBoard, assignOrderToDeliveryBoy, cancelDeliveryRequest, loadAllAvailableDeliveryPartners } from './delivery-logic.js';
+        import { submitReport } from './report-logic.js';
+
+        wireImageUpload('shopLogoFileUpload', 'shopLogoFile', 'shopLogoStatus');
+        wireImageUpload('pImageFileUpload', 'pImageFile', 'pImageStatus');
+        wireImageUpload('pImageFile2Upload', 'pImageFile2', 'pImage2Status');
+        wireImageUpload('pImageFile3Upload', 'pImageFile3', 'pImage3Status');
+        wireImageUpload('pImageFile4Upload', 'pImageFile4', 'pImage4Status');
+        wireImageUpload('epImageFileUpload', 'epImageFile', 'epImageStatus');
+        wireImageUpload('epImageFile2Upload', 'epImageFile2', 'epImage2Status');
+        wireImageUpload('epImageFile3Upload', 'epImageFile3', 'epImage3Status');
+        wireImageUpload('epImageFile4Upload', 'epImageFile4', 'epImage4Status');
+
+        let currentLoggedInUser = null;
+
+        window.toggleDotsMenu = function() {
+            document.getElementById('dotsMenuPanel').classList.toggle('active');
+        };
+        document.addEventListener('click', (e) => {
+            const wrap = document.querySelector('.dots-menu-wrap');
+            if (wrap && !wrap.contains(e.target)) {
+                document.getElementById('dotsMenuPanel').classList.remove('active');
+            }
+        });
+
+        const ALL_SECONDARY_SECTION_IDS = ['shopProfileSection', 'addProductSection', 'bulkUploadSection', 'productsSection', 'analyticsSection', 'couponsSection', 'payoutSection', 'kycSection'];
+        const PRIMARY_SECTION_IDS = ['ordersSection', 'returnsSection', 'questionsSection'];
+
+        // Selecting an item from "⋮" now SWAPS the view entirely — hides the
+        // always-visible Orders/Returns/Questions too, shows only the picked
+        // section plus a "Back to Dashboard" button — instead of the old
+        // behaviour of just appending it below everything else, which felt
+        // cluttered since it landed in the middle of already-visible content.
+        window.showDashboardSection = function(sectionId) {
+            document.getElementById('dotsMenuPanel').classList.remove('active');
+            ALL_SECONDARY_SECTION_IDS.forEach(id => {
+                document.getElementById(id)?.classList.toggle('dash-hidden-section', id !== sectionId);
+            });
+            PRIMARY_SECTION_IDS.forEach(id => {
+                document.getElementById(id)?.classList.add('dash-hidden-section');
+            });
+            document.getElementById('backToDashboardBtn').style.display = 'block';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            if (currentDashboardUid) {
+                const module = buildSecondaryModules(currentDashboardUid).find(m => m[1] === sectionId);
+                if (module) loadDashboardModule(module[0], module[1], module[2]);
+            }
+        };
+
+        window.backToDashboard = function() {
+            ALL_SECONDARY_SECTION_IDS.forEach(id => {
+                document.getElementById(id)?.classList.add('dash-hidden-section');
+            });
+            PRIMARY_SECTION_IDS.forEach(id => {
+                document.getElementById(id)?.classList.remove('dash-hidden-section');
+            });
+            document.getElementById('backToDashboardBtn').style.display = 'none';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        function renderLowStockAlerts(lowStockList) {
+            const card = document.getElementById('lowStockAlertCard');
+            const listEl = document.getElementById('lowStockList');
+
+            if (!lowStockList || lowStockList.length === 0) {
+                card.style.display = 'none';
+                return;
+            }
+
+            card.style.display = 'block';
+            listEl.innerHTML = lowStockList.map(p => `
+                <div class="low-stock-item">
+                    <span>${escapeHtml(p.name)}</span>
+                    <span class="warn-count">${p.stock <= 0 ? 'Out of Stock' : p.stock + ' left'}</span>
+                </div>
+            `).join('');
+        }
+
+        window.logoutSeller = async function() {
+            await signOut(auth);
+            window.location.href = "login.html";
+        }
+
+        let unsubscribeNotifBell = null;
+        let dashboardObserver = null;
+        const loadedDashboardModules = new Set();
+
+        // Lazy-load each dashboard section's data only once that section
+        // actually scrolls into view, instead of firing all 7 Firestore
+        // queries the instant a seller logs in. Keeps the first paint fast
+        // and avoids a burst of reads for sections the seller may never
+        // scroll down to in that visit.
+        let currentDashboardUid = null;
+
+        // Sections visible by default (Orders/Returns/Questions) load their
+        // data automatically via IntersectionObserver, same as before.
+        function buildPrimaryModules(uid) {
+            return [
+                ['orders', 'ordersSection', () => fetchDashboardOrders(db, uid, renderAnalyticsFromOrders)],
+                ['returns', 'returnsSection', () => loadReturnRequests(db, uid)],
+                ['questions', 'questionsSection', () => loadSellerQuestions(db, uid)],
+            ];
+        }
+
+        // Sections tucked away in the "⋮" menu only load their data once the
+        // seller actually opens them from that menu — see showDashboardSection().
+        function buildSecondaryModules(uid) {
+            return [
+                ['products', 'productsSection', () => fetchMyListedProducts(db, uid, renderLowStockAlerts)],
+                ['coupons', 'couponsSection', () => loadMyCoupons(db, uid)],
+                ['payouts', 'payoutSection', () => loadPayoutSummary(db, uid)],
+                ['kyc', 'kycSection', () => loadKycStatus(db, uid)],
+                // Analytics has no Firestore query of its own — it's rendered
+                // from the same order data the (auto-loaded) Orders module
+                // already fetched. Orders is a PRIMARY section, so by the
+                // time a seller opens Analytics from the "⋮" menu, Orders has
+                // almost always already loaded — calling
+                // loadDashboardModule('orders', ...) again in that case used
+                // to be a silent no-op (it's guarded against loading twice),
+                // which left this section stuck showing "Loading..." forever
+                // with nothing left to ever call renderAnalyticsFromOrders()
+                // again. Rendering directly from the data Orders already has
+                // avoids that trap entirely.
+                ['analytics', 'analyticsSection', () => {
+                    if (loadedDashboardModules.has('orders')) {
+                        renderAnalyticsFromOrders(getCurrentOrders());
+                    } else {
+                        fetchDashboardOrders(db, uid, renderAnalyticsFromOrders);
+                    }
+                }],
+            ];
+        }
+
+        function loadDashboardModule(name, sectionId, task) {
+            if (loadedDashboardModules.has(name)) return;
+            loadedDashboardModules.add(name);
+            const section = document.getElementById(sectionId);
+            const target = section?.querySelector('[id$="Container"]');
+            if (target && !target.dataset.loaded) target.innerHTML = '<p class="module-loading">Loading...</p>';
+            Promise.resolve().then(task).catch((error) => {
+                loadedDashboardModules.delete(name);
+                if (target) target.innerHTML = '<p class="module-error">This section could not be loaded. Please try again.</p>';
+                console.error(`Dashboard module ${name} failed`, error);
+            });
+        }
+
+        function initializeSellerDashboardModules(uid) {
+            const modules = buildPrimaryModules(uid);
+            dashboardObserver = new IntersectionObserver((entries) => {
+                entries.filter((entry) => entry.isIntersecting).forEach((entry) => {
+                    const module = modules.find((item) => item[1] === entry.target.id);
+                    if (module) loadDashboardModule(module[0], module[1], module[2]);
+                });
+            }, { rootMargin: '240px 0px' }); // start loading a bit before the section is actually on-screen, so it feels instant
+            modules.forEach((module) => dashboardObserver.observe(document.getElementById(module[1])));
+        }
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                // Safety check: if an admin has blocked this seller, kick them out
+                const { doc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
+                const userSnap = await getDoc(doc(db, "users", user.uid));
+                if (userSnap.exists() && userSnap.data().blocked === true) {
+                    showToast("Your seller account has been suspended by DesiMarket admin.", 'error');
+                    await signOut(auth);
+                    window.location.href = "login.html";
+                    return;
+                }
+
+                currentLoggedInUser = user;
+                currentDashboardUid = user.uid;
+                document.getElementById('sellerIdText').innerText = "Unique Seller ID: " + user.uid;
+
+                isPremiumSeller(db, user.uid).then(premium => {
+                    const box = document.getElementById('premiumStatusBox');
+                    box.style.display = 'block';
+                    if (premium) {
+                        box.style.background = 'linear-gradient(135deg,#fff3d6,#ffe4a3)';
+                        box.style.color = '#8a6800';
+                        box.innerHTML = '🌟 <strong>Premium Seller</strong> — unlimited products, coupons, photos & bulk upload unlocked!';
+                    } else {
+                        box.style.background = '#f0f2f2';
+                        box.style.color = '#555';
+                        box.innerHTML = '🆓 <strong>Free Plan</strong> — up to 30 products, 1 photo/product, 1 active coupon. Contact us to upgrade to Premium!';
+                    }
+                });
+
+                await loadSellerProfileFromFirestore(db, user.uid);
+                getFollowerCount(db, user.uid).then(count => {
+                    const el = document.getElementById('dispFollowerCount');
+                    if (el) el.innerText = `👥 ${count} Follower${count === 1 ? '' : 's'}`;
+                });
+
+                // Persisted notification bell — covers new orders, new customer
+                // questions, and order/return status updates, all in one place
+                // now (previously there were two separate bells here).
+                unsubscribeNotifBell = mountNotificationBell(db, user.uid, 'notifBellMount');
+
+                // Keep the free-tier dashboard light: stagger reads so the first render stays fast and
+                // the browser does not make a burst of Firestore reads when a seller logs in.
+                if (!dashboardObserver) initializeSellerDashboardModules(user.uid);
+            } else {
+                window.location.href = "login.html";
+            }
+        });
+
+        window.enableEditMode = function() {
+            document.getElementById('profileDisplay').style.display = 'none';
+            document.getElementById('profileForm').style.display = 'grid';
+            refreshShopLocationMap();
+        }
+
+        window.useMyLocationForShop = useMyLocationForShop;
+
+        window.copySellerId = function() {
+            if (!currentLoggedInUser) return;
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(currentLoggedInUser.uid)
+                    .then(() => showToast('Shop ID copied to clipboard! 📋'))
+                    .catch(() => showToast('Your Shop ID: ' + currentLoggedInUser.uid));
+            } else {
+                showToast('Your Shop ID: ' + currentLoggedInUser.uid);
+            }
+        }
+
+        window.viewMyShopPage = function() {
+            if (currentLoggedInUser) {
+                window.open(`shop.html?id=${currentLoggedInUser.uid}`, '_blank');
+            }
+        }
+
+        window.viewLogoFullscreen = function() {
+            const logoSrc = document.getElementById('dispLogo').src;
+            if (!logoSrc) return;
+            document.getElementById('logoViewerImg').src = logoSrc;
+            document.getElementById('logoViewerModal').classList.add('active');
+        }
+
+        window.closeLogoViewer = function() {
+            document.getElementById('logoViewerModal').classList.remove('active');
+        }
+
+        window.saveSellerProfileMain = function() {
+            saveSellerProfile(db, currentLoggedInUser, (uid) => loadSellerProfileFromFirestore(db, uid));
+        }
+
+        window.addProductMain = function() {
+            addProductToFirebase(db, currentLoggedInUser, (uid) => fetchMyListedProducts(db, uid));
+        }
+
+        window.filterOrdersMain = function(status) {
+            filterOrders(status);
+        }
+
+        window.saveProductEditsMain = function() {
+            if (currentLoggedInUser) {
+                saveProductEdits(db, currentLoggedInUser.uid, (uid) => fetchMyListedProducts(db, uid));
+            }
+        }
+
+        window.closeEditProductModal = closeEditProductModal;
+
+        window.deleteProduct = function(productId) {
+            if(currentLoggedInUser) {
+                deleteProduct(db, productId, currentLoggedInUser.uid, (uid) => fetchMyListedProducts(db, uid));
+            }
+        }
+
+        window.updateOrderStatus = function(orderId, newStatus) {
+            if(currentLoggedInUser) {
+                updateOrderStatus(db, orderId, newStatus);
+            }
+        }
+
+        window.markShippedMain = function(orderId) {
+            if(currentLoggedInUser) {
+                markAsShipped(db, orderId);
+            }
+        }
+
+        window.confirmDeliveryMain = function(orderId) {
+            if(currentLoggedInUser) {
+                confirmDelivery(db, orderId);
+            }
+        }
+
+        // ---------- Delivery-partner matching (seller side) ----------
+        let currentDeliveryVillage = '';
+
+        function feeLabelMain(feeType, feeAmount) {
+            if (!feeAmount) return 'rate not set';
+            if (feeType === 'per_km') return `₹${feeAmount}/km`;
+            if (feeType === 'per_trip') return `₹${feeAmount}/trip`;
+            return `₹${feeAmount}/order`;
+        }
+
+        function renderDeliveryBoyList(boys) {
+            const listEl = document.getElementById('deliveryBoysListContainer');
+            if (boys.length === 0) {
+                listEl.innerHTML = `<p style="font-size:13px; color:#888;">No available delivery partners found. Try posting to the job board instead.</p>`;
+                return;
+            }
+            listEl.innerHTML = boys.map(b => `
+                <div style="display:flex; align-items:center; justify-content:space-between; padding:10px; border:1px solid #eee; border-radius:8px; margin-bottom:8px;">
+                    <div>
+                        <strong style="font-size:13.5px;">${escapeHtml(b.name)}</strong>
+                        ${b.kycStatus === 'Verified' ? '<span style="font-size:11px; background:#e8f0fe; color:#1a73e8; padding:1px 6px; border-radius:8px; margin-left:4px;">✅ Verified</span>' : ''}
+                        <span style="font-size:11px; background:#eafaf1; color:#1a7f4b; padding:1px 6px; border-radius:8px; margin-left:4px;">${escapeHtml(feeLabelMain(b.feeType, b.feeAmount))}</span><br>
+                        <span style="font-size:12px; color:#666;">📞 ${escapeHtml(b.phone)} · ${escapeHtml(b.vehicleType || 'bike')} · ${escapeHtml((b.villages || []).join(', '))}${typeof b.distanceKm === 'number' ? ` · 📏 ${b.distanceKm.toFixed(1)} km away` : ''}</span>
+                    </div>
+                    <button class="dash-action-btn btn-accept" onclick='window.assignDeliveryBoyMain(${JSON.stringify({ id: b.id, name: b.name, phone: b.phone, vehicleType: b.vehicleType, villages: b.villages, feeType: b.feeType, feeAmount: b.feeAmount }).replace(/'/g, "&#39;")})'>Assign</button>
+                </div>
+            `).join('');
+        }
+
+        window.openDeliveryOptions = async function(orderId, buyerCity) {
+            document.getElementById('deliveryOrderId').value = orderId;
+            currentDeliveryVillage = buyerCity || '';
+            document.getElementById('deliveryOptionsModal').classList.add('active');
+
+            const listEl = document.getElementById('deliveryBoysListContainer');
+            if (!currentDeliveryVillage) {
+                listEl.innerHTML = `<p style="font-size:13px; color:#888;">This order doesn't have a delivery village on file, so nearby delivery partners can't be matched automatically. Try "Browse all live partners" above, or post it to the job board.</p>`;
+                return;
+            }
+            listEl.innerHTML = `<p style="font-size:13px; color:#888;">Loading available delivery partners in ${escapeHtml(currentDeliveryVillage)}...</p>`;
+            try {
+                const boys = await findAvailableDeliveryBoys(db, currentDeliveryVillage);
+                renderDeliveryBoyList(boys);
+            } catch (error) {
+                listEl.innerHTML = `<p style="font-size:13px; color:#c0392b;">⚠️ Unable to load delivery partners: ${escapeHtml(error.message || String(error))}</p>`;
+            }
+        };
+
+        // "Browse all live partners" — every available delivery partner
+        // platform-wide, not filtered to this order's exact destination
+        // village. Useful when the village-text match comes up empty (typos,
+        // slightly different spelling, etc.) or the seller just wants to see
+        // who's around.
+        window.showAllDeliveryBoysMain = async function() {
+            const listEl = document.getElementById('deliveryBoysListContainer');
+            listEl.innerHTML = `<p style="font-size:13px; color:#888;">Loading every available delivery partner...</p>`;
+            try {
+                const boys = await loadAllAvailableDeliveryPartners(db);
+                renderDeliveryBoyList(boys);
+            } catch (error) {
+                listEl.innerHTML = `<p style="font-size:13px; color:#c0392b;">⚠️ Unable to load delivery partners: ${escapeHtml(error.message || String(error))}</p>`;
+            }
+        };
+
+        window.closeDeliveryOptions = function() {
+            document.getElementById('deliveryOptionsModal').classList.remove('active');
+        };
+
+        window.postToJobBoardMain = async function() {
+            const orderId = document.getElementById('deliveryOrderId').value;
+            await postOrderToJobBoard(db, orderId);
+            window.closeDeliveryOptions();
+        };
+
+        window.assignDeliveryBoyMain = async function(deliveryBoy) {
+            const orderId = document.getElementById('deliveryOrderId').value;
+            await assignOrderToDeliveryBoy(db, orderId, deliveryBoy);
+            window.closeDeliveryOptions();
+        };
+
+        window.cancelDeliveryMain = async function(orderId) {
+            if (!confirm("Cancel this delivery request? The order will go back to self-delivery.")) return;
+            await cancelDeliveryRequest(db, orderId);
+        };
+
+        // ---------- Report Buyer ----------
+        let reportingBuyerUid = '', reportingOrderId = '';
+        window.openReportBuyerModal = function(buyerUid, buyerName, orderId) {
+            if (!buyerUid) { showToast("This order has no linked buyer account to report.", 'error'); return; }
+            reportingBuyerUid = buyerUid;
+            reportingOrderId = orderId;
+            document.getElementById('reportBuyerNameDisplay').textContent = buyerName || 'this buyer';
+            document.getElementById('reportBuyerReason').value = '';
+            document.getElementById('reportBuyerDetails').value = '';
+            document.getElementById('reportBuyerModal').classList.add('active');
+        };
+        window.closeReportBuyerModal = function() {
+            document.getElementById('reportBuyerModal').classList.remove('active');
+        };
+        window.submitReportBuyerMain = function() {
+            if (!currentLoggedInUser) return;
+            submitReport(db, {
+                reportType: 'buyer',
+                reportedUid: reportingBuyerUid,
+                reportedName: document.getElementById('reportBuyerNameDisplay').textContent,
+                orderId: reportingOrderId,
+                reporterUid: currentLoggedInUser.uid,
+                reason: document.getElementById('reportBuyerReason').value,
+                details: document.getElementById('reportBuyerDetails').value
+            });
+            window.closeReportBuyerModal();
+        };
+
+        window.generateVariantStockGrid = generateVariantStockGrid;
+
+        window.addCouponMain = function() {
+            if (!currentLoggedInUser) return;
+            const code = document.getElementById('couponCode').value;
+            const type = document.getElementById('couponType').value;
+            const value = document.getElementById('couponValue').value;
+            const expiry = document.getElementById('couponExpiry').value; // '' if left blank
+            const usageLimit = document.getElementById('couponUsageLimit').value;
+            addCoupon(db, currentLoggedInUser.uid, code, type, value, expiry, usageLimit).then(() => {
+                document.getElementById('couponCode').value = '';
+                document.getElementById('couponValue').value = '';
+                document.getElementById('couponExpiry').value = '';
+                document.getElementById('couponUsageLimit').value = '';
+            });
+        }
+
+        window.toggleCouponMain = function(couponId, active) {
+            if (!currentLoggedInUser) return;
+            toggleCouponActive(db, couponId, active);
+        }
+
+        window.deleteCouponMain = function(couponId) {
+            if (!currentLoggedInUser) return;
+            deleteCoupon(db, couponId);
+        }
+
+        window.approveReturnMain = function(orderId) {
+            if (!currentLoggedInUser) return;
+            if (!confirm('Approve this return? The order will be marked as Returned.')) return;
+            updateReturnStatus(db, orderId, 'Approved');
+        }
+
+        window.rejectReturnMain = function(orderId) {
+            if (!currentLoggedInUser) return;
+            updateReturnStatus(db, orderId, 'Rejected');
+        }
+
+        window.downloadReportMain = function() {
+            if (!currentLoggedInUser) return;
+            downloadSalesReport(db, currentLoggedInUser.uid);
+        }
+
+        window.submitAnswerMain = function(questionId) {
+            if (!currentLoggedInUser) return;
+            const answerText = document.getElementById('answerInput-' + questionId).value;
+            submitAnswer(db, questionId, answerText);
+        }
+
+        window.bulkUploadMain = function() {
+            if (!currentLoggedInUser) return;
+            const file = document.getElementById('csvFileInput').files[0];
+            const shopName = document.getElementById('shopName').value.trim() || document.getElementById('dispShopName').innerText.trim();
+            bulkUploadProducts(db, currentLoggedInUser, shopName, file, (uid) => fetchMyListedProducts(db, uid));
+        }
+
+        // Close the live listeners when leaving the page, so they don't
+        // keep consuming Firestore reads in the background.
+        window.addEventListener('pagehide', () => {
+            stopListeningToMyProducts();
+            stopListeningToOrders();
+            if (unsubscribeNotifBell) unsubscribeNotifBell();
+            dashboardObserver?.disconnect();
+            dashboardObserver = null;
+            loadedDashboardModules.clear();
+        });
+    </script>
+</body>
+</html>
