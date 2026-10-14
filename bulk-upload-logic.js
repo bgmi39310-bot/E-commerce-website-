@@ -1,6 +1,5 @@
-import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { isPremiumSeller } from './premium-logic.js';
 import { showToast } from './toast.js';
+import { BACKEND_BASE_URL } from './order-api.js';
 
 // Simple CSV line parser that respects quoted fields containing commas.
 function parseCsvLine(line) {
@@ -29,12 +28,6 @@ export async function bulkUploadProducts(db, currentLoggedInUser, shopName, file
     if (!shopName) { showToast("Please save your Shop Profile first!", 'error'); return; }
     if (!file) { showToast("Please choose a CSV file first.", 'error'); return; }
 
-    const premium = await isPremiumSeller(db, currentLoggedInUser.uid);
-    if (!premium) {
-        showToast("Bulk CSV upload is a Premium feature. Upgrade to Premium to add many products at once!", 'error');
-        return;
-    }
-
     statusEl.innerText = 'Reading file...';
     statusEl.style.color = '#888';
 
@@ -49,43 +42,27 @@ export async function bulkUploadProducts(db, currentLoggedInUser, shopName, file
         }
 
         // Skip header row (line 0), expect: name,price,unit,stock,material,warranty,image,description,category
-        const rows = lines.slice(1);
-        let successCount = 0;
-        let failCount = 0;
+        const rows = lines.slice(1).map(line => {
+            const [name, price, unit, stock, material, warranty, image, description, category] = parseCsvLine(line);
+            return { name, price, unit, stock, material, warranty, image, description, category };
+        });
 
         statusEl.innerText = `Uploading ${rows.length} products...`;
 
-        for (const line of rows) {
-            const cols = parseCsvLine(line);
-            const [name, price, unit, stock, material, warranty, image, description, category] = cols;
+        // The Premium-only gate and the actual writes both happen
+        // server-side now (see backend/routes/products.py) — that gate used
+        // to be a client-side isPremiumSeller() check only, bypassable by
+        // calling the Firestore SDK directly regardless of plan.
+        const idToken = await currentLoggedInUser.getIdToken();
+        const res = await fetch(`${BACKEND_BASE_URL}/api/products/bulk`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+            body: JSON.stringify({ shopName, products: rows })
+        });
+        const result = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(result.error || 'Could not upload products.');
 
-            if (!name || !price) { failCount++; continue; }
-
-            try {
-                await addDoc(collection(db, "vendors"), {
-                    name: name.trim(),
-                    price: Number(price) || 0,
-                    unit: (unit || 'Per Piece').trim(),
-                    stock: stock ? Number(stock) : 10,
-                    material: (material || '100% Original').trim(),
-                    warranty: (warranty || 'Verified Quality').trim(),
-                    image: (image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300').trim(),
-                    images: [(image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300').trim()],
-                    description: (description || `${name} available in best quality.`).trim(),
-                    category: (category || 'other').trim().toLowerCase(),
-                    shopName: shopName,
-                    sellerUid: currentLoggedInUser.uid,
-                    createdAt: new Date(),
-                    updatedAt: serverTimestamp()
-                });
-                successCount++;
-            } catch (err) {
-                console.error('Row failed:', line, err);
-                failCount++;
-            }
-        }
-
-        statusEl.innerText = `✅ Uploaded ${successCount} products successfully.${failCount > 0 ? ` (${failCount} rows skipped due to errors)` : ''}`;
+        statusEl.innerText = `✅ Uploaded ${result.created} products successfully.${result.failed > 0 ? ` (${result.failed} rows skipped due to errors)` : ''}`;
         statusEl.style.color = '#28a745';
         document.getElementById('csvFileInput').value = '';
 
