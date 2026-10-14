@@ -10,8 +10,26 @@ service cloud.firestore {
 
     // ---------- USERS ----------
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      // Only your own profile, or an admin's — this collection holds
+      // name/phone/address for every user, not something any signed-in
+      // stranger should be able to browse.
+      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
+
+      // A non-admin write must leave isAdmin/blocked EXACTLY as they were
+      // (absent stays absent, false stays false, true stays true) — this is
+      // what actually stops someone granting themselves admin by writing
+      // isAdmin:true to their own profile doc, which the old rule allowed
+      // outright (it only checked WHO was writing, never WHAT they wrote).
+      allow create: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.get('isAdmin', false) == false
+        && request.resource.data.get('blocked', false) == false;
+
+      allow update: if request.auth != null && (
+        isAdmin() ||
+        (request.auth.uid == userId
+          && request.resource.data.get('isAdmin', false) == resource.data.get('isAdmin', false)
+          && request.resource.data.get('blocked', false) == resource.data.get('blocked', false))
+      );
       allow delete: if false;
 
       match /addresses/{addressId} {
@@ -33,17 +51,37 @@ service cloud.firestore {
       // marking-as-read, or deleting is restricted to the owner.
       match /notifications/{notifId} {
         allow read, update, delete: if request.auth != null && request.auth.uid == userId;
-        allow create: if request.auth != null;
+        // Creation stays open to any signed-in user (see note above), but
+        // `link` is constrained to a plain local page like "orders.html" or
+        // "chat.html?chatId=xyz" — never a javascript: URL or an external
+        // site — since this is the one field the bell's click handler
+        // navigates the VICTIM's browser to.
+        allow create: if request.auth != null
+          && (!('link' in request.resource.data) || request.resource.data.link == ''
+              || request.resource.data.link.matches('^[a-zA-Z0-9_-]+\\.html([?][^\n]*)?$'));
       }
     }
 
     // ---------- SELLER SHOP PROFILES ----------
     match /sellers_profiles/{sellerId} {
       allow read: if true;
-      allow create: if request.auth != null && (request.auth.uid == sellerId || isAdmin());
+      // A seller may submit KYC (which sets their own kycStatus to
+      // 'Pending' — see kyc-logic.js) but can never set it to 'Verified'
+      // themselves. Without this, the old rule let a seller write
+      // kycStatus:'Verified' directly to their own profile via the
+      // Firestore SDK — a fake trust badge with no actual review, since
+      // the real approval (backend/routes/admin.py's /verify-kyc) only
+      // ever runs through firebase-admin, which bypasses these rules
+      // anyway and is unaffected by this restriction.
+      allow create: if request.auth != null && (request.auth.uid == sellerId || isAdmin())
+        && request.resource.data.get('kycStatus', 'Not Submitted') != 'Verified';
       allow update: if request.auth != null && (
-        request.auth.uid == sellerId ||
         isAdmin() ||
+        (
+          request.auth.uid == sellerId &&
+          (request.resource.data.get('kycStatus', null) == resource.data.get('kycStatus', null) ||
+           request.resource.data.get('kycStatus', null) == 'Pending')
+        ) ||
         // Any logged-in buyer may adjust ONLY the followerCount field (via
         // follow/unfollow) — nothing else on the seller's profile.
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followerCount'])
@@ -74,7 +112,19 @@ service cloud.firestore {
     // delivery partner themselves (or an admin) may create/edit/delete it.
     match /delivery_profiles/{deliveryUid} {
       allow read: if true;
-      allow create, update: if request.auth != null && (request.auth.uid == deliveryUid || isAdmin());
+      // Same kycStatus self-verification gap as sellers_profiles above,
+      // fixed the same way — a delivery partner can submit (-> 'Pending')
+      // but never set their own 'Verified' badge.
+      allow create: if request.auth != null && (request.auth.uid == deliveryUid || isAdmin())
+        && request.resource.data.get('kycStatus', 'Not Submitted') != 'Verified';
+      allow update: if request.auth != null && (
+        isAdmin() ||
+        (
+          request.auth.uid == deliveryUid &&
+          (request.resource.data.get('kycStatus', null) == resource.data.get('kycStatus', null) ||
+           request.resource.data.get('kycStatus', null) == 'Pending')
+        )
+      );
       allow delete: if request.auth != null && (request.auth.uid == deliveryUid || isAdmin());
     }
 
@@ -89,14 +139,15 @@ service cloud.firestore {
     // ---------- PRODUCTS (vendors collection) ----------
     match /vendors/{productId} {
       allow read: if true;
-      // Listing a product requires a verified email — the account.html
-      // banner alone didn't stop anything; this is the actual enforcement.
-      // request.auth.token.email_verified is set directly on the ID token
-      // by Firebase Auth itself (true automatically for Google sign-in,
-      // false until verified for email/password sign-up), so this can't be
-      // spoofed by the client.
-      allow create: if request.auth != null && request.auth.token.email_verified == true
-                    && request.resource.data.sellerUid == request.auth.uid;
+      // Products are created ONLY by the backend now (POST /api/products,
+      // POST /api/products/bulk — see backend/routes/products.py) via
+      // firebase-admin, which bypasses these rules entirely — so this being
+      // `false` doesn't stop real listings from being created. What it DOES
+      // stop: a free-tier seller calling the Firestore SDK directly to list
+      // unlimited products, or more photos per product than their plan
+      // allows — limits that used to live ONLY in product-logic.js's
+      // decision whether to call addDoc, never actually enforced here.
+      allow create: if false;
       allow update: if request.auth != null && (
         resource.data.sellerUid == request.auth.uid ||
         isAdmin() ||
@@ -107,16 +158,32 @@ service cloud.firestore {
 
     // ---------- CHATS ----------
     match /chats/{chatId} {
-      allow read, update: if request.auth != null &&
+      allow read: if request.auth != null &&
         (resource.data.buyerUid == request.auth.uid || resource.data.sellerUid == request.auth.uid);
       allow create: if request.auth != null &&
         (request.resource.data.buyerUid == request.auth.uid || request.resource.data.sellerUid == request.auth.uid);
+      // A participant may only touch the fields sendMessage()/markChatRead()
+      // actually write (see chat-logic.js) — never reassign buyerUid/sellerUid,
+      // which would otherwise let either party silently redirect/hijack the
+      // thread to a different person.
+      allow update: if request.auth != null &&
+        (resource.data.buyerUid == request.auth.uid || resource.data.sellerUid == request.auth.uid) &&
+        request.resource.data.buyerUid == resource.data.buyerUid &&
+        request.resource.data.sellerUid == resource.data.sellerUid &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['lastMessage', 'lastMessageAt', 'unreadByBuyer', 'unreadBySeller']);
 
       match /messages/{messageId} {
         allow read: if request.auth != null &&
           (get(/databases/$(database)/documents/chats/$(chatId)).data.buyerUid == request.auth.uid ||
            get(/databases/$(database)/documents/chats/$(chatId)).data.sellerUid == request.auth.uid);
-        allow create: if request.auth != null && request.resource.data.senderUid == request.auth.uid;
+        // The sender must be THEMSELVES, and must actually be one of the
+        // two people on this chat — without the second check, anyone
+        // signed in could write senderUid: <their own uid> into a
+        // complete stranger's conversation.
+        allow create: if request.auth != null && request.resource.data.senderUid == request.auth.uid &&
+          (get(/databases/$(database)/documents/chats/$(chatId)).data.buyerUid == request.auth.uid ||
+           get(/databases/$(database)/documents/chats/$(chatId)).data.sellerUid == request.auth.uid);
       }
     }
 
@@ -130,13 +197,26 @@ service cloud.firestore {
     // ---------- COUPONS ----------
     match /coupons/{couponId} {
       allow read: if true;
-      allow create, update, delete: if request.auth != null &&
-        (request.resource.data.sellerUid == request.auth.uid || resource.data.sellerUid == request.auth.uid || isAdmin());
-      // A buyer applying a coupon at checkout needs to bump usedCount on a
-      // coupon that isn't theirs — mirrors the `views` counter pattern on
-      // vendors above: any signed-in user may touch ONLY this one field.
-      allow update: if request.auth != null &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedCount']);
+      // Coupons are created ONLY by the backend now (POST /api/coupons —
+      // see backend/routes/coupons.py) via firebase-admin, which bypasses
+      // these rules entirely — so this being `false` doesn't stop real
+      // coupons from being created. What it DOES stop: a free-tier seller
+      // creating unlimited active coupons, or a duplicate code colliding
+      // with another seller's — neither was ever actually checked here,
+      // only in coupon-logic.js's client-side decision whether to call
+      // addDoc. Must already own the coupon (or be admin) to touch it
+      // otherwise, AND can never change WHO owns it — the old update rule
+      // checked "is the NEW sellerUid me?", which let anyone hijack any
+      // coupon by updating it with their own uid as the new owner.
+      // usedCount is bumped by the backend too (via firebase-admin — see
+      // backend/routes/payments.py), so there's no legitimate client-side
+      // write to it anymore either, unlike when checkout ran client-side.
+      allow create: if false;
+      allow update, delete: if request.auth != null &&
+        (isAdmin() || (
+          resource.data.sellerUid == request.auth.uid &&
+          request.resource.data.sellerUid == resource.data.sellerUid
+        ));
     }
 
     // ---------- BANNERS ----------
@@ -161,8 +241,21 @@ service cloud.firestore {
     // random third authenticated user who happens to guess/pass a dispute ID.
     match /disputes/{disputeId} {
       allow create: if request.auth != null && request.resource.data.raisedByUid == request.auth.uid;
-      allow read, update: if request.auth != null &&
+      allow read: if request.auth != null &&
         (resource.data.raisedByUid == request.auth.uid || resource.data.againstUid == request.auth.uid || isAdmin());
+      // A participant (not admin) may only ever touch lastUpdateAt — the one
+      // field sendDisputeMessage() legitimately bumps. Changing `status`
+      // (Open/Resolved/Closed) requires isAdmin(): the app's UI already only
+      // shows that control to admins (see dispute-thread.html), but without
+      // this the rule itself let either party close their own dispute
+      // directly via the Firestore SDK, with no actual admin review.
+      allow update: if request.auth != null && (
+        isAdmin() ||
+        (
+          (resource.data.raisedByUid == request.auth.uid || resource.data.againstUid == request.auth.uid) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastUpdateAt'])
+        )
+      );
 
       match /messages/{messageId} {
         allow read: if request.auth != null &&
@@ -180,7 +273,16 @@ service cloud.firestore {
     match /productQuestions/{questionId} {
       allow read: if true;
       allow create: if request.auth != null && request.resource.data.askerUid == request.auth.uid;
-      allow update: if request.auth != null && (resource.data.sellerUid == request.auth.uid || isAdmin());
+      // A seller may only ever answer — never rewrite the buyer's original
+      // question, who asked it, or which product/seller it's about. See
+      // submitAnswer() in qa-logic.js for the fields this is modeled on.
+      allow update: if request.auth != null && (
+        isAdmin() ||
+        (
+          resource.data.sellerUid == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['answer', 'answered', 'answeredAt'])
+        )
+      );
       allow delete: if isAdmin();
     }
 
@@ -188,16 +290,24 @@ service cloud.firestore {
     match /reviews/{reviewId} {
       allow read: if true;
       // A review must be tied to a REAL order that (a) actually belongs to
-      // this buyer and (b) hasn't already been reviewed — otherwise anyone
-      // with any signed-in UID (including a throwaway anonymous one) could
-      // write unlimited fake reviews directly via the Firestore SDK,
-      // bypassing the "write a review" button entirely. This is what
-      // actually stops that, not the client-side UI.
+      // this buyer, (b) was actually Delivered (not Pending/Cancelled), and
+      // (c) hasn't already been reviewed — otherwise anyone with any
+      // signed-in UID (including a throwaway anonymous one) could write
+      // unlimited fake reviews directly via the Firestore SDK, bypassing
+      // the "write a review" button entirely. This is what actually stops
+      // that, not the client-side UI. rating/productId/sellerUid are also
+      // checked against that SAME order, so a review can't claim 11 stars
+      // or praise/attack a different product than what was actually bought.
       allow create: if request.auth != null
         && request.resource.data.buyerUid == request.auth.uid
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
         && request.resource.data.orderId is string
         && get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.buyerUid == request.auth.uid
-        && get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.reviewed != true;
+        && get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.status == 'Delivered'
+        && get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.reviewed != true
+        && get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.productId == request.resource.data.productId
+        && get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.sellerUid == request.resource.data.sellerUid;
       allow update, delete: if isAdmin();
     }
 
@@ -212,6 +322,20 @@ service cloud.firestore {
       return (before == 'Pending' && (after == 'Accepted' || after == 'Cancelled')) ||
              (before == 'Accepted' && (after == 'Shipped' || after == 'Cancelled')) ||
              (before == 'Shipped' && after == 'Delivered');
+    }
+
+    // A seller may move a Delivered order to 'Returned' ONLY as the direct
+    // result of approving a return the buyer already asked for: the order
+    // must currently be Delivered with a Pending return request, and this
+    // very same write must be the one flipping returnStatus to Approved.
+    // Without this, 'Returned' was unreachable — the app's "Approve Return"
+    // button writes status:'Returned', and sellerCanTransition() above has
+    // no Delivered -> Returned path, so every approval was silently denied.
+    function sellerCanApproveReturn(before, after) {
+      return before.status == 'Delivered' && after.status == 'Returned'
+          && before.returnRequested == true
+          && before.returnStatus == 'Pending'
+          && after.returnStatus == 'Approved';
     }
 
     function buyerCanTransition(before, after) {
@@ -235,6 +359,17 @@ service cloud.firestore {
                   && (resource.data.buyerUid == request.auth.uid
                       || resource.data.sellerUid == request.auth.uid
                       || resource.data.deliveryBoyUid == request.auth.uid
+                      // The delivery job board must be readable by delivery
+                      // partners browsing it — but NOT by just anyone who's
+                      // logged in. Without this extra check, any random
+                      // authenticated buyer could query
+                      // orders-where-deliveryRequestStatus-is-open and read
+                      // OTHER buyers' names/phone numbers/addresses, since
+                      // that's an open, un-owned document from their
+                      // perspective. Requiring a real delivery_profiles doc
+                      // (created only via delivery-dashboard.html signup)
+                      // restricts this to people actually registered as
+                      // delivery partners.
                       || (resource.data.deliveryRequestStatus == 'open'
                           && exists(/databases/$(database)/documents/delivery_profiles/$(request.auth.uid)))
                       || isAdmin());
@@ -243,31 +378,70 @@ service cloud.firestore {
         isAdmin() ||
         (
           resource.data.sellerUid == request.auth.uid &&
+          // Every field a seller can EVER legitimately touch on an order,
+          // across accept/ship/deliver, job-board posting/assignment, and
+          // return approval/rejection — see order-logic.js, delivery-logic.js
+          // and return-logic.js. Anything outside this list (price,
+          // buyerAddress, buyerPhone, productName, sellerUid, ...) is
+          // rejected outright, regardless of what "status" says.
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'acceptedAt', 'shippedAt', 'deliveredAt', 'cancelledAt', 'deliveryOTP', 'updatedAt',
+            'deliveryRequestStatus', 'deliveryBoyUid', 'deliveryBoyName', 'deliveryBoyPhone',
+            'deliveryFeeType', 'deliveryFeeAmount', 'returnStatus'
+          ]) &&
           (
+            // Updates that don't touch "status" at all (e.g. marking
+            // reviewed, storing a returnRequested flag, posting/assigning
+            // delivery) aren't a status transition and don't need to pass
+            // the transition check. The one extra status move a seller may
+            // make is approving a return (Delivered -> Returned) — see
+            // sellerCanApproveReturn() for exactly what that requires.
             !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']) ||
-            sellerCanTransition(resource.data.status, request.resource.data.status)
+            sellerCanTransition(resource.data.status, request.resource.data.status) ||
+            sellerCanApproveReturn(resource.data, request.resource.data)
           )
         ) ||
         (
           resource.data.buyerUid == request.auth.uid &&
+          // Same idea as the seller list above, for what a buyer can ever
+          // legitimately touch — cancelling, marking a product reviewed,
+          // requesting a return. See orders.html and return-logic.js.
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'cancelledAt', 'cancelledBy', 'updatedAt',
+            'reviewed', 'returnRequested', 'returnReason', 'returnStatus', 'returnRequestedAt'
+          ]) &&
           (
             !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']) ||
             buyerCanTransition(resource.data.status, request.resource.data.status)
           )
         ) ||
         (
+          // The delivery partner currently assigned to this order can move
+          // its status forward exactly like a seller would (Accepted ->
+          // Shipped -> Delivered), via the same pickup/delivery OTP flow —
+          // and can freely change delivery-related fields (e.g. to back out
+          // of an assignment) since those aren't a status transition.
           resource.data.deliveryBoyUid == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'shippedAt', 'deliveredAt', 'deliveryOTP', 'updatedAt',
+            'deliveryBoyUid', 'deliveryBoyName', 'deliveryBoyPhone', 'deliveryRequestStatus',
+            'deliveryFeeType', 'deliveryFeeAmount'
+          ]) &&
           (
             !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']) ||
             sellerCanTransition(resource.data.status, request.resource.data.status)
           )
         ) ||
         (
+          // Any signed-in delivery partner may CLAIM an open job-board
+          // order — narrowly: only by setting THEMSELVES as deliveryBoyUid
+          // on an order that is currently open, and only touching
+          // delivery-related fields (never price, status, buyer info, etc).
           resource.data.deliveryRequestStatus == 'open' &&
           request.resource.data.deliveryBoyUid == request.auth.uid &&
           request.resource.data.deliveryRequestStatus == 'assigned' &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['deliveryBoyUid', 'deliveryBoyName', 'deliveryBoyPhone', 'deliveryRequestStatus', 'deliveryFeeType', 'deliveryFeeAmount'])
+            .hasOnly(['deliveryBoyUid', 'deliveryBoyName', 'deliveryBoyPhone', 'deliveryRequestStatus', 'deliveryFeeType', 'deliveryFeeAmount', 'updatedAt'])
         )
       );
 
