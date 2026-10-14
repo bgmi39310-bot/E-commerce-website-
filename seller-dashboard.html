@@ -938,7 +938,7 @@
             const value = document.getElementById('couponValue').value;
             const expiry = document.getElementById('couponExpiry').value; // '' if left blank
             const usageLimit = document.getElementById('couponUsageLimit').value;
-            addCoupon(db, currentLoggedInUser.uid, code, type, value, expiry, usageLimit).then(() => {
+            addCoupon(db, currentLoggedInUser, code, type, value, expiry, usageLimit).then(() => {
                 document.getElementById('couponCode').value = '';
                 document.getElementById('couponValue').value = '';
                 document.getElementById('couponExpiry').value = '';
