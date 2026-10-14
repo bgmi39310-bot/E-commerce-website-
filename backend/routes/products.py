@@ -24,13 +24,16 @@ main way these caches stay fresh.
 
 import json
 import logging
+from datetime import datetime, timezone
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, request, jsonify, g
 
 from firebase_admin import firestore
 
+from utils.auth import require_auth
 from utils.cache import get_redis
 from utils.firebase_admin_init import db
+from utils.limiter import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +44,58 @@ _LISTING_TTL_SECONDS = 600  # 10 min safety-net TTL (see module docstring)
 _PRODUCT_TTL_SECONDS = 600
 
 _HOMEPAGE_CACHE_KEY = "homepage:products"
+
+# Mirrors premium-logic.js's FREE_TIER_LIMITS — kept here too because the
+# the whole point of this endpoint is enforcing these server-side. The old
+# client-only check (premium-logic.js's countSellerProducts/isPremiumSeller,
+# called from product-logic.js before deciding whether to show an error
+# toast) was never actually a security boundary: a free seller could add
+# unlimited products or photos by calling the Firestore SDK directly and
+# skipping the UI's own check entirely, since the create permission in
+# firestore.rules never looked at how many products that seller already had.
+_FREE_TIER_LIMITS = {
+    "maxProducts": 30,
+    "maxPhotosPerProduct": 1,
+    "maxBulkRows": 450,  # Firestore batches cap at 500 writes; stay comfortably under that
+}
+
+_DEFAULT_PRODUCT_IMAGE = "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80"
+
+
+def _is_premium_seller(uid):
+    snap = db.collection("sellers_profiles").document(uid).get()
+    return snap.exists and (snap.to_dict() or {}).get("isPremium") is True
+
+
+def _invalidate_product_caches(uid):
+    """Products created here go straight into Firestore via firebase-admin,
+    which the live Firestore->Redis sync listener (utils/product_sync.py)
+    will pick up and reflect within about a second anyway — but invalidating
+    these two keys immediately means the NEXT page load (which could happen
+    before that listener fires) doesn't serve a stale list missing the
+    product the seller just added."""
+    r = get_redis()
+    if r is None:
+        return
+    try:
+        r.delete(_HOMEPAGE_CACHE_KEY)
+        r.delete(f"shop:{uid}:products")
+    except Exception:
+        logger.exception("Could not invalidate product caches for sellerUid=%s", uid)
+
+
+def _safe_float(value, default=None):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_int(value, default):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
 
 def _shop_key(seller_uid):
@@ -122,6 +177,156 @@ def list_shop_products(seller_uid):
             logger.exception("Could not write shop product list to Redis for sellerUid=%s (continuing without caching it)", seller_uid)
 
     return jsonify({"products": products, "cached": False})
+
+
+@products_bp.route("", methods=["POST"])
+@limiter.limit("20 per minute")
+@require_auth
+def create_product():
+    """
+    Creates a product. Mirrors product-logic.js's addProductToFirebase, but
+    server-side — see _FREE_TIER_LIMITS above for why that move was needed.
+    sellerUid is taken from the verified ID token (g.uid), never trusted
+    from the request body, so nobody can list a product under someone
+    else's name.
+    """
+    if not g.user.get("email_verified"):
+        return jsonify({"error": "Please verify your email before listing products."}), 403
+
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    shop_name = (data.get("shopName") or "").strip()
+    price = _safe_float(data.get("price"))
+
+    if not name or not shop_name:
+        return jsonify({"error": "Please enter Product Name and Price, and save your Shop Profile first."}), 400
+    if price is None or price <= 0:
+        return jsonify({"error": "Please enter a valid price."}), 400
+
+    is_premium = _is_premium_seller(g.uid)
+
+    if not is_premium:
+        count_result = db.collection("vendors").where("sellerUid", "==", g.uid).count().get()
+        existing_count = count_result[0][0].value
+        if existing_count >= _FREE_TIER_LIMITS["maxProducts"]:
+            return jsonify({
+                "error": f"Free sellers can list up to {_FREE_TIER_LIMITS['maxProducts']} products. "
+                         "Upgrade to Premium for unlimited listings!"
+            }), 403
+
+    images = data.get("images")
+    images = [str(u).strip() for u in images if str(u or "").strip()] if isinstance(images, list) else []
+    if not is_premium and len(images) > _FREE_TIER_LIMITS["maxPhotosPerProduct"]:
+        images = images[:_FREE_TIER_LIMITS["maxPhotosPerProduct"]]
+    if not images:
+        images = [_DEFAULT_PRODUCT_IMAGE]
+
+    sizes = data.get("sizes")
+    sizes = [str(s).strip() for s in sizes if str(s or "").strip()] if isinstance(sizes, list) else []
+    colors = data.get("colors")
+    colors = [str(c).strip() for c in colors if str(c or "").strip()] if isinstance(colors, list) else []
+
+    variant_stock = data.get("variantStock")
+    if not isinstance(variant_stock, dict) or not variant_stock:
+        variant_stock = None  # None = not tracked per-variant, same meaning as the old client code
+
+    now = datetime.now(timezone.utc)
+    doc_ref = db.collection("vendors").document()
+    doc_ref.set({
+        "name": name,
+        "price": price,
+        "unit": (data.get("unit") or "Per Piece"),
+        "material": (data.get("material") or "").strip() or "100% Original",
+        "warranty": (data.get("warranty") or "").strip() or "Verified Quality",
+        "image": images[0],
+        "images": images,
+        "description": (data.get("description") or "").strip() or f"{name} available in best quality.",
+        "shopName": shop_name,
+        "sellerUid": g.uid,
+        "stock": _safe_int(data.get("stock"), 10),
+        "sizes": sizes,
+        "category": (data.get("category") or "other"),
+        "colors": colors,
+        "variantStock": variant_stock,
+        "returnWindowDays": _safe_int(data.get("returnWindowDays"), 7),
+        "createdAt": now,
+        "updatedAt": now,
+    })
+
+    _invalidate_product_caches(g.uid)
+    return jsonify({"success": True, "productId": doc_ref.id})
+
+
+@products_bp.route("/bulk", methods=["POST"])
+@limiter.limit("5 per minute")
+@require_auth
+def bulk_create_products():
+    """
+    Creates many products at once from already-CSV-parsed rows (the CSV
+    file itself is still parsed client-side — see bulk-upload-logic.js —
+    this just moves the actual Firestore writes + the Premium-only gate
+    server-side, same reasoning as create_product() above). Bulk upload was
+    ALREADY meant to be Premium-only, but that gate was client-side JS only
+    — anyone could call this collection's create permission directly and
+    bulk-add as a free seller.
+    """
+    if not g.user.get("email_verified"):
+        return jsonify({"error": "Please verify your email before listing products."}), 403
+
+    data = request.get_json(silent=True) or {}
+    shop_name = (data.get("shopName") or "").strip()
+    rows = data.get("products")
+
+    if not shop_name:
+        return jsonify({"error": "Please save your Shop Profile first!"}), 400
+    if not isinstance(rows, list) or not rows:
+        return jsonify({"error": "No products to upload."}), 400
+    if len(rows) > _FREE_TIER_LIMITS["maxBulkRows"]:
+        return jsonify({"error": f"Too many rows in one upload (max {_FREE_TIER_LIMITS['maxBulkRows']})."}), 400
+
+    if not _is_premium_seller(g.uid):
+        return jsonify({"error": "Bulk CSV upload is a Premium feature. Upgrade to Premium to add many products at once!"}), 403
+
+    now = datetime.now(timezone.utc)
+    batch = db.batch()
+    success_count = 0
+    fail_count = 0
+
+    for row in rows:
+        if not isinstance(row, dict):
+            fail_count += 1
+            continue
+        name = (row.get("name") or "").strip()
+        price = _safe_float(row.get("price"))
+        if not name or price is None or price <= 0:
+            fail_count += 1
+            continue
+
+        image = (row.get("image") or "").strip() or _DEFAULT_PRODUCT_IMAGE
+        doc_ref = db.collection("vendors").document()
+        batch.set(doc_ref, {
+            "name": name,
+            "price": price,
+            "unit": (row.get("unit") or "").strip() or "Per Piece",
+            "stock": _safe_int(row.get("stock"), 10),
+            "material": (row.get("material") or "").strip() or "100% Original",
+            "warranty": (row.get("warranty") or "").strip() or "Verified Quality",
+            "image": image,
+            "images": [image],
+            "description": (row.get("description") or "").strip() or f"{name} available in best quality.",
+            "category": (row.get("category") or "other").strip().lower(),
+            "shopName": shop_name,
+            "sellerUid": g.uid,
+            "createdAt": now,
+            "updatedAt": now,
+        })
+        success_count += 1
+
+    if success_count > 0:
+        batch.commit()
+        _invalidate_product_caches(g.uid)
+
+    return jsonify({"success": True, "created": success_count, "failed": fail_count})
 
 
 @products_bp.route("/<product_id>", methods=["GET"])
