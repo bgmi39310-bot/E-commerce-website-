@@ -1,7 +1,7 @@
-import { collection, addDoc, getDocs, query, where, doc, updateDoc, deleteDoc, increment } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { isPremiumSeller, countSellerActiveCoupons, FREE_TIER_LIMITS } from './premium-logic.js';
+import { collection, getDocs, query, where, doc, updateDoc, deleteDoc, increment } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { showToast } from './toast.js';
 import { escapeHtml } from './sanitize.js';
+import { BACKEND_BASE_URL } from './order-api.js';
 
 // Local cache so toggling/deleting a coupon never needs to re-query Firestore.
 let cachedCoupons = [];
@@ -62,7 +62,7 @@ export async function loadMyCoupons(db, sellerUid) {
     }
 }
 
-export async function addCoupon(db, sellerUid, code, discountType, value, expiryDate, usageLimit) {
+export async function addCoupon(db, currentLoggedInUser, code, discountType, value, expiryDate, usageLimit) {
     const cleanCode = code.trim().toUpperCase();
     if (!cleanCode) { showToast("Please enter a coupon code.", 'error'); return; }
     if (!value || Number(value) <= 0) { showToast("Please enter a valid discount value.", 'error'); return; }
@@ -73,41 +73,31 @@ export async function addCoupon(db, sellerUid, code, discountType, value, expiry
     }
     if (usageLimit && Number(usageLimit) <= 0) { showToast("Usage limit must be at least 1.", 'error'); return; }
 
-    const premium = await isPremiumSeller(db, sellerUid);
-    if (!premium) {
-        const activeCount = cachedCoupons.filter(c => c.active).length;
-        if (activeCount >= FREE_TIER_LIMITS.maxActiveCoupons) {
-            showToast(`Free sellers can have ${FREE_TIER_LIMITS.maxActiveCoupons} active coupon at a time. Upgrade to Premium for unlimited coupons!`, 'error');
-            return;
-        }
-    }
-
     try {
-        // A coupon code must be unique across the WHOLE site while active, not
-        // just per-seller — checkout looks a code up by code alone (it has no
-        // way to know which seller the buyer means), so two different sellers
-        // both having an active "SAVE20" would make checkout pick one of them
-        // arbitrarily. This check catches that at creation time.
-        const dupQ = query(collection(db, "coupons"), where("code", "==", cleanCode), where("active", "==", true));
-        const dupSnap = await getDocs(dupQ);
-        if (!dupSnap.empty) {
-            showToast(`Coupon code "${cleanCode}" is already in use (by you or another seller). Please choose a different code.`, 'error');
-            return;
-        }
+        // The Premium active-coupon-count gate and the sitewide duplicate-code
+        // check both re-run server-side now (see backend/routes/coupons.py) —
+        // the old gate was a client-side isPremiumSeller() check only,
+        // bypassable by calling the Firestore SDK directly regardless of plan.
+        const idToken = await currentLoggedInUser.getIdToken();
+        const res = await fetch(`${BACKEND_BASE_URL}/api/coupons`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+            body: JSON.stringify({
+                code: cleanCode,
+                discountType,
+                value: Number(value),
+                expiryDate: expiryDate || null,
+                usageLimit: usageLimit ? Number(usageLimit) : null
+            })
+        });
+        const result = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(result.error || 'Could not create coupon.');
 
-        const newCoupon = {
-            code: cleanCode,
-            sellerUid: sellerUid,
-            discountType: discountType,
-            value: Number(value),
-            expiryDate: expiryDate || null,       // 'YYYY-MM-DD' or null = never expires
-            usageLimit: usageLimit ? Number(usageLimit) : null, // null = unlimited
-            usedCount: 0,
-            active: true,
-            createdAt: new Date()
-        };
-        const docRef = await addDoc(collection(db, "coupons"), newCoupon);
-        cachedCoupons.unshift({ id: docRef.id, ...newCoupon }); // patch locally, no re-fetch
+        cachedCoupons.unshift({
+            id: result.couponId, code: cleanCode, sellerUid: currentLoggedInUser.uid,
+            discountType, value: Number(value), expiryDate: expiryDate || null,
+            usageLimit: usageLimit ? Number(usageLimit) : null, usedCount: 0, active: true
+        }); // patch locally, no re-fetch
         renderCoupons();
         showToast(`Coupon "${cleanCode}" created! 🎉`);
     } catch (error) {
