@@ -12,6 +12,7 @@ from routes.uploads import uploads_bp
 from routes.account import account_bp
 from routes.products import products_bp
 from routes.sellers import sellers_bp
+from routes.coupons import coupons_bp
 from utils.cache import init_redis
 from utils.limiter import limiter
 from utils.product_sync import start_product_sync
@@ -59,6 +60,7 @@ def create_app():
     app.register_blueprint(account_bp)
     app.register_blueprint(products_bp)
     app.register_blueprint(sellers_bp)
+    app.register_blueprint(coupons_bp)
 
     def _startup_background_tasks():
         # Both of these do blocking network I/O (connecting to Redis, then
