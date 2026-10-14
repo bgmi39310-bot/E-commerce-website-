@@ -1,10 +1,10 @@
-import { collection, addDoc, doc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { doc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { NO_IMAGE_PLACEHOLDER } from './img-utils.js';
-import { isPremiumSeller, countSellerProducts, FREE_TIER_LIMITS } from './premium-logic.js';
 import { showToast } from './toast.js';
 import { escapeHtml } from './sanitize.js';
 import { buildVariantKey } from './stock-logic.js';
 import { deltaSync, removeFromDeltaSyncCache } from './delta-sync-logic.js';
+import { BACKEND_BASE_URL } from './order-api.js';
 
 // Builds the list of size/color combinations a seller can optionally set
 // per-variant stock for. If both sizes and colors are given, every
@@ -92,49 +92,42 @@ export async function addProductToFirebase(db, currentLoggedInUser, fetchProduct
 
     if (!name || !priceVal) { showToast("Please enter Product Name and Price!", 'error'); return; }
 
-    // ---------- Free vs Premium limits ----------
-    const premium = await isPremiumSeller(db, currentLoggedInUser.uid);
-    if (!premium) {
-        const currentCount = await countSellerProducts(db, currentLoggedInUser.uid);
-        if (currentCount >= FREE_TIER_LIMITS.maxProducts) {
-            showToast(`Free sellers can list up to ${FREE_TIER_LIMITS.maxProducts} products. Upgrade to Premium for unlimited listings!`, 'error');
-            return;
-        }
-    }
-
     const shopNameVal = document.getElementById('shopName').value.trim();
     if (!shopNameVal) { showToast("Please save Shop Profile first!", 'error'); return; }
 
-    const defaultImg = "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&auto=format&fit=crop&q=80";
-    let imagesArray = [imageUrl, imageUrl2, imageUrl3, imageUrl4].filter(url => url !== '');
-    if (!premium && imagesArray.length > FREE_TIER_LIMITS.maxPhotosPerProduct) {
-        imagesArray = imagesArray.slice(0, FREE_TIER_LIMITS.maxPhotosPerProduct);
-    }
-    if (imagesArray.length === 0) imagesArray.push(defaultImg);
-
+    const imagesArray = [imageUrl, imageUrl2, imageUrl3, imageUrl4].filter(url => url !== '');
     const variantStock = collectVariantStock('p'); // null unless the seller filled in the optional per-variant grid
 
     try {
-        await addDoc(collection(db, "vendors"), {
-            name: name,
-            price: Number(priceVal),
-            unit: document.getElementById('pUnit').value,
-            material: document.getElementById('pMaterial').value.trim() || "100% Original",
-            warranty: document.getElementById('pWarranty').value.trim() || "Verified Quality",
-            image: imagesArray[0],
-            images: imagesArray,
-            description: document.getElementById('pDesc').value.trim() || `${name} available in best quality.`,
-            shopName: shopNameVal,
-            sellerUid: currentLoggedInUser.uid,
-            stock: stockVal === '' ? 10 : Number(stockVal),
-            sizes: sizesVal ? sizesVal.split(',').map(s => s.trim()).filter(s => s) : [],
-            category: categoryVal || 'other',
-            colors: colorsVal ? colorsVal.split(',').map(c => c.trim()).filter(c => c) : [],
-            variantStock: variantStock, // null = not tracked per-variant, just uses overall stock
-            returnWindowDays: Number(document.getElementById('pReturnWindow').value),
-            createdAt: new Date(),
-            updatedAt: serverTimestamp()
+        // Price/photo-count/free-tier-product-count are all re-checked
+        // server-side now (see backend/routes/products.py) — the free-tier
+        // limits used to be enforced ONLY by this file deciding not to call
+        // addDoc, which anyone could bypass by writing to Firestore
+        // directly, since the create permission itself never looked at how
+        // many products that seller already had.
+        const idToken = await currentLoggedInUser.getIdToken();
+        const res = await fetch(`${BACKEND_BASE_URL}/api/products`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+            body: JSON.stringify({
+                name,
+                price: Number(priceVal),
+                unit: document.getElementById('pUnit').value,
+                material: document.getElementById('pMaterial').value.trim(),
+                warranty: document.getElementById('pWarranty').value.trim(),
+                images: imagesArray,
+                description: document.getElementById('pDesc').value.trim(),
+                shopName: shopNameVal,
+                stock: stockVal === '' ? 10 : Number(stockVal),
+                sizes: sizesVal ? sizesVal.split(',').map(s => s.trim()).filter(s => s) : [],
+                category: categoryVal || 'other',
+                colors: colorsVal ? colorsVal.split(',').map(c => c.trim()).filter(c => c) : [],
+                variantStock,
+                returnWindowDays: Number(document.getElementById('pReturnWindow').value)
+            })
         });
+        const result = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(result.error || 'Could not add product.');
 
         showToast("Product Added Successfully to Database! 🎉");
         document.getElementById('pName').value = '';
@@ -189,7 +182,9 @@ export async function fetchMyListedProducts(db, uid, onLowStockUpdate) {
         });
     } catch (error) {
         console.error("Error loading products: ", error);
-        container.innerHTML = "<p style='color:red;'>Error loading your products.</p>";
+        // TEMPORARY: showing the real error message on screen so the exact
+        // cause can be diagnosed from a screenshot, without devtools.
+        container.innerHTML = `<p style="color:red;">Debug error: ${escapeHtml(error.code || '')} ${escapeHtml(error.message || String(error))}</p>`;
         return;
     }
 
