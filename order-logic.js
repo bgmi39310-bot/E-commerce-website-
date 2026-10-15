@@ -36,7 +36,9 @@ export async function fetchDashboardOrders(db, uid, onOrdersUpdate) {
         if (onOrdersUpdate) onOrdersUpdate(allOrders); // lets analytics recompute from the same data, no extra reads
     } catch (error) {
         console.error("Error fetching orders: ", error);
-        if (container) container.innerHTML = "<p style='color:red;'>Error loading orders.</p>";
+        // TEMPORARY: showing the real error message on screen so the exact
+        // cause can be diagnosed from a screenshot, without devtools.
+        if (container) container.innerHTML = `<p style="color:red;">Debug error: ${escapeHtml(error.code || '')} ${escapeHtml(error.message || String(error))}</p>`;
     }
 }
 
