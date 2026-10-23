@@ -200,14 +200,20 @@
         };
 
         let selectedPayment = 'COD';
+        let currentUpiUrl = null;      // set by setupUpiPayment(); null = UPI not usable for this cart
+        let upiInitiated = false;      // true once the UPI app has been opened for this order
         window.selectPayment = async function(method) {
             selectedPayment = method;
+            upiInitiated = false;
+            currentUpiUrl = null;
+            document.getElementById('placeOrderBtn').innerText = 'Place Order';
             document.querySelectorAll('.payment-card').forEach(c => c.classList.toggle('active', c.dataset.method === method));
 
             const upiBox = document.getElementById('upiPayBox');
             if (method === 'UPI') {
                 await setupUpiPayment();
                 upiBox.style.display = 'block';
+                upiBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
             } else {
                 upiBox.style.display = 'none';
             }
@@ -242,9 +248,10 @@
             const { finalTotal } = renderSummary();
             const upiUrl = `upi://pay?pa=${encodeURIComponent(sellerData.upiId)}&pn=${encodeURIComponent(sellerData.shopName || 'DesiMarket Seller')}&am=${finalTotal.toFixed(2)}&cu=INR&tn=${encodeURIComponent('DesiMarket Order')}`;
 
+            currentUpiUrl = upiUrl;
             btn.style.display = 'inline-block';
-            noteEl.innerText = `Pay ₹${finalTotal.toFixed(0)} to ${sellerData.shopName || 'seller'} via your UPI app, then place the order.`;
-            btn.onclick = () => { window.location.href = upiUrl; };
+            noteEl.innerText = `Pay ₹${finalTotal.toFixed(0)} to ${sellerData.shopName || 'seller'} (UPI: ${sellerData.upiId}). Tap Place Order — your UPI app will open first.`;
+            btn.onclick = () => { upiInitiated = true; window.location.href = upiUrl; };
         }
 
         let appliedCoupon = null; // { id, code, sellerUid, discountType, value }
@@ -356,6 +363,23 @@
             if (!/^\d{10}$/.test(phone)) {
                 showToast('Please enter a valid 10-digit mobile number.', 'error');
                 return;
+            }
+
+            // UPI: open the UPI app FIRST, only place the order on the 2nd tap
+            // (after the buyer says they have paid). Never place a UPI order
+            // before the buyer even had a chance to pay.
+            if (selectedPayment === 'UPI') {
+                if (!currentUpiUrl) {
+                    showToast('UPI is not available for this order. Please choose Cash on Delivery or Pay Online.', 'error');
+                    return;
+                }
+                if (!upiInitiated) {
+                    upiInitiated = true;
+                    document.getElementById('placeOrderBtn').innerText = '✅ I have paid — Place Order';
+                    showToast('Pay in your UPI app, then come back here and tap "I have paid — Place Order".');
+                    window.location.href = currentUpiUrl;
+                    return;
+                }
             }
 
             const btn = document.getElementById('placeOrderBtn');
