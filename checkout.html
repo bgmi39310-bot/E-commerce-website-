@@ -131,6 +131,7 @@
             <div id="upiPayBox" style="display:none; margin-top:14px; text-align:center;">
                 <button type="button" id="upiPayBtn" style="background:#232f3e; color:white; border:none; padding:11px 20px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:13.5px;">📲 Open UPI App to Pay</button>
                 <p id="upiPayNote" style="font-size:11.5px; color:#767676; margin-top:8px;"></p>
+                <img id="upiQrImg" src="" alt="Seller payment QR" style="display:none; max-width:220px; width:100%; margin:12px auto 0; border-radius:8px; border:1px solid #ddd;">
             </div>
         </div>
 
@@ -223,6 +224,8 @@
             const cart = getCart();
             const noteEl = document.getElementById('upiPayNote');
             const btn = document.getElementById('upiPayBtn');
+            const qrImg = document.getElementById('upiQrImg');
+            qrImg.style.display = 'none';
 
             const sellerUids = [...new Set(cart.map(item => item.sellerUid).filter(Boolean))];
             if (sellerUids.length === 0) {
@@ -239,13 +242,25 @@
             const sellerSnap = await getDoc(doc(db, "sellers_profiles", sellerUids[0]));
             const sellerData = sellerSnap.exists() ? sellerSnap.data() : {};
 
-            if (!sellerData.upiId) {
-                noteEl.innerText = 'This seller has not added a UPI ID yet — please use Cash on Delivery.';
+            if (!sellerData.upiId && !sellerData.upiQr) {
+                noteEl.innerText = 'This seller has not added a UPI ID or QR code yet — please use Cash on Delivery or Pay Online.';
                 btn.style.display = 'none';
                 return;
             }
 
             const { finalTotal } = renderSummary();
+
+            if (sellerData.upiQr) {
+                qrImg.src = sellerData.upiQr;
+                qrImg.style.display = 'block';
+            }
+            if (!sellerData.upiId) {
+                // QR-only seller: buyer scans the QR with any UPI app.
+                currentUpiUrl = 'QR_ONLY';
+                btn.style.display = 'none';
+                noteEl.innerText = `Scan this QR with any UPI app and pay ₹${finalTotal.toFixed(0)} to ${sellerData.shopName || 'seller'}, then tap Place Order.`;
+                return;
+            }
             const upiUrl = `upi://pay?pa=${encodeURIComponent(sellerData.upiId)}&pn=${encodeURIComponent(sellerData.shopName || 'DesiMarket Seller')}&am=${finalTotal.toFixed(2)}&cu=INR&tn=${encodeURIComponent('DesiMarket Order')}`;
 
             currentUpiUrl = upiUrl;
@@ -376,6 +391,10 @@
                 if (!upiInitiated) {
                     upiInitiated = true;
                     document.getElementById('placeOrderBtn').innerText = '✅ I have paid — Place Order';
+                    if (currentUpiUrl === 'QR_ONLY') {
+                        showToast('Scan the QR code above and pay, then tap "I have paid — Place Order".');
+                        return;
+                    }
                     showToast('Pay in your UPI app, then come back here and tap "I have paid — Place Order".');
                     window.location.href = currentUpiUrl;
                     return;
