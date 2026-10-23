@@ -219,6 +219,7 @@
                     <div class="profile-info-item"><span class="pii-label">📍 City / Area</span><span class="pii-value" id="dispCity"></span></div>
                     <div class="profile-info-item full-width"><span class="pii-label">🏠 Address</span><span class="pii-value" id="dispAddress"></span></div>
                     <div class="profile-info-item full-width"><span class="pii-label">🚚 Delivers to Villages</span><span class="pii-value" id="dispVillages"></span></div>
+                    <div class="profile-info-item full-width"><span class="pii-label">💸 UPI ID</span><span class="pii-value" id="dispUpi"></span><img id="dispUpiQr" src="" alt="Payment QR" style="display:none; max-width:160px; margin-top:8px; border-radius:6px; border:1px solid #ddd;"></div>
                 </div>
                 <div class="btn-group-profile">
                     <button class="btn-edit" onclick="enableEditMode()">✏️ Edit Profile</button>
@@ -232,7 +233,19 @@
                 <input type="text" id="shopPhone" placeholder="Contact Number">
                 <input type="text" id="shopCity" placeholder="City / Area (e.g. Indore, MG Road) — shown under 'Sellers Near You'">
                 <input type="text" id="shopVillages" placeholder="Villages you deliver to (comma-separated: Rampur, Shivpur, Ganeshpur)" class="full-width">
-                <input type="text" id="shopUpiId" placeholder="UPI ID (e.g. yourname@okhdfcbank)">
+                <div class="full-width" style="border:1px dashed #fa8900; border-radius:8px; padding:12px; background:#fffaf2;">
+                    <label style="font-size:13px; font-weight:700; display:block; margin-bottom:4px;">💸 Payment Details (orders ka paisa yahan aayega)</label>
+                    <p style="font-size:12px; color:#666; margin:0 0 8px;">Apna UPI ID aur/ya QR code daalo. Buyer "Pay via UPI Now" chunega to paisa seedha aapko milega.</p>
+                    <input type="text" id="shopUpiId" placeholder="UPI ID (e.g. yourname@okhdfcbank)" style="width:100%; box-sizing:border-box; margin-bottom:8px;">
+                    <div class="file-upload-box">
+                        <label>Payment QR Code (optional):</label>
+                        <div class="img-upload-row">
+                            <input type="url" id="shopUpiQr" placeholder="QR image link or upload →">
+                            <label class="upload-btn">📤<input type="file" id="shopUpiQrUpload" accept="image/*" hidden></label>
+                        </div>
+                        <span class="upload-status" id="shopUpiQrStatus"></span>
+                    </div>
+                </div>
                 <div class="file-upload-box">
                     <label>Shop Logo:</label>
                     <div class="img-upload-row">
@@ -534,6 +547,7 @@
         import { submitReport } from './report-logic.js';
 
         wireImageUpload('shopLogoFileUpload', 'shopLogoFile', 'shopLogoStatus');
+        wireImageUpload('shopUpiQrUpload', 'shopUpiQr', 'shopUpiQrStatus');
         wireImageUpload('pImageFileUpload', 'pImageFile', 'pImageStatus');
         wireImageUpload('pImageFile2Upload', 'pImageFile2', 'pImage2Status');
         wireImageUpload('pImageFile3Upload', 'pImageFile3', 'pImage3Status');
