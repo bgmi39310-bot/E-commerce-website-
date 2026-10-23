@@ -290,7 +290,7 @@
                 renderOrders(orders);
             } catch (error) {
                 console.error(error);
-                content.innerHTML = `<div class="no-orders">Unable to load orders right now. Please try again.</div>`;
+                content.innerHTML = `<div class="no-orders">Unable to load orders right now. Please try again.<br><small style="color:#c0392b; word-break:break-word;">${escapeHtml((error.code || '') + ' ' + (error.message || String(error)))}</small></div>`;
             }
         }
 
