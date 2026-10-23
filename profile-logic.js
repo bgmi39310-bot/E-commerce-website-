@@ -89,6 +89,15 @@ export async function loadSellerProfileFromFirestore(db, uid) {
             if (villagesField) villagesField.value = (profile.deliveryVillages || []).join(', ');
             const upiField = document.getElementById('shopUpiId');
             if (upiField) upiField.value = profile.upiId || '';
+            const qrField = document.getElementById('shopUpiQr');
+            if (qrField) qrField.value = profile.upiQr || '';
+            const dispUpi = document.getElementById('dispUpi');
+            if (dispUpi) dispUpi.innerText = profile.upiId || 'Not added yet — tap Edit Profile';
+            const dispUpiQr = document.getElementById('dispUpiQr');
+            if (dispUpiQr) {
+                if (profile.upiQr) { dispUpiQr.src = profile.upiQr; dispUpiQr.style.display = 'block'; }
+                else { dispUpiQr.style.display = 'none'; }
+            }
         } else {
             document.getElementById('profileDisplay').style.display = 'none';
             document.getElementById('profileForm').style.display = 'grid';
@@ -121,6 +130,7 @@ export async function saveSellerProfile(db, currentLoggedInUser, loadProfileCall
         city: document.getElementById('shopCity') ? document.getElementById('shopCity').value.trim() : '',
         deliveryVillages,
         upiId: upiField ? upiField.value.trim() : '',
+        upiQr: document.getElementById('shopUpiQr') ? document.getElementById('shopUpiQr').value.trim() : '',
         logo: logoUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
         // Optional — only set if the seller tapped/dragged a pin on the map.
         // Sellers who skip this keep working exactly as before (city/village
