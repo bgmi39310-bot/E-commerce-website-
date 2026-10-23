@@ -435,6 +435,7 @@
                 // amount, but the backend independently verifies that
                 // amount against real product prices before creating
                 // any order, and refunds automatically if they don't match.
+                const cart = getCart();
                 const items = cart.map(item => ({
                     productId: item.id || null,
                     selectedSize: item.selectedSize || null,
