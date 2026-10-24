@@ -127,7 +127,7 @@ export async function loadDeliveryProfile(db, uid) {
 // DesiMarket doesn't compute per-km pricing automatically — it's shown so
 // sellers/buyers know the rate to expect and agree the actual amount with
 // the delivery partner directly.
-export async function saveDeliveryProfile(db, uid, { name, phone, villages, vehicleType, feeType, feeAmount, maxDistanceKm }) {
+export async function saveDeliveryProfile(db, uid, { name, phone, villages, vehicleType, feeType, feeAmount, maxDistanceKm, upiId, upiQr }) {
     const cleanVillages = (villages || []).map(v => v.trim()).filter(Boolean);
     if (!name || !phone || cleanVillages.length === 0) {
         showToast("Please fill in your name, phone, and at least one village/area you serve.", 'error');
@@ -147,6 +147,8 @@ export async function saveDeliveryProfile(db, uid, { name, phone, villages, vehi
             feeType: validFeeTypes.includes(feeType) ? feeType : 'per_order',
             feeAmount: Number(feeAmount) || 0,
             maxDistanceKm: maxDistanceKm ? Number(maxDistanceKm) : null,
+            upiId: (upiId || '').trim(),
+            upiQr: (upiQr || '').trim(),
             lat: pickedDeliveryLat,
             lng: pickedDeliveryLng,
             isAvailable: true, // default to available right after setting up — they can toggle off any time
