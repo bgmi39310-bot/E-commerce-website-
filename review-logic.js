@@ -44,9 +44,13 @@ export async function submitReview(db, { orderId, productId, sellerUid, buyerUid
 
         showToast("Thank you for your review! ⭐");
         if (refreshCallback) refreshCallback();
+        return true;
     } catch (error) {
         console.error("Error submitting review:", error);
-        showToast("Unable to submit review right now. Please try again.", 'error');
+        // Include the error code so the real cause (e.g. permission-denied)
+        // can be seen instead of a vague message.
+        showToast(`Unable to submit review right now [${error.code || 'error'}]. Please try again.`, 'error');
+        return false;
     }
 }
 
