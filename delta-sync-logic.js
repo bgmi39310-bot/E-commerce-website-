@@ -104,7 +104,7 @@ function saveCache(storageKey, items, lastSync) {
  * @param storageKey      a name unique to this screen+user, e.g. `orders:seller:${uid}`
  * @returns the full merged list (existing cached items + whatever changed), newest-updated first
  */
-export async function deltaSync(db, { collectionPath, whereField, whereValue, storageKey }) {
+export async function deltaSync(db, { collectionPath, whereField, whereValue, storageKey, unorderedFirstSync = false }) {
     if (!whereValue) return [];
 
     let cached = loadCache(storageKey);
@@ -132,12 +132,17 @@ export async function deltaSync(db, { collectionPath, whereField, whereValue, st
         ));
     } else {
         // First-ever sync for this screen+user: one bounded full fetch to seed the cache.
-        snap = await getDocs(query(
-            base,
-            where(whereField, '==', whereValue),
-            orderBy('updatedAt', 'desc'),
-            limit(FIRST_SYNC_LIMIT)
-        ));
+        // For small per-owner lists (a seller's products) the first fetch skips
+        // orderBy('updatedAt'): Firestore silently leaves out any document that
+        // has no updatedAt field at all, so such a product would never show up.
+        snap = await getDocs(unorderedFirstSync
+            ? query(base, where(whereField, '==', whereValue), limit(FIRST_SYNC_LIMIT))
+            : query(
+                base,
+                where(whereField, '==', whereValue),
+                orderBy('updatedAt', 'desc'),
+                limit(FIRST_SYNC_LIMIT)
+            ));
     }
 
     snap.forEach(d => {
