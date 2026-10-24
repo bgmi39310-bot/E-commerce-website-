@@ -11,6 +11,7 @@ import logging
 from flask import Blueprint, jsonify
 
 from utils.cache import get_redis
+from utils.fast_cache import serve_cached
 from utils.seller_sync import SELLERS_CACHE_KEY
 from utils.firebase_admin_init import db
 
@@ -35,12 +36,19 @@ def _cache_get(r, key):
         return None
 
 
+_MEMORY_TTL_SECONDS = 15  # how long each worker reuses its in-memory copy (see utils/fast_cache.py)
+
+
 @sellers_bp.route("", methods=["GET"])
 def list_sellers():
+    return serve_cached("sellers:list", _MEMORY_TTL_SECONDS, _build_sellers_payload)
+
+
+def _build_sellers_payload():
     r = get_redis()
     cached = _cache_get(r, SELLERS_CACHE_KEY)
     if cached is not None:
-        return jsonify({"sellers": cached, "cached": True})
+        return {"sellers": cached, "cached": True}
 
     sellers = []
     for doc in db.collection("sellers_profiles").stream():
@@ -54,5 +62,5 @@ def list_sellers():
         except Exception:
             logger.exception("Could not write sellers list to Redis (continuing without caching it)")
 
-    return jsonify({"sellers": sellers, "cached": False})
+    return {"sellers": sellers, "cached": False}
 
