@@ -1,4 +1,4 @@
-import { collection, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, query, where, orderBy, limit, getDocs, Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // ============================================================================
 // Shared delta-sync for "my own growing history" screens — buyer's My
@@ -46,12 +46,35 @@ function cacheKeyFor(storageKey) {
     return `deltaSync:${storageKey}`;
 }
 
+// The cache is saved as JSON, and JSON.stringify turns a Firestore Timestamp
+// into a plain { seconds, nanoseconds } object — which has NO .toDate() or
+// .toMillis() any more. Pages like My Orders call order.deliveredAt.toDate()
+// (to decide if the return window is still open) and createdAt.toDate()
+// (to show the order date), so on every visit after the first, those values
+// silently stopped working: no return button, no date. This turns the plain
+// objects back into real Timestamps when the cache is read.
+function reviveTimestamps(value) {
+    if (Array.isArray(value)) return value.map(reviveTimestamps);
+    if (value && typeof value === 'object') {
+        const keys = Object.keys(value);
+        if (typeof value.seconds === 'number' && typeof value.nanoseconds === 'number' &&
+            keys.every(k => k === 'seconds' || k === 'nanoseconds' || k === 'type')) {
+            return new Timestamp(value.seconds, value.nanoseconds);
+        }
+        const out = {};
+        for (const k of keys) out[k] = reviveTimestamps(value[k]);
+        return out;
+    }
+    return value;
+}
+
 function loadCache(storageKey) {
     try {
         const raw = localStorage.getItem(cacheKeyFor(storageKey));
         if (!raw) return null;
         const parsed = JSON.parse(raw);
         if (!parsed || !Array.isArray(parsed.items) || !parsed.lastSync) return null;
+        parsed.items = reviveTimestamps(parsed.items);
         return parsed;
     } catch {
         return null; // corrupt/unreadable cache — treat as no cache, just resync fully
@@ -90,7 +113,12 @@ export async function deltaSync(db, { collectionPath, whereField, whereValue, st
     let snap;
     if (cached) {
         // Delta fetch: only documents touched since the last sync.
-        const lastSyncDate = new Date(cached.lastSync);
+        // Look back 5 minutes before the watermark as a safety margin: the
+        // watermark is the phone's clock, while updatedAt is the server's. If
+        // the phone's clock runs ahead, a change made just now could look
+        // "older" than the watermark and be missed. Re-fetching a few extra
+        // recent documents is cheap, and they just overwrite by id.
+        const lastSyncDate = new Date(new Date(cached.lastSync).getTime() - 5 * 60 * 1000);
         snap = await getDocs(query(
             base,
             where(whereField, '==', whereValue),
@@ -132,6 +160,14 @@ export function clearDeltaSyncCache(storageKey) {
     try {
         localStorage.removeItem(cacheKeyFor(storageKey));
     } catch { /* ignore */ }
+}
+
+/** Merges changes into ONE cached item right after a successful write, so
+ *  the next page load shows the new state straight away. */
+export function updateInDeltaSyncCache(storageKey, id, changes) {
+    const cached = loadCache(storageKey);
+    if (!cached) return;
+    saveCache(storageKey, cached.items.map(item => item.id === id ? { ...item, ...changes } : item), cached.lastSync);
 }
 
 /** Removes ONE item from a screen's cached list immediately — call this
