@@ -420,7 +420,7 @@ export async function updateOrderStatus(db, orderId, newStatus) {
 
         const orderRef = doc(db, "orders", orderId);
         await updateDoc(orderRef, { status: newStatus, [newStatus.toLowerCase() + 'At']: new Date(), updatedAt: serverTimestamp() });
-        applyLocalOrderChange(orderId, { status: newStatus, [newStatus.toLowerCase() + 'At']: Timestamp.now(), updatedAt: Timestamp.now() });
+        applyLocalOrderChange(orderId, { status: newStatus, [newStatus.toLowerCase() + 'At']: Timestamp.now() });
 
         // A cancelled order shouldn't keep its stock reserved forever.
         if (newStatus === 'Cancelled' && order) {
@@ -457,7 +457,7 @@ export async function markAsShipped(db, orderId) {
         const otp = Math.floor(1000 + Math.random() * 9000).toString();
         const orderRef = doc(db, "orders", orderId);
         await updateDoc(orderRef, { status: 'Shipped', shippedAt: new Date(), deliveryOTP: otp, updatedAt: serverTimestamp() });
-        applyLocalOrderChange(orderId, { status: 'Shipped', shippedAt: Timestamp.now(), deliveryOTP: otp, updatedAt: Timestamp.now() });
+        applyLocalOrderChange(orderId, { status: 'Shipped', shippedAt: Timestamp.now(), deliveryOTP: otp });
         showToast("Order marked as Shipped! 🚚\n\nThe buyer will now see a Delivery OTP on their Orders page. Ask them for it when you hand over the package, to confirm delivery.");
 
         if (order && order.buyerUid) {
@@ -515,7 +515,7 @@ async function confirmDeliveryInner(db, orderId) {
     try {
         const orderRef = doc(db, "orders", orderId);
         await updateDoc(orderRef, { status: 'Delivered', deliveredAt: new Date(), updatedAt: serverTimestamp() });
-        applyLocalOrderChange(orderId, { status: 'Delivered', deliveredAt: Timestamp.now(), updatedAt: Timestamp.now() });
+        applyLocalOrderChange(orderId, { status: 'Delivered', deliveredAt: Timestamp.now() });
         showToast("✅ Delivery confirmed! Order marked as Delivered.");
 
         if (order.buyerUid) {
