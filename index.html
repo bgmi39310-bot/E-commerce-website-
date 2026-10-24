@@ -326,6 +326,10 @@
             currentBuyerUid = user ? user.uid : null;
             if (user && !user.isAnonymous) migrateLegacyCartData(user.uid);
             authReadyResolve();
+            // The sellers list may already be on screen (from the cache) before
+            // we knew who is signed in — redo the filter so a seller always sees
+            // their OWN shop.
+            if (allSellers.length) applySellerVillageFilter();
             // Only show the bell for a signed-in / already-anonymous session — we
             // never force sign-in just to display it (see comment above).
             if (unsubscribeNotifBell) { unsubscribeNotifBell(); unsubscribeNotifBell = null; }
@@ -745,19 +749,38 @@
             applySellerVillageFilter();
         };
 
+        // "Kanjna", " kanjna ", "Village-Kanjna", "kanjna village" should all count
+        // as the same place — sellers type village names in many ways.
+        function normalizePlace(v) {
+            return (v || '').toLowerCase()
+                .replace(/\b(village|gram|gaon|gaw|dist|district|city)\b/g, ' ')
+                .replace(/[^a-z0-9\u0900-\u097f]+/g, ' ')
+                .trim();
+        }
+
+        function sellerCoversVillage(seller, villageNorm) {
+            if (!villageNorm) return false;
+            const places = (seller.deliveryVillages || []).concat(seller.city ? [seller.city] : []);
+            return places.some(p => {
+                const pn = normalizePlace(p);
+                if (!pn) return false;
+                return pn === villageNorm ||
+                    (pn.length >= 4 && villageNorm.length >= 4 && (pn.includes(villageNorm) || villageNorm.includes(pn)));
+            });
+        }
+
         function applySellerVillageFilter() {
             let filtered;
             if (showAllSellersMode || !myVillage) {
                 // No village saved yet — show only followed sellers (if any)
                 // rather than defaulting to "everyone", per the same
                 // near-you-first principle; "Show all shops" is explicit opt-in.
-                filtered = myVillage ? allSellers : allSellers.filter(s => followedSellerIds.has(s.id));
+                filtered = myVillage ? allSellers : allSellers.filter(s => followedSellerIds.has(s.id) || s.id === currentBuyerUid);
             } else {
-                const villageLower = myVillage.toLowerCase();
-                filtered = allSellers.filter(s => {
-                    const villages = (s.deliveryVillages || []).map(v => (v || '').toLowerCase());
-                    return villages.includes(villageLower) || followedSellerIds.has(s.id);
-                });
+                const villageNorm = normalizePlace(myVillage);
+                filtered = allSellers.filter(s =>
+                    sellerCoversVillage(s, villageNorm) || followedSellerIds.has(s.id) || s.id === currentBuyerUid
+                );
             }
 
             // If the person has opted in to "Sort by Distance", put sellers
