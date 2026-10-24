@@ -91,7 +91,8 @@
     import { showToast } from './toast.js';
     import { escapeHtml } from './sanitize.js';
     import { mountNotificationBell } from './notif-logic.js';
-    import { markAsShipped, confirmDelivery } from './order-logic.js';
+    import { markAsShipped, confirmDelivery, needsPaymentCollection } from './order-logic.js';
+    import { wireImageUpload } from './image-upload.js';
     import {
         loadDeliveryProfile, saveDeliveryProfile, setDeliveryAvailability,
         loadJobBoard, claimDeliveryJob, loadMyDeliveries, declineDeliveryAssignment,
@@ -187,12 +188,25 @@
                     </div>
                     <input type="number" id="dFeeAmount" placeholder="Your rate (₹)" min="0" value="${p.feeAmount || ''}" class="full-width">
 
+                    <div class="full-width" style="border:1px dashed #fa8900; border-radius:8px; padding:12px; background:#fffaf2;">
+                        <label style="font-size:13px; font-weight:700; display:block; margin-bottom:4px;">💸 Payment details (delivery par buyer se paisa lene ke liye)</label>
+                        <p style="font-size:12px; color:#666; margin:0 0 8px;">Buyer UPI se dega to wo yahan paisa bhejega. Baad me seller aapse hisaab karega.</p>
+                        <input type="text" id="dUpiId" placeholder="Your UPI ID (e.g. yourname@okhdfcbank)" value="${escapeHtml(p.upiId || '')}" style="width:100%; box-sizing:border-box; margin-bottom:8px;">
+                        <label style="font-size:13px; display:block; margin-bottom:4px;">Payment QR (optional):</label>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <input type="url" id="dUpiQr" placeholder="QR image link or upload →" value="${escapeHtml(p.upiQr || '')}" style="flex:1; box-sizing:border-box;">
+                            <label style="cursor:pointer; font-size:22px;">📤<input type="file" id="dUpiQrUpload" accept="image/*" hidden></label>
+                        </div>
+                        <span id="dUpiQrStatus" style="font-size:12px; color:#666;"></span>
+                    </div>
+
                     <button class="action-btn full-width" onclick="window.saveProfileMain()">Save Profile & Continue</button>
                     ${myProfile ? `<button class="action-btn secondary full-width" onclick="window.cancelEditMain()">Cancel</button>` : ''}
                 </div>
             </div>
         `;
         refreshDeliveryLocationMap();
+        wireImageUpload('dUpiQrUpload', 'dUpiQr', 'dUpiQrStatus', { aspect: 'orig', maxDimension: 900, quality: 0.92, targetKB: 300 });
     }
 
     window.updateFeeTypeUI = function() {
@@ -246,7 +260,9 @@
             vehicleType: document.getElementById('dVehicle').value,
             feeType: feeTypeInput ? feeTypeInput.value : 'per_order',
             feeAmount: document.getElementById('dFeeAmount').value,
-            maxDistanceKm: document.getElementById('dMaxDistance').value
+            maxDistanceKm: document.getElementById('dMaxDistance').value,
+            upiId: document.getElementById('dUpiId').value.trim(),
+            upiQr: document.getElementById('dUpiQr').value.trim()
         });
         if (ok) await loadAndRenderProfile();
     };
@@ -403,6 +419,12 @@
                         <p>🏪 From: ${escapeHtml(o.shopName || 'N/A')}</p>
                         <p>📍 To: ${escapeHtml(o.buyerAddress || 'N/A')}</p>
                         <p>📞 Buyer: ${escapeHtml(o.buyerPhone || 'N/A')}</p>
+                        ${(() => {
+                            if (o.paymentStatus === 'Payment Collected') return `<p style="color:#007600; font-weight:600;">✅ ₹${o.paymentCollectedAmount || o.price || 0} collect ho chuka hai</p>`;
+                            if (needsPaymentCollection(o)) return `<p style="color:#c7511f; font-weight:700;">💰 Delivery par buyer se ₹${o.price || 0} lena hai (UPI ya cash) — OTP se pehle</p>`;
+                            if (o.paymentVerified) return `<p style="color:#007600;">✅ Ye order pehle se paid hai — paisa nahi lena</p>`;
+                            return '';
+                        })()}
                         <div class="btn-row">${actionBtns}</div>
                     </div>
                 `;
