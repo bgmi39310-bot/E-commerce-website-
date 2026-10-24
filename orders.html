@@ -191,8 +191,11 @@
                 // feature. 0 means the seller doesn't accept returns at all.
                 const returnWindowDays = order.returnWindowDays !== undefined ? order.returnWindowDays : 7;
                 let daysSinceDelivered = null;
-                if (order.deliveredAt && order.deliveredAt.toDate) {
-                    daysSinceDelivered = (Date.now() - order.deliveredAt.toDate().getTime()) / (1000 * 60 * 60 * 24);
+                // Use deliveredAt; for older orders that don't have it, fall back
+                // to updatedAt so the return button isn't silently hidden.
+                const deliveredStamp = order.deliveredAt || (status === 'Delivered' ? order.updatedAt : null);
+                if (deliveredStamp && deliveredStamp.toDate) {
+                    daysSinceDelivered = (Date.now() - deliveredStamp.toDate().getTime()) / (1000 * 60 * 60 * 24);
                 }
                 const returnWindowOpen = returnWindowDays > 0 && daysSinceDelivered !== null && daysSinceDelivered <= returnWindowDays;
                 const returnWindowExpired = returnWindowDays > 0 && daysSinceDelivered !== null && daysSinceDelivered > returnWindowDays;
@@ -207,6 +210,7 @@
                             <span class="status-pill status-${status}">${status}</span>
                         </div>
                         ${renderProgress(status)}
+                        ${renderPaymentLine(order)}
                         ${status === 'Shipped' && order.deliveryOTP ? `
                             <div class="delivery-code-box">
                                 <div class="code-label">🔐 Your Delivery OTP</div>
@@ -233,6 +237,7 @@
                                 <button class="review-submit-btn" onclick="submitMyReview('${order.id}', '${order.productId || ''}', '${order.sellerUid || ''}')">Submit Review</button>
                             </div>
                         ` : ''}
+                        ${['Pending', 'Accepted', 'Shipped'].includes(status) ? `<div class="return-status-note" style="background:#f0f2f2; color:#666;">⭐ Rating aur ↩️ Return ka option order <strong>Delivered</strong> hone ke baad milega.</div>` : ''}
                         ${status === 'Delivered' && order.reviewed ? `<div class="reviewed-note">✅ You reviewed this order</div>` : ''}
                         ${status === 'Delivered' && !order.returnRequested && returnWindowOpen ? `
                             <button class="return-btn" onclick="toggleReturnForm('${order.id}')">↩️ Request Return / Refund</button>
@@ -265,6 +270,17 @@
                 `;
             });
             content.innerHTML = html;
+        }
+
+        function renderPaymentLine(order) {
+            const ps = order.paymentStatus;
+            if (ps === 'Awaiting Seller Confirmation') return `<p style="font-size:13px; color:#b8860b; margin:8px 0;">⏳ UPI payment: seller ki confirmation ka wait (UTR ${escapeHtml(order.upiUtr || '')})</p>`;
+            if (ps === 'Payment Received') return `<p style="font-size:13px; color:#007600; margin:8px 0;">✅ UPI payment confirmed by seller</p>`;
+            if (ps === 'Payment Not Received') return `<p style="font-size:13px; color:#c0392b; margin:8px 0;">❌ Seller ko aapka UPI payment nahi mila — seller se sampark karo.</p>`;
+            if (ps === 'Payment Collected') return `<p style="font-size:13px; color:#007600; margin:8px 0;">✅ Payment ho gaya (${order.paymentCollectedMethod === 'UPI' ? 'UPI' : 'Cash'}) — delivery par diya</p>`;
+            if (ps === 'UPI on Delivery') return `<p style="font-size:13px; color:#555; margin:8px 0;">📱 Delivery par ₹${order.price || 0} UPI (ya cash) se do</p>`;
+            if (order.paymentMethod === 'COD') return `<p style="font-size:13px; color:#555; margin:8px 0;">💵 Delivery par ₹${order.price || 0} cash (ya UPI) se do</p>`;
+            return '';
         }
 
         async function fetchMyOrders(uid) {
