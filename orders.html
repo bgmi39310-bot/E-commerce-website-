@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="page-loader.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Orders - DesiMarket</title>
@@ -332,6 +333,19 @@
                 buyerUid: currentBuyerUid,
                 buyerName: currentBuyerName,
                 rating, comment
+            }, () => {
+                // Swap the review form for the "reviewed" note straight away,
+                // so the button can't be pressed a second time.
+                if (ordersById[orderId]) ordersById[orderId].reviewed = true;
+                const form = document.getElementById('reviewForm-' + orderId);
+                if (form) {
+                    const btn = form.previousElementSibling;
+                    if (btn && btn.classList.contains('review-btn')) btn.remove();
+                    const note = document.createElement('div');
+                    note.className = 'reviewed-note';
+                    note.textContent = '✅ You reviewed this order';
+                    form.replaceWith(note);
+                }
             });
         };
 
