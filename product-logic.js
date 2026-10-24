@@ -178,7 +178,8 @@ export async function fetchMyListedProducts(db, uid, onLowStockUpdate) {
             collectionPath: 'vendors',
             whereField: 'sellerUid',
             whereValue: uid,
-            storageKey: `vendors:seller:${uid}`
+            storageKey: `vendors:seller:${uid}`,
+            unorderedFirstSync: true
         });
     } catch (error) {
         console.error("Error loading products: ", error);
