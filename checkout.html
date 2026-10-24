@@ -42,8 +42,8 @@
         .new-addr-link { font-size: 12.5px; color: #007185; cursor: pointer; text-decoration: underline; display: inline-block; margin-top: 4px; }
         .form-row .form-group { flex: 1; }
 
-        .payment-options { display: flex; gap: 10px; }
-        .payment-card { flex: 1; border: 2px solid #ddd; border-radius: 6px; padding: 12px; text-align: center; cursor: pointer; font-size: 13.5px; font-weight: 600; }
+        .payment-options { display: flex; gap: 10px; flex-wrap: wrap; }
+        .payment-card { flex: 1 1 140px; border: 2px solid #ddd; border-radius: 6px; padding: 12px; text-align: center; cursor: pointer; font-size: 13.5px; font-weight: 600; }
         .payment-card.active { border-color: #fa8900; background: #fff3e0; color: #c7511f; }
 
         .order-item-row { display: flex; justify-content: space-between; font-size: 13.5px; padding: 6px 0; border-bottom: 1px solid #f2f2f2; }
@@ -125,12 +125,18 @@
             <h2>💳 Payment Method</h2>
             <div class="payment-options">
                 <div class="payment-card active" data-method="COD" onclick="selectPayment('COD')">💵 Cash on Delivery</div>
-                <div class="payment-card" data-method="UPI" onclick="selectPayment('UPI')">📱 Pay via UPI Now</div>
+                <div class="payment-card" data-method="UPI_DELIVERY" onclick="selectPayment('UPI_DELIVERY')">📱 UPI on Delivery<br><span style="font-weight:400; font-size:11.5px;">delivery par UPI se do</span></div>
+                <div class="payment-card" data-method="UPI" onclick="selectPayment('UPI')">📲 Pay UPI Now<br><span style="font-weight:400; font-size:11.5px;">advance + UTR number</span></div>
                 <div class="payment-card" data-method="RAZORPAY" onclick="selectPayment('RAZORPAY')">💳 Pay Online (Card / UPI / Netbanking)</div>
             </div>
             <div id="upiPayBox" style="display:none; margin-top:14px; text-align:center;">
                 <button type="button" id="upiPayBtn" style="background:#232f3e; color:white; border:none; padding:11px 20px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:13.5px;">📲 Open UPI App to Pay</button>
                 <p id="upiPayNote" style="font-size:11.5px; color:#767676; margin-top:8px;"></p>
+                <div id="upiUtrWrap" style="display:none; margin-top:12px; text-align:left;">
+                    <label style="font-size:13px; font-weight:700; display:block; margin-bottom:4px;">Payment karne ke baad UTR / UPI Ref No. daalo (12 digit)</label>
+                    <input type="text" id="upiUtrInput" inputmode="numeric" maxlength="12" placeholder="e.g. 412345678901" style="width:100%; box-sizing:border-box; padding:10px; border:1px solid #ccc; border-radius:6px; font-size:15px;">
+                    <p style="font-size:11.5px; color:#767676; margin:4px 0 0;">UPI app me payment ki detail me "UTR" ya "UPI transaction ID" likha hota hai.</p>
+                </div>
                 <img id="upiQrImg" src="" alt="Seller payment QR" style="display:none; max-width:220px; width:100%; margin:12px auto 0; border-radius:8px; border:1px solid #ddd;">
             </div>
         </div>
@@ -203,7 +209,58 @@
         let selectedPayment = 'COD';
         let currentUpiUrl = null;      // set by setupUpiPayment(); null = UPI not usable for this cart
         let upiInitiated = false;      // true once the UPI app has been opened for this order
+        // Names of shops in the cart that have not added a UPI ID or QR code.
+        async function sellersMissingUpi() {
+            const cart = getCart();
+            const uids = [...new Set(cart.map(i => i.sellerUid).filter(Boolean))];
+            const missing = [];
+            for (const uid of uids) {
+                try {
+                    const snap = await getDoc(doc(db, "sellers_profiles", uid));
+                    const d = snap.exists() ? snap.data() : {};
+                    if (!d.upiId && !d.upiQr) missing.push(d.shopName || 'Dukandar');
+                } catch (e) { /* if we can't check, don't block the buyer */ }
+            }
+            return missing;
+        }
+
+        function showUpiMissingPopup(shopNames) {
+            if (!document.getElementById('upiPopupStyle')) {
+                const st = document.createElement('style');
+                st.id = 'upiPopupStyle';
+                st.textContent = '@keyframes upiPopIn { from { transform: scale(.85) translateY(20px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } } @keyframes upiFade { from { opacity: 0; } to { opacity: 1; } }';
+                document.head.appendChild(st);
+            }
+            const names = shopNames.map(n => '<strong>' + escapeHtml(n) + '</strong>').join(', ');
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'position:fixed; inset:0; background:rgba(15,25,35,.6); z-index:99999; display:flex; align-items:center; justify-content:center; padding:18px; animation:upiFade .2s ease;';
+            wrap.innerHTML = `
+                <div style="background:#fff; border-radius:16px; max-width:360px; width:100%; padding:26px 22px 20px; text-align:center; box-shadow:0 18px 50px rgba(0,0,0,.35); animation:upiPopIn .28s ease;">
+                    <div style="width:74px; height:74px; margin:0 auto 14px; border-radius:50%; background:linear-gradient(135deg,#fff3e0,#ffe0b2); display:flex; align-items:center; justify-content:center; font-size:38px;">📱</div>
+                    <h3 style="margin:0 0 8px; font-size:19px; color:#232f3e;">UPI abhi available nahi hai</h3>
+                    <p style="margin:0 0 10px; font-size:14px; line-height:1.55; color:#555;">${names} ne abhi apna <strong>UPI ID ya QR code</strong> nahi daala hai, isliye is dukaan ko UPI se payment nahi ho sakta.</p>
+                    <div style="background:#f1f8f2; border:1px solid #bfe0c4; border-radius:10px; padding:10px 12px; margin:0 0 16px; font-size:13.5px; color:#1b5e20; line-height:1.5;">
+                        💵 Kripya <strong>Cash on Delivery</strong> chuniye. Delivery par aap seedha paisa de sakte hain.
+                    </div>
+                    <button id="upiPopupOk" style="width:100%; padding:13px; border:none; border-radius:10px; background:linear-gradient(180deg,#f7dfa5,#f0c14b); color:#111; font-weight:700; font-size:15px; cursor:pointer;">Theek hai, Cash on Delivery chunta hoon</button>
+                </div>`;
+            document.body.appendChild(wrap);
+            const close = () => wrap.remove();
+            wrap.querySelector('#upiPopupOk').onclick = close;
+            wrap.addEventListener('click', e => { if (e.target === wrap) close(); });
+        }
+
         window.selectPayment = async function(method) {
+            // UPI needs the seller's UPI ID or QR — if a shop hasn't set one up,
+            // switch back to Cash on Delivery and explain why with a popup.
+            if (method === 'UPI' || method === 'UPI_DELIVERY') {
+                const missing = await sellersMissingUpi();
+                if (missing.length) {
+                    await window.selectPayment('COD');
+                    showUpiMissingPopup(missing);
+                    return;
+                }
+            }
             selectedPayment = method;
             upiInitiated = false;
             currentUpiUrl = null;
@@ -226,6 +283,7 @@
             const btn = document.getElementById('upiPayBtn');
             const qrImg = document.getElementById('upiQrImg');
             qrImg.style.display = 'none';
+            document.getElementById('upiUtrWrap').style.display = 'none';
 
             const sellerUids = [...new Set(cart.map(item => item.sellerUid).filter(Boolean))];
             if (sellerUids.length === 0) {
@@ -258,14 +316,16 @@
                 // QR-only seller: buyer scans the QR with any UPI app.
                 currentUpiUrl = 'QR_ONLY';
                 btn.style.display = 'none';
-                noteEl.innerText = `Scan this QR with any UPI app and pay ₹${finalTotal.toFixed(0)} to ${sellerData.shopName || 'seller'}, then tap Place Order.`;
+                document.getElementById('upiUtrWrap').style.display = 'block';
+                noteEl.innerText = `Scan this QR with any UPI app and pay ₹${finalTotal.toFixed(0)} to ${sellerData.shopName || 'seller'}, then enter the UTR number below and tap Place Order.`;
                 return;
             }
             const upiUrl = `upi://pay?pa=${encodeURIComponent(sellerData.upiId)}&pn=${encodeURIComponent(sellerData.shopName || 'DesiMarket Seller')}&am=${finalTotal.toFixed(2)}&cu=INR&tn=${encodeURIComponent('DesiMarket Order')}`;
 
             currentUpiUrl = upiUrl;
             btn.style.display = 'inline-block';
-            noteEl.innerText = `Pay ₹${finalTotal.toFixed(0)} to ${sellerData.shopName || 'seller'} (UPI: ${sellerData.upiId}). Tap Place Order — your UPI app will open first.`;
+            document.getElementById('upiUtrWrap').style.display = 'block';
+            noteEl.innerText = `Pay ₹${finalTotal.toFixed(0)} to ${sellerData.shopName || 'seller'} (UPI: ${sellerData.upiId}). Tap Place Order — your UPI app will open first. Payment ke baad UTR number niche daalo.`;
             btn.onclick = () => { upiInitiated = true; window.location.href = upiUrl; };
         }
 
@@ -383,6 +443,7 @@
             // UPI: open the UPI app FIRST, only place the order on the 2nd tap
             // (after the buyer says they have paid). Never place a UPI order
             // before the buyer even had a chance to pay.
+            let upiUtr = '';
             if (selectedPayment === 'UPI') {
                 if (!currentUpiUrl) {
                     showToast('UPI is not available for this order. Please choose Cash on Delivery or Pay Online.', 'error');
@@ -397,6 +458,11 @@
                     }
                     showToast('Pay in your UPI app, then come back here and tap "I have paid — Place Order".');
                     window.location.href = currentUpiUrl;
+                    return;
+                }
+                upiUtr = document.getElementById('upiUtrInput').value.trim();
+                if (!/^\d{12}$/.test(upiUtr)) {
+                    showToast('Payment ke baad apna 12-digit UTR / UPI Ref number daalo.', 'error');
                     return;
                 }
             }
@@ -431,7 +497,8 @@
                     items,
                     delivery: { name, phone, address: fullAddress, city },
                     couponCode: appliedCoupon ? appliedCoupon.code : null,
-                    paymentMethod: selectedPayment
+                    paymentMethod: selectedPayment === 'UPI_DELIVERY' ? 'UPI' : selectedPayment,
+                    upiUtr: upiUtr || undefined
                 });
 
                 // Keep a local copy for the buyer's "My Orders" quick view
