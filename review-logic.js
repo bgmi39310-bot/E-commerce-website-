@@ -1,4 +1,4 @@
-import { collection, getDocs, query, where, doc, writeBatch, orderBy, limit, getAggregateFromServer, average, count, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, getDocs, getDoc, updateDoc, query, where, doc, writeBatch, orderBy, limit, getAggregateFromServer, average, count, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { showToast } from './toast.js';
 import { escapeHtml } from './sanitize.js';
 
@@ -30,6 +30,18 @@ export async function submitReview(db, { orderId, productId, sellerUid, buyerUid
         // (the Firestore rule that blocks that only checks orders.reviewed,
         // which would have been stuck at false). A batch commits both
         // writes together, or neither.
+        // Orders are created WITHOUT a `reviewed` field. The security rule
+        // that allows a review checks `order.reviewed != true`, and reading a
+        // field that doesn't exist makes Firestore reject the whole write
+        // (permission-denied) — so no order could ever be reviewed. Giving
+        // the order an explicit `reviewed: false` first makes that check
+        // work. (A buyer is allowed to set this field on their own order.)
+        const orderRef = doc(db, "orders", orderId);
+        const orderSnap = await getDoc(orderRef);
+        if (orderSnap.exists() && orderSnap.data().reviewed === undefined) {
+            await updateDoc(orderRef, { reviewed: false, updatedAt: serverTimestamp() });
+        }
+
         const batch = writeBatch(db);
         const reviewRef = doc(collection(db, "reviews"));
         batch.set(reviewRef, {
