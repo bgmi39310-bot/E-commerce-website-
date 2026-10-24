@@ -42,8 +42,13 @@ const FIRST_SYNC_LIMIT = 300; // generous cap for the one-time first full fetch
 // documents that genuinely still exist — quietly correcting any drift.
 const MAX_CACHE_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
+// "v2": bumping this version throws away every old saved list once. Older
+// versions used the phone's clock as the sync watermark, which could make a
+// document created by the server (e.g. a new product) look "older" than the
+// watermark and be skipped forever — so lists could be missing items. A
+// fresh full sync fixes any list that was already affected.
 function cacheKeyFor(storageKey) {
-    return `deltaSync:${storageKey}`;
+    return `deltaSync:v2:${storageKey}`;
 }
 
 // The cache is saved as JSON, and JSON.stringify turns a Firestore Timestamp
@@ -149,7 +154,18 @@ export async function deltaSync(db, { collectionPath, whereField, whereValue, st
     // deliberate: it means a document written mid-fetch is simply picked up
     // again on the NEXT sync rather than possibly being missed — a little
     // redundancy is fine, missing an update silently is not.
-    saveCache(storageKey, items, syncStartedAt.toISOString());
+    // The watermark comes from the documents' OWN server timestamps (the
+    // newest updatedAt we've seen), not from the phone's clock — so a phone
+    // whose clock is a few minutes off can never cause changes to be missed.
+    let maxMs = 0;
+    for (const item of items) {
+        const ms = item.updatedAt && item.updatedAt.toMillis ? item.updatedAt.toMillis() : 0;
+        if (ms > maxMs) maxMs = ms;
+    }
+    const watermark = maxMs > 0
+        ? new Date(maxMs)
+        : (cached ? new Date(cached.lastSync) : new Date(0));
+    saveCache(storageKey, items, watermark.toISOString());
 
     return items;
 }
