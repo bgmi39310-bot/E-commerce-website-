@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { doc, getDoc, setDoc, collection, query, where, getDocs, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { NO_IMAGE_PLACEHOLDER } from './img-utils.js';
 import { showToast } from './toast.js';
 import { initPickerMap } from './map-utils.js';
@@ -108,6 +108,24 @@ export async function loadSellerProfileFromFirestore(db, uid) {
     }
 }
 
+// Every product stores a COPY of the shop name when it is listed, so when a
+// seller renames their shop the old name would stay on all existing
+// products. This updates every product of this seller whose saved shop name
+// no longer matches. Runs on every profile save, so it also repairs
+// products that were left with an old name earlier. The caller only runs it
+// when needed (see productsSyncedShopName in saveSellerProfile), so normal
+// profile edits cost no extra reads.
+async function syncShopNameOnProducts(db, sellerUid, shopName) {
+    const snap = await getDocs(query(collection(db, "vendors"), where("sellerUid", "==", sellerUid)));
+    const stale = snap.docs.filter(d => d.data().shopName !== shopName);
+    for (let i = 0; i < stale.length; i += 400) {
+        const batch = writeBatch(db);
+        stale.slice(i, i + 400).forEach(d => batch.update(d.ref, { shopName, updatedAt: serverTimestamp() }));
+        await batch.commit();
+    }
+    return stale.length;
+}
+
 export async function saveSellerProfile(db, currentLoggedInUser, loadProfileCallback) {
     if (!currentLoggedInUser) return;
     const shopName = document.getElementById('shopName').value.trim();
@@ -144,8 +162,26 @@ export async function saveSellerProfile(db, currentLoggedInUser, loadProfileCall
         // would silently wipe out fields that live on this same document but
         // are set elsewhere (followerCount from follow-logic.js, isPremium
         // from premium-logic.js, KYC status from kyc-logic.js, etc).
-        await setDoc(doc(db, "sellers_profiles", currentLoggedInUser.uid), profile, { merge: true });
+        const profileRef = doc(db, "sellers_profiles", currentLoggedInUser.uid);
+        // One cheap read of the profile itself (1 document) tells us whether
+        // the products already carry this exact shop name.
+        const prevSnap = await getDoc(profileRef);
+        const needsProductSync = !prevSnap.exists() || prevSnap.data().productsSyncedShopName !== shopName;
+
+        await setDoc(profileRef, profile, { merge: true });
         loadProfileCallback(currentLoggedInUser.uid);
+
+        // Keep the shop name on this seller's products in sync with the
+        // profile — only when the name is new/changed, not on every save.
+        try {
+            if (needsProductSync) {
+                await syncShopNameOnProducts(db, currentLoggedInUser.uid, shopName);
+                await setDoc(profileRef, { productsSyncedShopName: shopName }, { merge: true });
+            }
+        } catch (syncError) {
+            console.error("Could not update shop name on products:", syncError);
+            showToast("Profile saved, but the shop name on your products could not be updated. Please save once more.", 'error');
+        }
 
         const msg = document.getElementById('profileMsg');
         msg.style.display = 'block';
