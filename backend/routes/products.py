@@ -31,6 +31,7 @@ from flask import Blueprint, request, jsonify, g
 from firebase_admin import firestore
 
 from utils.auth import require_auth
+from utils.fast_cache import serve_cached
 from utils.cache import get_redis
 from utils.firebase_admin_init import db
 from utils.limiter import limiter
@@ -127,16 +128,23 @@ def _cache_get(r, key):
         return None
 
 
+_MEMORY_TTL_SECONDS = 15  # how long each worker reuses its in-memory copy (see utils/fast_cache.py)
+
+
 @products_bp.route("", methods=["GET"])
 def list_products():
     """The full product listing for the homepage. Replaces index.html's old
     direct `getDocs(query(collection(db, "vendors"), limit(500)))` call —
     same 500-item cap, just served from Redis on every visit after the
-    first."""
+    first, and from this worker's memory (pre-compressed) between refreshes."""
+    return serve_cached("products:list", _MEMORY_TTL_SECONDS, _build_products_payload)
+
+
+def _build_products_payload():
     r = get_redis()
     cached = _cache_get(r, _HOMEPAGE_CACHE_KEY)
     if cached is not None:
-        return jsonify({"products": cached, "cached": True})
+        return {"products": cached, "cached": True}
 
     # Ordered newest-first: if there are ever more than _PRODUCT_LIMIT
     # products, this guarantees the cap drops the OLDEST listings, not an
@@ -155,7 +163,7 @@ def list_products():
         except Exception:
             logger.exception("Could not write homepage product list to Redis (continuing without caching it)")
 
-    return jsonify({"products": products, "cached": False})
+    return {"products": products, "cached": False}
 
 
 @products_bp.route("/shop/<seller_uid>", methods=["GET"])
