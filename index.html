@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="page-loader.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DesiMarket - India's Desi Online Marketplace</title>
@@ -898,13 +899,15 @@
             `).join('');
         }
 
-        window.onload = function() {
-            applyTranslations();
-            fetchLiveProducts();
-            updateCartBadge();
-            setupHeroBanners();
-            loadSellersNearYou();
-        };
+        // Start loading the homepage data right away. This module script already
+        // runs after the page's HTML is parsed, so there is no need to wait for
+        // window.onload (which also waits for every image, font and analytics
+        // script) — waiting made the products appear later than necessary.
+        applyTranslations();
+        fetchLiveProducts();
+        updateCartBadge();
+        setupHeroBanners();
+        loadSellersNearYou();
     </script>
 </body>
 </html>
