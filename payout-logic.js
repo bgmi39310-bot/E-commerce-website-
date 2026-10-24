@@ -15,7 +15,7 @@ export async function loadPayoutSummary(db, uid) {
     try {
         const base = collection(db, "orders");
 
-        const [deliveredSnap, cancelledSnap, inTransitSnap] = await Promise.all([
+        const [deliveredSnap, cancelledSnap, inTransitSnap, upiSnap, partnerSnap] = await Promise.all([
             getAggregateFromServer(
                 query(base, where("sellerUid", "==", uid), where("status", "==", "Delivered")),
                 { total: sum("price") }
@@ -28,7 +28,19 @@ export async function loadPayoutSummary(db, uid) {
                 query(base, where("sellerUid", "==", uid), where("status", "in", ["Pending", "Accepted", "Shipped"])),
                 { total: sum("price") }
             ),
+            // Total of direct-UPI payments the seller has confirmed as received.
+            getAggregateFromServer(
+                query(base, where("sellerUid", "==", uid), where("paymentStatus", "==", "Payment Received")),
+                { total: sum("price") }
+            ).catch(() => null),
+            // Money delivery partners collected on the seller's behalf and haven't handed over yet.
+            getAggregateFromServer(
+                query(base, where("sellerUid", "==", uid), where("settlementStatus", "==", "Pending")),
+                { total: sum("price") }
+            ).catch(() => null),
         ]);
+        const withPartners = partnerSnap ? (partnerSnap.data().total || 0) : 0;
+        const upiConfirmed = upiSnap ? (upiSnap.data().total || 0) : 0;
 
         const delivered = deliveredSnap.data().total || 0;
         const cancelled = cancelledSnap.data().total || 0;
@@ -43,6 +55,14 @@ export async function loadPayoutSummary(db, uid) {
                 <div class="payout-card pending">
                     <div class="payout-value">₹${inTransit.toFixed(0)}</div>
                     <div class="payout-label">In Progress (Not Yet Delivered)</div>
+                </div>
+                <div class="payout-card earned">
+                    <div class="payout-value">₹${upiConfirmed.toFixed(0)}</div>
+                    <div class="payout-label">UPI Payments Confirmed</div>
+                </div>
+                <div class="payout-card pending">
+                    <div class="payout-value">₹${withPartners.toFixed(0)}</div>
+                    <div class="payout-label">Delivery Partners ke paas (lena baaki)</div>
                 </div>
                 <div class="payout-card lost">
                     <div class="payout-value">₹${cancelled.toFixed(0)}</div>
