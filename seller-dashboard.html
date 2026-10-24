@@ -546,16 +546,16 @@
         import { findAvailableDeliveryBoys, postOrderToJobBoard, assignOrderToDeliveryBoy, cancelDeliveryRequest, loadAllAvailableDeliveryPartners } from './delivery-logic.js';
         import { submitReport } from './report-logic.js';
 
-        wireImageUpload('shopLogoFileUpload', 'shopLogoFile', 'shopLogoStatus');
-        wireImageUpload('shopUpiQrUpload', 'shopUpiQr', 'shopUpiQrStatus');
-        wireImageUpload('pImageFileUpload', 'pImageFile', 'pImageStatus');
-        wireImageUpload('pImageFile2Upload', 'pImageFile2', 'pImage2Status');
-        wireImageUpload('pImageFile3Upload', 'pImageFile3', 'pImage3Status');
-        wireImageUpload('pImageFile4Upload', 'pImageFile4', 'pImage4Status');
-        wireImageUpload('epImageFileUpload', 'epImageFile', 'epImageStatus');
-        wireImageUpload('epImageFile2Upload', 'epImageFile2', 'epImage2Status');
-        wireImageUpload('epImageFile3Upload', 'epImageFile3', 'epImage3Status');
-        wireImageUpload('epImageFile4Upload', 'epImageFile4', 'epImage4Status');
+        wireImageUpload('shopLogoFileUpload', 'shopLogoFile', 'shopLogoStatus', { aspect: '1:1', maxDimension: 500, quality: 0.8, targetKB: 70 });
+        wireImageUpload('shopUpiQrUpload', 'shopUpiQr', 'shopUpiQrStatus', { aspect: 'orig', maxDimension: 900, quality: 0.92, targetKB: 300 });
+        wireImageUpload('pImageFileUpload', 'pImageFile', 'pImageStatus', { aspect: 'orig', maxDimension: 900, quality: 0.78, targetKB: 140 });
+        wireImageUpload('pImageFile2Upload', 'pImageFile2', 'pImage2Status', { aspect: 'orig', maxDimension: 900, quality: 0.78, targetKB: 140 });
+        wireImageUpload('pImageFile3Upload', 'pImageFile3', 'pImage3Status', { aspect: 'orig', maxDimension: 900, quality: 0.78, targetKB: 140 });
+        wireImageUpload('pImageFile4Upload', 'pImageFile4', 'pImage4Status', { aspect: 'orig', maxDimension: 900, quality: 0.78, targetKB: 140 });
+        wireImageUpload('epImageFileUpload', 'epImageFile', 'epImageStatus', { aspect: 'orig', maxDimension: 900, quality: 0.78, targetKB: 140 });
+        wireImageUpload('epImageFile2Upload', 'epImageFile2', 'epImage2Status', { aspect: 'orig', maxDimension: 900, quality: 0.78, targetKB: 140 });
+        wireImageUpload('epImageFile3Upload', 'epImageFile3', 'epImage3Status', { aspect: 'orig', maxDimension: 900, quality: 0.78, targetKB: 140 });
+        wireImageUpload('epImageFile4Upload', 'epImageFile4', 'epImage4Status', { aspect: 'orig', maxDimension: 900, quality: 0.78, targetKB: 140 });
 
         let currentLoggedInUser = null;
 
