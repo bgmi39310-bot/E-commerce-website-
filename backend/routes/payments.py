@@ -481,9 +481,21 @@ def place_order():
     delivery = data.get("delivery") or {}  # { name, phone, address, city }
     coupon_code = (data.get("couponCode") or "").strip().upper() or None
     payment_method = (data.get("paymentMethod") or "").strip().upper()
+    upi_utr = str(data.get("upiUtr") or "").strip()
 
     if payment_method not in _NON_GATEWAY_PAYMENT_METHODS:
         return jsonify({"error": "'paymentMethod' must be 'COD' or 'UPI'."}), 400
+
+    # Direct-UPI (buyer pays the seller's UPI/QR, no gateway): the buyer
+    # must give the 12-digit UTR / UPI reference number of the payment, and
+    # the SELLER then confirms "payment received" (see confirm_upi_payment
+    # below). A UTR can only ever be used for one checkout.
+    if payment_method == "UPI" and upi_utr:
+        if not (upi_utr.isdigit() and len(upi_utr) == 12):
+            return jsonify({"error": "Please enter the 12-digit UTR / UPI reference number from your payment."}), 400
+        dup = db.collection("orders").where("upiUtr", "==", upi_utr).limit(1).get()
+        if len(dup) > 0:
+            return jsonify({"error": "This UTR number was already used for another order."}), 409
 
     name = (delivery.get("name") or "").strip()
     phone = (delivery.get("phone") or "").strip()
@@ -510,11 +522,221 @@ def place_order():
         return jsonify({"error": f"'{e.product_name}' only has {e.available} left in stock."}), 409
 
     # 4) Stock is reserved — create the orders.
+    extra_fields = {"paymentVerified": False}
+    notif_suffix = ""
+    if payment_method == "UPI" and upi_utr:
+        extra_fields.update({"upiUtr": upi_utr, "paymentStatus": "Awaiting Seller Confirmation"})
+        notif_suffix = f" — UPI paid (UTR {upi_utr}). Please check your UPI app and confirm payment."
+    elif payment_method == "UPI":
+        extra_fields["paymentStatus"] = "UPI on Delivery"
+    else:
+        extra_fields["paymentStatus"] = "Cash on Delivery"
+
     created_order_ids = _create_orders(
         verified_items, g.uid, delivery, coupon_code, coupon_seller, coupon_doc_ref,
         payment_method=payment_method,
-        extra_order_fields={"paymentVerified": False},
-        notif_suffix="",
+        extra_order_fields=extra_fields,
+        notif_suffix=notif_suffix,
     )
 
     return jsonify({"success": True, "orderIds": created_order_ids})
+
+
+@payments_bp.route("/confirm-upi-payment", methods=["POST"])
+@limiter.limit("30 per minute")
+@require_auth
+def confirm_upi_payment():
+    """
+    The SELLER of a direct-UPI order says whether the money actually reached
+    their UPI account. Done here (not from the browser) so only the real
+    seller of that exact order can do it, and buyers can never mark their
+    own order as paid.
+    Body: { "orderId": "...", "received": true | false }
+    """
+    data = request.get_json(silent=True) or {}
+    order_id = str(data.get("orderId") or "").strip()
+    received = data.get("received")
+    if not order_id or not isinstance(received, bool):
+        return jsonify({"error": "'orderId' and 'received' (true/false) are required."}), 400
+
+    order_ref = db.collection("orders").document(order_id)
+    snap = order_ref.get()
+    if not snap.exists:
+        return jsonify({"error": "Order not found."}), 404
+    order = snap.to_dict()
+
+    if order.get("sellerUid") != g.uid:
+        return jsonify({"error": "This is not your order."}), 403
+    if order.get("paymentStatus") != "Awaiting Seller Confirmation":
+        return jsonify({"error": "This order is not waiting for a UPI payment confirmation."}), 409
+
+    now = datetime.now(timezone.utc)
+    if received:
+        order_ref.update({
+            "paymentVerified": True,
+            "paymentStatus": "Payment Received",
+            "paymentConfirmedAt": now,
+            "updatedAt": now,
+        })
+        title = f"Payment received for {order.get('productName', 'your order')} ✅"
+        body = "The seller confirmed your UPI payment. Your order will be processed soon."
+    else:
+        order_ref.update({
+            "paymentVerified": False,
+            "paymentStatus": "Payment Not Received",
+            "updatedAt": now,
+        })
+        title = f"Payment not received for {order.get('productName', 'your order')}"
+        body = "The seller could not find your UPI payment. Please contact the seller."
+
+    if order.get("buyerUid"):
+        db.collection("users").document(order["buyerUid"]).collection("notifications").document().set({
+            "title": title,
+            "body": body,
+            "type": "payment",
+            "link": "orders.html",
+            "read": False,
+            "createdAt": now,
+        })
+
+    return jsonify({"success": True})
+
+
+@payments_bp.route("/collect-delivery-payment", methods=["POST"])
+@limiter.limit("30 per minute")
+@require_auth
+def collect_delivery_payment():
+    """
+    Pay-at-delivery: whoever hands the order over (the assigned delivery
+    partner, or the seller when delivering themselves) records that they
+    collected the money from the buyer — by UPI or cash — right before the
+    delivery OTP step.
+    Body: { "orderId": "...", "method": "UPI" | "CASH" }
+    """
+    data = request.get_json(silent=True) or {}
+    order_id = str(data.get("orderId") or "").strip()
+    method = str(data.get("method") or "").strip().upper()
+    if not order_id or method not in ("UPI", "CASH"):
+        return jsonify({"error": "'orderId' and 'method' (UPI or CASH) are required."}), 400
+
+    order_ref = db.collection("orders").document(order_id)
+    snap = order_ref.get()
+    if not snap.exists:
+        return jsonify({"error": "Order not found."}), 404
+    order = snap.to_dict()
+
+    delivery_partner_uid = order.get("deliveryBoyUid")
+    handler_uid = delivery_partner_uid or order.get("sellerUid")
+    if g.uid != handler_uid:
+        return jsonify({"error": "Only the person delivering this order can collect its payment."}), 403
+    if order.get("status") != "Shipped":
+        return jsonify({"error": "Payment can be collected only while the order is Shipped."}), 409
+    if order.get("paymentMethod") not in ("COD", "UPI") or order.get("paymentVerified") or order.get("paymentCollected"):
+        return jsonify({"error": "No payment needs to be collected for this order."}), 409
+    if order.get("paymentStatus") in ("Awaiting Seller Confirmation", "Payment Not Received"):
+        return jsonify({"error": "This order's advance UPI payment is still being confirmed by the seller."}), 409
+
+    now = datetime.now(timezone.utc)
+    collected_by = "delivery" if delivery_partner_uid else "seller"
+    amount = order.get("price") or 0
+    order_ref.update({
+        "paymentCollected": True,
+        "paymentStatus": "Payment Collected",
+        "paymentCollectedBy": collected_by,
+        "paymentCollectedByUid": g.uid,
+        "paymentCollectedByName": order.get("deliveryBoyName") if delivery_partner_uid else None,
+        "paymentCollectedMethod": method,
+        "paymentCollectedAmount": amount,
+        "paymentCollectedAt": now,
+        # When a delivery partner collected, the seller still has to receive
+        # that money from them — tracked here until the seller marks it settled.
+        "settlementStatus": "Pending" if delivery_partner_uid else "Settled",
+        "updatedAt": now,
+    })
+
+    if delivery_partner_uid and order.get("sellerUid"):
+        db.collection("users").document(order["sellerUid"]).collection("notifications").document().set({
+            "title": f"₹{amount:.0f} collected by delivery partner",
+            "body": f"{order.get('deliveryBoyName') or 'Your delivery partner'} collected ₹{amount:.0f} ({method}) for {order.get('productName', 'an order')}. Collect it from them.",
+            "type": "payment",
+            "link": "seller-dashboard.html",
+            "read": False,
+            "createdAt": now,
+        })
+
+    return jsonify({"success": True})
+
+
+@payments_bp.route("/settle-delivery-payment", methods=["POST"])
+@limiter.limit("30 per minute")
+@require_auth
+def settle_delivery_payment():
+    """The SELLER confirms the delivery partner has handed over the money they collected."""
+    data = request.get_json(silent=True) or {}
+    order_id = str(data.get("orderId") or "").strip()
+    if not order_id:
+        return jsonify({"error": "'orderId' is required."}), 400
+
+    order_ref = db.collection("orders").document(order_id)
+    snap = order_ref.get()
+    if not snap.exists:
+        return jsonify({"error": "Order not found."}), 404
+    order = snap.to_dict()
+
+    if order.get("sellerUid") != g.uid:
+        return jsonify({"error": "This is not your order."}), 403
+    if order.get("settlementStatus") != "Pending":
+        return jsonify({"error": "Nothing pending to settle for this order."}), 409
+
+    now = datetime.now(timezone.utc)
+    order_ref.update({"settlementStatus": "Settled", "settledAt": now, "updatedAt": now})
+    return jsonify({"success": True})
+
+
+@payments_bp.route("/record-missing-payment", methods=["POST"])
+@limiter.limit("30 per minute")
+@require_auth
+def record_missing_payment():
+    """
+    The SELLER records, after the fact, who collected the money on an already
+    Delivered COD / UPI-on-delivery order whose payment was never recorded.
+    Body: { "orderId": "...", "collectedBy": "seller" | "delivery", "method": "UPI" | "CASH" }
+    """
+    data = request.get_json(silent=True) or {}
+    order_id = str(data.get("orderId") or "").strip()
+    collected_by = str(data.get("collectedBy") or "").strip().lower()
+    method = str(data.get("method") or "").strip().upper()
+    if not order_id or collected_by not in ("seller", "delivery") or method not in ("UPI", "CASH"):
+        return jsonify({"error": "'orderId', 'collectedBy' (seller/delivery) and 'method' (UPI/CASH) are required."}), 400
+
+    order_ref = db.collection("orders").document(order_id)
+    snap = order_ref.get()
+    if not snap.exists:
+        return jsonify({"error": "Order not found."}), 404
+    order = snap.to_dict()
+
+    if order.get("sellerUid") != g.uid:
+        return jsonify({"error": "This is not your order."}), 403
+    if order.get("status") != "Delivered":
+        return jsonify({"error": "Only Delivered orders can be updated this way."}), 409
+    if order.get("paymentMethod") not in ("COD", "UPI") or order.get("paymentVerified") or order.get("paymentCollected"):
+        return jsonify({"error": "This order's payment is already recorded or was paid in advance."}), 409
+    if collected_by == "delivery" and not order.get("deliveryBoyUid"):
+        return jsonify({"error": "No delivery partner was assigned to this order."}), 409
+
+    now = datetime.now(timezone.utc)
+    order_ref.update({
+        "paymentCollected": True,
+        "paymentStatus": "Payment Collected",
+        "paymentCollectedBy": collected_by,
+        "paymentCollectedByUid": order.get("deliveryBoyUid") if collected_by == "delivery" else g.uid,
+        "paymentCollectedByName": order.get("deliveryBoyName") if collected_by == "delivery" else None,
+        "paymentCollectedMethod": method,
+        "paymentCollectedAmount": order.get("price") or 0,
+        "paymentCollectedAt": now,
+        "paymentRecordedLate": True,
+        "settlementStatus": "Pending" if collected_by == "delivery" else "Settled",
+        "updatedAt": now,
+    })
+    return jsonify({"success": True})
+
