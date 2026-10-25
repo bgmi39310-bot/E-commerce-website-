@@ -32,6 +32,7 @@ from firebase_admin import firestore
 
 from utils.auth import require_auth
 from utils.fast_cache import serve_cached
+from utils import cache_keeper
 from utils.cache import get_redis
 from utils.firebase_admin_init import db
 from utils.limiter import limiter
@@ -137,7 +138,30 @@ def list_products():
     direct `getDocs(query(collection(db, "vendors"), limit(500)))` call —
     same 500-item cap, just served from Redis on every visit after the
     first, and from this worker's memory (pre-compressed) between refreshes."""
+    cache_keeper.touch(_HOMEPAGE_CACHE_KEY)  # site is in use: keep the Redis copy warm
     return serve_cached("products:list", _MEMORY_TTL_SECONDS, _build_products_payload)
+
+
+def _fetch_products_from_firestore():
+    # Ordered newest-first: if there are ever more than _PRODUCT_LIMIT
+    # products, this guarantees the cap drops the OLDEST listings, not an
+    # arbitrary slice — without an explicit order, a seller's brand-new
+    # product could simply never appear once the catalog passed the cap.
+    # No composite index needed (a plain orderBy with no where-filter uses
+    # Firestore's automatic single-field index).
+    return [
+        _doc_to_dict(d)
+        for d in db.collection("vendors").order_by("createdAt", direction=firestore.Query.DESCENDING).limit(_PRODUCT_LIMIT).stream()
+    ]
+
+
+def _write_products_to_redis(r, products):
+    if r is None:
+        return
+    try:
+        r.set(_HOMEPAGE_CACHE_KEY, json.dumps(products, default=str), ex=_LISTING_TTL_SECONDS)
+    except Exception:
+        logger.exception("Could not write homepage product list to Redis (continuing without caching it)")
 
 
 def _build_products_payload():
@@ -146,24 +170,17 @@ def _build_products_payload():
     if cached is not None:
         return {"products": cached, "cached": True}
 
-    # Ordered newest-first: if there are ever more than _PRODUCT_LIMIT
-    # products, this guarantees the cap drops the OLDEST listings, not an
-    # arbitrary slice — without an explicit order, a seller's brand-new
-    # product could simply never appear once the catalog passed the cap.
-    # No composite index needed (a plain orderBy with no where-filter uses
-    # Firestore's automatic single-field index).
-    products = [
-        _doc_to_dict(d)
-        for d in db.collection("vendors").order_by("createdAt", direction=firestore.Query.DESCENDING).limit(_PRODUCT_LIMIT).stream()
-    ]
-
-    if r is not None:
-        try:
-            r.set(_HOMEPAGE_CACHE_KEY, json.dumps(products, default=str), ex=_LISTING_TTL_SECONDS)
-        except Exception:
-            logger.exception("Could not write homepage product list to Redis (continuing without caching it)")
-
+    products = _fetch_products_from_firestore()
+    _write_products_to_redis(r, products)
     return {"products": products, "cached": False}
+
+
+def _rebuild_products_cache():
+    """Used by utils/cache_keeper.py: refills the Redis copy BEFORE it expires."""
+    _write_products_to_redis(get_redis(), _fetch_products_from_firestore())
+
+
+cache_keeper.register(_HOMEPAGE_CACHE_KEY, _rebuild_products_cache)
 
 
 @products_bp.route("/shop/<seller_uid>", methods=["GET"])
