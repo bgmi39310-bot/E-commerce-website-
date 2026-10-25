@@ -17,6 +17,7 @@ from utils.cache import init_redis
 from utils.limiter import limiter
 from utils.product_sync import start_product_sync
 from utils.seller_sync import start_seller_sync
+from utils.cache_keeper import start_cache_keeper
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -82,6 +83,7 @@ def create_app():
         init_redis()
         start_product_sync()
         start_seller_sync()
+        start_cache_keeper()
 
     threading.Thread(target=_startup_background_tasks, daemon=True).start()
 
