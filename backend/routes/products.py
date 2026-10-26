@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 products_bp = Blueprint("products", __name__, url_prefix="/api/products")
 
 _PRODUCT_LIMIT = 500  # matches the limit index.html used when it queried Firestore directly
-_LISTING_TTL_SECONDS = 600  # 10 min safety-net TTL (see module docstring)
+_LISTING_TTL_SECONDS = 3600  # 1 hour (the live sync deletes the key the moment a product really changes)
 _PRODUCT_TTL_SECONDS = 600
 
 _HOMEPAGE_CACHE_KEY = "homepage:products"
@@ -142,6 +142,39 @@ def list_products():
     return serve_cached("products:list", _MEMORY_TTL_SECONDS, _build_products_payload)
 
 
+def _load_rating_summary():
+    """productId -> (average rating, number of reviews), worked out from the
+    `reviews` collection. Runs only when the homepage list is rebuilt (about
+    once an hour while the site is in use), not on every visit."""
+    totals = {}
+    try:
+        for d in db.collection("reviews").select(["productId", "rating"]).stream():
+            data = d.to_dict() or {}
+            pid, rating = data.get("productId"), data.get("rating")
+            if not pid or not isinstance(rating, (int, float)):
+                continue
+            t = totals.setdefault(pid, [0, 0])
+            t[0] += rating
+            t[1] += 1
+    except Exception:
+        logger.exception("Could not read reviews for the homepage ranking (listing stays newest-first)")
+        return {}
+    return {pid: (round(s / c, 2), c) for pid, (s, c) in totals.items() if c}
+
+
+def _rank_by_rating(products):
+    """Best-rated products first, then products with the same rating by how
+    many people rated them, then the products nobody has rated yet. Python's
+    sort is stable, so inside each group the newest products stay first."""
+    ratings = _load_rating_summary()
+    for p in products:
+        avg, cnt = ratings.get(p.get("id"), (0, 0))
+        p["avgRating"] = avg
+        p["ratingCount"] = cnt
+    products.sort(key=lambda p: (0 if p["ratingCount"] else 1, -p["avgRating"], -p["ratingCount"]))
+    return products
+
+
 def _fetch_products_from_firestore():
     # Ordered newest-first: if there are ever more than _PRODUCT_LIMIT
     # products, this guarantees the cap drops the OLDEST listings, not an
@@ -149,10 +182,11 @@ def _fetch_products_from_firestore():
     # product could simply never appear once the catalog passed the cap.
     # No composite index needed (a plain orderBy with no where-filter uses
     # Firestore's automatic single-field index).
-    return [
+    products = [
         _doc_to_dict(d)
         for d in db.collection("vendors").order_by("createdAt", direction=firestore.Query.DESCENDING).limit(_PRODUCT_LIMIT).stream()
     ]
+    return _rank_by_rating(products)
 
 
 def _write_products_to_redis(r, products):
