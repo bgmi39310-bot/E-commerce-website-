@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 sellers_bp = Blueprint("sellers", __name__, url_prefix="/api/sellers")
 
-_LISTING_TTL_SECONDS = 600
+_LISTING_TTL_SECONDS = 3600  # 1 hour (the live sync deletes the key the moment a seller profile changes)
 
 
 def _cache_get(r, key):
