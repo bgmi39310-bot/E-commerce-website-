@@ -102,6 +102,8 @@
 
         .product-body { padding: 10px 10px 12px; flex-grow: 1; display: flex; flex-direction: column; }
         .product-title { font-size: 13.5px; font-weight: 600; color: #0f1111; margin-bottom: 4px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 34px; }
+        .rating-line { font-size: 12px; font-weight: 700; color: #c7511f; margin-bottom: 4px; }
+        .rating-line small { color: #767676; font-weight: 400; }
         .shop-badge { font-size: 11px; color: #565959; margin-bottom: 6px; display: flex; align-items: center; gap: 4px; }
         .product-price { font-size: 16px; font-weight: bold; color: #B12704; margin-top: auto; }
         .product-price small { font-size: 11px; color: #565959; font-weight: normal; }
@@ -451,6 +453,10 @@
                 const outOfStock = stock <= 0;
                 const wishlist = getWishlist();
                 const isWishlisted = wishlist.includes(product.id);
+                const ratingCount = parseInt(product.ratingCount) || 0;
+                const ratingHtml = ratingCount > 0
+                    ? `<div class="rating-line">★ ${(parseFloat(product.avgRating) || 0).toFixed(1)} <small>(${ratingCount})</small></div>`
+                    : '';
 
                 const card = document.createElement('div');
                 card.className = 'product-card' + (outOfStock ? ' out-of-stock' : '');
@@ -464,6 +470,7 @@
                     <div class="product-body">
                         <div class="product-title">${pName}</div>
                         <div class="shop-badge"><i class="fas fa-store"></i> ${pShop}</div>
+                        ${ratingHtml}
                         <div class="product-price">₹${price.toFixed(0)} <small>${unit}</small></div>
                         <div class="view-hint">${outOfStock ? t('currentlyUnavailable') : t('tapToView')}</div>
                     </div>
