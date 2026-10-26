@@ -26,7 +26,7 @@ from utils.firebase_admin_init import db
 logger = logging.getLogger(__name__)
 
 SELLERS_CACHE_KEY = "sellers:all"
-_LISTING_TTL_SECONDS = 600  # 10 min safety net, same reasoning as product_sync.py
+_LISTING_TTL_SECONDS = 3600  # 1 hour safety net, same reasoning as product_sync.py
 
 
 def _on_sellers_change(col_snapshot, changes, read_time):
