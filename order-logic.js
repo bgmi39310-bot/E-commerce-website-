@@ -283,6 +283,13 @@ function displayDashboardOrders() {
         const colorSafe = escapeHtml(order.selectedColor || '');
         const buyerNameSafe = escapeHtml(order.buyerName || 'Customer');
         const buyerPhoneSafe = escapeHtml(order.buyerPhone || 'N/A');
+        // WhatsApp chat with the buyer (Indian 10-digit numbers get the 91 prefix).
+        const waDigits = String(order.buyerPhone || '').replace(/\D/g, '');
+        const waPhone = waDigits.length === 10 ? '91' + waDigits : waDigits;
+        const waText = `Namaste ${order.buyerName || ''} ji, DesiMarket par aapka order "${order.productName || 'product'}" (Qty: ${order.quantity || 1}) mila hai. Delivery ke baare me baat karni thi.`;
+        const waBtn = waPhone.length >= 11
+            ? `<a href="https://wa.me/${waPhone}?text=${encodeURIComponent(waText)}" target="_blank" rel="noopener" class="call-btn" style="background:#25d366; color:#fff;">💬 WhatsApp</a>`
+            : '';
         const buyerAddressSafe = escapeHtml(order.buyerAddress || 'N/A');
 
         // Delivery-partner status line — only relevant once the order is
@@ -344,12 +351,14 @@ function displayDashboardOrders() {
                     <p><strong>Address:</strong> ${buyerAddressSafe}</p>
                     <p><strong>Amount:</strong> ₹${order.price || 0}</p>
                     <p><strong>Status:</strong> <span style="font-weight:bold; color:#007600;">${order.status || 'Pending'}</span></p>
+                    ${order.deliverySlot ? `<p style="font-size:13px; color:#007185;"><strong>🕒 Delivery ka samay:</strong> ${escapeHtml(order.deliverySlot)}</p>` : ''}
                     ${paymentLine}
                     ${deliveryLine}
                     ${currentStatusFilter === 'Shipped' ? `<p style="color:#6f42c1; font-size:13px;"><strong>🔐 Ask whoever hands it over (you or your delivery partner) to get the buyer's Delivery OTP to confirm handover.</strong></p>` : ''}
 
                     <div class="btn-group">
                         <a href="tel:${encodeURIComponent(order.buyerPhone || '')}" class="call-btn">📞 Call Buyer</a>
+                        ${waBtn}
                         <button type="button" class="dash-action-btn" style="background:#f0f2f2; color:#555;" data-buyer-uid="${order.buyerUid || ''}" data-buyer-name="${escapeHtml(order.buyerName || 'this buyer')}" data-order-id="${order.id}" onclick="window.openReportBuyerModal(this.dataset.buyerUid, this.dataset.buyerName, this.dataset.orderId)">🚩 Report Buyer</button>
                         ${currentStatusFilter === 'Pending' && canAccept ? `<button class="dash-action-btn btn-accept" onclick="updateOrderStatus('${order.id}', 'Accepted')">Accept</button>` : ''}
                         ${currentStatusFilter === 'Accepted' && !order.deliveryRequestStatus ? `<button class="dash-action-btn btn-ship" onclick="markShippedMain('${order.id}')">Mark Shipped (Self-Deliver)</button>` : ''}
