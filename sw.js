@@ -10,7 +10,7 @@
 // network. Network-first always fetches the latest version when online, and
 // only falls back to the cache when there's genuinely no connection.
 
-const CACHE_NAME = 'desimarket-shell-v2';
+const CACHE_NAME = 'desimarket-shell-v3';
 
 const APP_SHELL = [
     './index.html',
@@ -33,6 +33,42 @@ self.addEventListener('activate', (event) => {
         )
     );
     self.clients.claim(); // take control of any already-open tabs/installed app right away
+});
+
+// ---------------------------------------------------------------------------
+// Push notifications (sent by the backend through Firebase Cloud Messaging).
+// Shows a notification even when the site is closed; tapping it opens the page.
+// ---------------------------------------------------------------------------
+self.addEventListener('push', (event) => {
+    let payload = {};
+    try { payload = event.data ? event.data.json() : {}; } catch (e) { payload = {}; }
+    // FCM wraps the message as { data: {...}, notification: {...}, fcmOptions: {...} }
+    const d = payload.data || {};
+    const n = payload.notification || {};
+    const title = n.title || d.title || 'DesiMarket';
+    const body = n.body || d.body || '';
+    const link = (payload.fcmOptions && payload.fcmOptions.link) || d.link || n.click_action || 'index.html';
+    event.waitUntil(self.registration.showNotification(title, {
+        body,
+        icon: './icon-192.png',
+        badge: './icon-192.png',
+        data: { link },
+        tag: d.tag || undefined
+    }));
+});
+
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    const link = (event.notification.data && event.notification.data.link) || 'index.html';
+    const target = new URL(link, self.registration.scope).href;
+    event.waitUntil(
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
+            for (const w of wins) {
+                if (w.url === target && 'focus' in w) return w.focus();
+            }
+            return self.clients.openWindow(target);
+        })
+    );
 });
 
 self.addEventListener('fetch', (event) => {
