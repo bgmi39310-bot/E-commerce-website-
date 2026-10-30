@@ -12,12 +12,18 @@ from routes.uploads import uploads_bp
 from routes.account import account_bp
 from routes.products import products_bp
 from routes.sellers import sellers_bp
+from routes.share import share_bp
+from routes.push import push_bp
+from routes.subscriptions import subscriptions_bp
 from routes.coupons import coupons_bp
 from utils.cache import init_redis
 from utils.limiter import limiter
 from utils.product_sync import start_product_sync
 from utils.seller_sync import start_seller_sync
 from utils.cache_keeper import start_cache_keeper
+from utils.order_watchdog import start_order_watchdog
+from utils.push_sender import start_push_sender
+from utils.subscription_runner import start_subscription_runner
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -61,6 +67,9 @@ def create_app():
     app.register_blueprint(account_bp)
     app.register_blueprint(products_bp)
     app.register_blueprint(sellers_bp)
+    app.register_blueprint(share_bp)
+    app.register_blueprint(push_bp)
+    app.register_blueprint(subscriptions_bp)
     app.register_blueprint(coupons_bp)
 
     def _startup_background_tasks():
@@ -84,6 +93,9 @@ def create_app():
         start_product_sync()
         start_seller_sync()
         start_cache_keeper()
+        start_order_watchdog()
+        start_push_sender()
+        start_subscription_runner()
 
     threading.Thread(target=_startup_background_tasks, daemon=True).start()
 
