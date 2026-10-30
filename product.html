@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="page-loader.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Product - DesiMarket</title>
@@ -93,6 +94,9 @@
     .variant-chip.selected { border-color: #fa8900; background: #fff3e0; color: #c7511f; font-weight: bold; }
 
     .action-row { display: flex; gap: 10px; }
+    @keyframes lowStockPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(231,76,60,.45); } 50% { box-shadow: 0 0 0 7px rgba(231,76,60,0); } }
+    .badge-low { background:#fff0e6 !important; color:#c0392b !important; border:1px solid #f5b7a5; animation: lowStockPulse 1.8s ease-in-out infinite; }
+    .btn-wa-share { width:100%; margin-top:10px; padding:11px; border:none; border-radius:8px; background:#25d366; color:#fff; font-weight:700; font-size:14px; cursor:pointer; }
     .btn-cart, .btn-buy { flex: 1; padding: 13px; border-radius: 6px; font-weight: bold; font-size: 14.5px; cursor: pointer; border: none; }
     .btn-cart { background: #ffd814; border: 1px solid #fcd200; }
     .btn-cart:hover { background: #f7ca00; }
@@ -297,6 +301,7 @@
     import { mountNotificationBell } from './notif-logic.js';
     import { placeOrderViaBackend } from './order-api.js';
     import { loadAddresses } from './address-logic.js';
+    import { openSubscribeModal } from './subscribe-ui.js';
     import { validateCoupon } from './coupon-logic.js';
     // report-logic.js and chat-logic.js are ONLY needed if the person
     // actually clicks "Report" or "Chat with seller" — most visitors never
@@ -426,6 +431,21 @@
         if (unsubscribeNotifBell) unsubscribeNotifBell();
     });
 
+    window.subscribeToProduct = function() {
+        if (!currentProduct) return;
+        openSubscribeModal({ db, product: currentProduct, productId, selectedVariants });
+    };
+
+    window.shareProductOnWhatsApp = function() {
+        const p = currentProduct;
+        if (!p) return;
+        const base = location.origin + location.pathname.replace(/[^/]*$/, '');
+        const link = `${base}product.html?id=${encodeURIComponent(productId)}`;
+        const price = parseFloat(p.price) || 0;
+        const text = `🛍️ *${p.name || 'Product'}* — ₹${price.toFixed(0)}${p.unit ? ' ' + p.unit : ''}\n🏪 ${p.shopName || 'Local Seller'}\nDesiMarket par dekhiye 👇\n${link}`;
+        window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+    };
+
     function renderProduct(p) {
         const content = document.getElementById('pageContent');
         const price = parseFloat(p.price) || 0;
@@ -453,7 +473,7 @@
                     <div class="p-badges">
                         <span class="badge">✅ ${escapeHtml(p.material || 'Original Quality')}</span>
                         <span class="badge warranty">🛡️ ${escapeHtml(p.warranty || 'Verified Quality')}</span>
-                        ${outOfStock ? '<span class="badge" style="background:#fdecea;color:#c0392b;">❌ Out of Stock</span>' : `<span class="badge" style="background:#eafaf1;color:#1a7f4b;">✔️ ${stock} in stock</span>`}
+                        ${outOfStock ? '<span class="badge" style="background:#fdecea;color:#c0392b;">❌ Out of Stock</span>' : (stock <= 5 ? `<span class="badge badge-low">🔥 Sirf ${stock} bache hain — jaldi karein!</span>` : `<span class="badge" style="background:#eafaf1;color:#1a7f4b;">✔️ ${stock} in stock</span>`)}
                         ${returnWindow > 0
                             ? `<span class="badge" style="background:#f3e8ff;color:#6f42c1;">↩️ Returnable within ${returnWindow} day${returnWindow === 1 ? '' : 's'}</span>`
                             : `<span class="badge" style="background:#f0f2f2;color:#666;">🚫 No returns accepted</span>`
@@ -504,6 +524,8 @@
                             <button class="btn-buy" onclick="openBuyModal()">⚡ Buy Now</button>
                         </div>
                     `}
+                    ${outOfStock ? '' : `<button class="btn-wa-share" style="background:#fff3e0; color:#c7511f; border:1.5px solid #ff9900;" onclick="subscribeToProduct()">🔁 Roz ke liye lagao (subscription)</button>`}
+                    <button class="btn-wa-share" onclick="shareProductOnWhatsApp()">🟢 WhatsApp par share karo</button>
                 </div>
             </div>
         `;
