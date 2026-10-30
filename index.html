@@ -72,6 +72,11 @@
         .price-range-wrap { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #444; }
         .price-range-wrap input { width: 75px; }
 
+        .low-stock-badge { position: absolute; top: 8px; left: 8px; background: #fff0e6; color: #c0392b; border: 1px solid #f5b7a5; font-size: 10px; font-weight: bold; padding: 3px 9px; border-radius: 10px; z-index: 5; }
+        .mic-btn { border: none; background: #fff3e0; color: #c7511f; width: 44px; border-radius: 0; font-size: 18px; cursor: pointer; flex-shrink: 0; }
+        .mic-btn.listening { background: #dc3545; color: #fff; animation: micPulse 1s ease-in-out infinite; }
+        @keyframes micPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(220,53,69,.5); } 50% { box-shadow: 0 0 0 8px rgba(220,53,69,0); } }
+        .mobile-search .mic-btn { border-radius: 4px; margin-left: 6px; height: 36px; }
         .out-of-stock-badge { position: absolute; top: 8px; left: 8px; background: #dc3545; color: white; font-size: 10px; font-weight: bold; padding: 3px 9px; border-radius: 10px; z-index: 5; }
         .product-card.out-of-stock img { opacity: 0.5; }
         .product-card.out-of-stock { position: relative; }
@@ -163,6 +168,7 @@
 
         <div class="search-container">
             <input type="text" id="searchInput" data-i18n-placeholder="searchPlaceholder" placeholder="Search products, local shops, items...">
+            <button class="mic-btn" type="button" title="Bolkar khojo" onclick="startVoiceSearch('searchInput', this)">🎤</button>
             <button class="search-btn"><i class="fas fa-search"></i></button>
         </div>
 
@@ -180,6 +186,7 @@
     <!-- Mobile Search Bar -->
     <div class="mobile-search">
         <input type="text" id="mobileSearchInput" data-i18n-placeholder="searchPlaceholder" placeholder="Search products...">
+        <button class="mic-btn" type="button" title="Bolkar khojo" onclick="startVoiceSearch('mobileSearchInput', this)">🎤</button>
     </div>
 
     <!-- Side Menu Drawer -->
@@ -189,10 +196,12 @@
         <a href="index.html"><i class="fas fa-home"></i> Home</a>
         <a href="cart.html"><i class="fas fa-shopping-cart"></i> Cart</a>
         <a href="orders.html"><i class="fas fa-box"></i> <span data-i18n="myOrders">My Orders</span></a>
+        <a href="subscriptions.html"><i class="fas fa-sync-alt"></i> My Subscriptions</a>
         <a href="wishlist.html"><i class="fas fa-heart"></i> <span data-i18n="myWishlist">My Wishlist</span></a>
         <a href="messages.html"><i class="fas fa-comment-dots"></i> <span data-i18n="myMessages">My Messages</span></a>
         <hr style="border: 0.5px solid #444;">
         <a href="account.html"><i class="fas fa-user-circle"></i> My Account</a>
+        <a href="javascript:void(0)" id="menuEnablePush" style="display:none;"><i class="fas fa-bell"></i> Notification chalu karo</a>
         <a href="seller-dashboard.html" id="menuSellerHub"><i class="fas fa-store"></i> <span data-i18n="sellerHub">Seller Hub (डैशबोर्ड)</span></a>
         <a href="signup.html?role=seller" id="menuBecomeSeller"><i class="fas fa-rocket"></i> <span data-i18n="becomeSeller">Become a Seller</span></a>
         <a href="delivery-dashboard.html" id="menuDeliveryHub"><i class="fas fa-truck"></i> Delivery Partner Hub</a>
@@ -305,6 +314,7 @@
         import { BACKEND_BASE_URL } from './order-api.js';
         import { getCart, getWishlist, saveWishlist, migrateLegacyCartData } from './cart-storage.js';
         import { distanceKm } from './map-utils.js';
+        import { setupPushMenuItem } from './push-logic.js';
 
         let allProducts = [];
         let currentCategory = 'all';
@@ -451,6 +461,7 @@
                 const unit = product.unit || '';
                 const stock = product.stock !== undefined ? product.stock : 10;
                 const outOfStock = stock <= 0;
+                const lowStock = !outOfStock && stock <= 5;
                 const wishlist = getWishlist();
                 const isWishlisted = wishlist.includes(product.id);
                 const ratingCount = parseInt(product.ratingCount) || 0;
@@ -462,7 +473,7 @@
                 card.className = 'product-card' + (outOfStock ? ' out-of-stock' : '');
                 card.onclick = () => { window.location.href = `product.html?id=${product.id}`; };
                 card.innerHTML = `
-                    ${outOfStock ? '<span class="out-of-stock-badge">Out of Stock</span>' : ''}
+                    ${outOfStock ? '<span class="out-of-stock-badge">Out of Stock</span>' : (lowStock ? `<span class="low-stock-badge">🔥 Sirf ${stock} bache</span>` : '')}
                     <button class="wishlist-btn ${isWishlisted ? 'active' : ''}" onclick="event.stopPropagation(); toggleWishlist('${product.id}', this)">${isWishlisted ? '❤️' : '🤍'}</button>
                     <div class="product-img-wrap">
                         <img src="${pImage}" alt="${pName}" loading="lazy" onerror="this.src='${NO_IMAGE_PLACEHOLDER}'">
@@ -531,6 +542,73 @@
             return result;
         }
 
+        // ---------- Search that understands Hindi (typed or spoken) ----------
+        // Spoken Hindi comes back in Devanagari ("टमाटर"), but most product
+        // names are written in English letters ("Tamatar"). So Devanagari is
+        // converted to English letters, and both sides are reduced to a rough
+        // "sound" key (oo = u, ee = i ...) so "दूध", "dudh" and "Doodh" all match.
+        const DEV_VOWELS = { 'अ': 'a', 'आ': 'a', 'इ': 'i', 'ई': 'i', 'उ': 'u', 'ऊ': 'u', 'ए': 'e', 'ऐ': 'ai', 'ओ': 'o', 'औ': 'au', 'ऋ': 'ri' };
+        const DEV_MATRAS = { 'ा': 'a', 'ि': 'i', 'ी': 'i', 'ु': 'u', 'ू': 'u', 'े': 'e', 'ै': 'ai', 'ो': 'o', 'ौ': 'au', 'ृ': 'ri' };
+        const DEV_CONS = { 'क': 'k', 'ख': 'kh', 'ग': 'g', 'घ': 'gh', 'ङ': 'n', 'च': 'ch', 'छ': 'chh', 'ज': 'j', 'झ': 'jh', 'ञ': 'n', 'ट': 't', 'ठ': 'th', 'ड': 'd', 'ढ': 'dh', 'ण': 'n', 'त': 't', 'थ': 'th', 'द': 'd', 'ध': 'dh', 'न': 'n', 'प': 'p', 'फ': 'f', 'ब': 'b', 'भ': 'bh', 'म': 'm', 'य': 'y', 'र': 'r', 'ल': 'l', 'व': 'v', 'श': 'sh', 'ष': 'sh', 'स': 's', 'ह': 'h', 'क़': 'k', 'ख़': 'kh', 'ग़': 'g', 'ज़': 'j', 'ड़': 'r', 'ढ़': 'rh', 'फ़': 'f' };
+        function romanize(text) {
+            const chars = Array.from(String(text).normalize('NFC'));
+            let out = '';
+            for (let i = 0; i < chars.length; i++) {
+                const c = chars[i];
+                if (DEV_CONS[c] !== undefined) {
+                    out += DEV_CONS[c];
+                    const next = chars[i + 1];
+                    const endOfWord = !next || !/[\u0900-\u097F]/.test(next);
+                    if (next === '्') { i++; }                                // halant: no vowel
+                    else if (DEV_MATRAS[next] !== undefined) { /* the matra adds the vowel */ }
+                    else if (!endOfWord) { out += 'a'; }                       // inherent "a" (dropped at word end)
+                } else if (DEV_VOWELS[c] !== undefined) { out += DEV_VOWELS[c]; }
+                else if (DEV_MATRAS[c] !== undefined) { out += DEV_MATRAS[c]; }
+                else if (c === 'ं' || c === 'ँ') { out += 'n'; }
+                else if (c === 'ः') { out += 'h'; }
+                else if (!/[\u0900-\u097F]/.test(c)) { out += c; }
+            }
+            return out;
+        }
+        function soundKey(text) {
+            return romanize(text).toLowerCase()
+                .replace(/oo/g, 'u').replace(/ee/g, 'i').replace(/aa/g, 'a')
+                .replace(/w/g, 'v').replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+        }
+        function matchesSearch(p, query) {
+            const name = (p.name || '').toLowerCase();
+            const shop = (p.shopName || '').toLowerCase();
+            if (name.includes(query) || shop.includes(query)) return true;
+            const qKey = soundKey(query);
+            if (!qKey) return false;
+            return soundKey(p.name || '').includes(qKey) || soundKey(p.shopName || '').includes(qKey);
+        }
+
+        // ---------- Voice search (Chrome / Android) ----------
+        window.startVoiceSearch = function(inputId, btnEl) {
+            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SR) { showToast('Is browser me bolkar search nahi chalta. Chrome use karein.', 'error'); return; }
+            if (btnEl.classList.contains('listening')) return;
+            const rec = new SR();
+            rec.lang = 'hi-IN';
+            rec.interimResults = false;
+            rec.maxAlternatives = 1;
+            btnEl.classList.add('listening');
+            showToast('🎤 Boliye... (jaise: "doodh" ya "tamatar")');
+            rec.onresult = (e) => {
+                const heard = (e.results[0][0].transcript || '').trim();
+                document.getElementById('searchInput').value = heard;
+                document.getElementById('mobileSearchInput').value = heard;
+                applyFilters();
+            };
+            rec.onerror = (e) => {
+                if (e.error === 'not-allowed') showToast('Mic ki ijazat chahiye. Browser me Mic allow karein.', 'error');
+                else if (e.error !== 'no-speech' && e.error !== 'aborted') showToast('Awaaz samajh nahi aayi. Dobara try karein.', 'error');
+            };
+            rec.onend = () => btnEl.classList.remove('listening');
+            try { rec.start(); } catch (err) { btnEl.classList.remove('listening'); }
+        };
+
         function applyFilters() {
             const searchQuery = (document.getElementById('searchInput').value || document.getElementById('mobileSearchInput').value || '').toLowerCase();
 
@@ -541,10 +619,7 @@
             }
 
             if (searchQuery) {
-                filtered = filtered.filter(p =>
-                    (p.name || '').toLowerCase().includes(searchQuery) ||
-                    (p.shopName || '').toLowerCase().includes(searchQuery)
-                );
+                filtered = filtered.filter(p => matchesSearch(p, searchQuery));
             }
 
             filtered = applySortAndPriceFilter(filtered);
@@ -934,6 +1009,7 @@
         // window.onload (which also waits for every image, font and analytics
         // script) — waiting made the products appear later than necessary.
         applyTranslations();
+        setupPushMenuItem('menuEnablePush');
         fetchLiveProducts();
         updateCartBadge();
         setupHeroBanners();
