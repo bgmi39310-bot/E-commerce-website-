@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="page-loader.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- Google Analytics (GA4) -->
@@ -160,8 +161,21 @@
                     <div class="shop-meta">📍 ${citySafe ? citySafe + ' — ' : ''}${addressSafe}</div>
                     <div class="shop-stats" id="followerCountText">👥 ${followerCount} Follower${followerCount === 1 ? '' : 's'}</div>
                 </div>
-                <button class="follow-btn ${nowFollowing ? 'following' : ''}" id="followBtn">${nowFollowing ? '✓ Following' : '➕ Follow'}</button>
+                <div style="display:flex; flex-direction:column; gap:6px; align-items:stretch;">
+                    <button class="follow-btn ${nowFollowing ? 'following' : ''}" id="followBtn">${nowFollowing ? '✓ Following' : '➕ Follow'}</button>
+                    <button type="button" id="shareShopBtn" style="background:#25d366; color:#fff; border:none; padding:7px 14px; border-radius:16px; font-size:12px; font-weight:700; cursor:pointer;">📤 Share</button>
+                </div>
             `;
+            document.getElementById('shareShopBtn').addEventListener('click', () => {
+                const base = location.origin + location.pathname.replace(/[^/]*$/, '');
+                const link = `${base}shop.html?id=${encodeURIComponent(sellerUid)}`;
+                const text = `🏪 *${sellerData.shopName || 'Local Shop'}*${sellerData.city ? ' — ' + sellerData.city : ''}\nDesiMarket par dekhiye 👇\n${link}`;
+                if (navigator.share) {
+                    navigator.share({ title: sellerData.shopName || 'DesiMarket Shop', text, url: link }).catch(() => {});
+                } else {
+                    window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+                }
+            });
 
             document.getElementById('followBtn').addEventListener('click', handleFollowClick);
 
