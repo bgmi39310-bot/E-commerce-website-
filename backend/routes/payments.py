@@ -273,6 +273,44 @@ def _variant_key(size, color):
     return f"{size or ''}|{color or ''}"
 
 
+# Delivery time the buyer can pick at checkout (shown to the seller and the delivery partner).
+DELIVERY_SLOTS = {
+    "morning": "Subah (8-12)",
+    "afternoon": "Dopahar (12-4)",
+    "evening": "Shaam (4-8)",
+    "anytime": "Kabhi bhi",
+}
+
+
+def _slot_label(key):
+    return DELIVERY_SLOTS.get(str(key or "").strip().lower())
+
+
+LOW_STOCK_THRESHOLD = 5  # the seller is alerted when a product's stock drops to this or below
+
+
+def _notify_low_stock(alerts):
+    """Tells sellers (best effort — never blocks or fails an order) when a
+    product has just run low or sold out. `alerts` = [(seller_uid, name, stock_left)]."""
+    seen = set()
+    for seller_uid, name, left in alerts:
+        if not seller_uid or (seller_uid, name) in seen:
+            continue
+        seen.add((seller_uid, name))
+        try:
+            now = datetime.now(timezone.utc)
+            if left <= 0:
+                title, body = f"❌ {name} ka stock khatam", "Ye product ab Out of Stock dikh raha hai. Stock badhane ke liye Seller Dashboard kholein."
+            else:
+                title, body = f"⚠️ {name} ka stock kam hai", f"Sirf {left} bache hain. Jaldi stock badhaiye taaki order na ruke."
+            db.collection("users").document(seller_uid).collection("notifications").document().set({
+                "title": title, "body": body, "type": "low_stock",
+                "link": "seller-dashboard.html", "read": False, "createdAt": now,
+            })
+        except Exception:
+            logger.exception("Could not send the low-stock notification for %s", name)
+
+
 def _reserve_stock(verified_items):
     """
     Reserves stock for every item in ONE Firestore transaction, so
@@ -281,9 +319,11 @@ def _reserve_stock(verified_items):
     what to do about that (refund, for Razorpay; just fail, for COD/UPI).
     """
     product_refs = [db.collection("vendors").document(i["productId"]) for i in verified_items]
+    low_stock_alerts = []
 
     @firestore.transactional
     def _do_reserve(transaction):
+        low_stock_alerts.clear()  # a transaction can retry; start clean each attempt
         snaps = [ref.get(transaction=transaction) for ref in product_refs]
         updates = []
         for ref, i, snap in zip(product_refs, verified_items, snaps):
@@ -291,6 +331,10 @@ def _reserve_stock(verified_items):
             current_stock = pdata.get("stock", 0)
             if current_stock < i["quantity"]:
                 raise InsufficientStock(i["productName"], current_stock)
+
+            new_stock = current_stock - i["quantity"]
+            if new_stock <= LOW_STOCK_THRESHOLD and (current_stock > LOW_STOCK_THRESHOLD or new_stock <= 0):
+                low_stock_alerts.append((pdata.get("sellerUid"), i["productName"], new_stock))
 
             update = {
                 "stock": firestore.Increment(-i["quantity"]),
@@ -320,6 +364,7 @@ def _reserve_stock(verified_items):
             transaction.update(ref, update)
 
     _do_reserve(db.transaction())
+    _notify_low_stock(low_stock_alerts)
 
 
 def _create_orders(verified_items, buyer_uid, delivery, coupon_code, coupon_seller,
@@ -351,6 +396,7 @@ def _create_orders(verified_items, buyer_uid, delivery, coupon_code, coupon_sell
             "buyerPhone": delivery.get("phone"),
             "buyerAddress": delivery.get("address"),
             "buyerCity": delivery.get("city"),
+            "deliverySlot": _slot_label(delivery.get("slot")),
             "paymentMethod": payment_method,
             "status": "Pending",
             "createdAt": now,
