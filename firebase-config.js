@@ -16,6 +16,35 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+export const firebaseApp = app;
+
+// ---------------------------------------------------------------------------
+// Firebase App Check (optional protection against fake traffic / bots).
+//
+// App Check makes Firebase accept requests only from the real DesiMarket
+// website, so scripts and bots can't use up the free Firestore/Auth quota.
+//
+// It is OFF until you paste a key here, so nothing changes today:
+//   1. Firebase console -> App Check -> Apps -> register this web app with
+//      "reCAPTCHA v3" (you get a "site key").
+//   2. Paste that site key between the quotes below and upload this file.
+//   3. Watch the App Check page for a few days (it shows how many requests
+//      are verified), and only then press "Enforce" for Firestore / Auth.
+// ---------------------------------------------------------------------------
+export const APP_CHECK_SITE_KEY = '';
+if (APP_CHECK_SITE_KEY) {
+    try {
+        const { initializeAppCheck, ReCaptchaV3Provider } =
+            await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check.js");
+        if (location.hostname === 'localhost') self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+        initializeAppCheck(app, {
+            provider: new ReCaptchaV3Provider(APP_CHECK_SITE_KEY),
+            isTokenAutoRefreshEnabled: true
+        });
+    } catch (e) {
+        console.error('App Check could not start (the site keeps working):', e);
+    }
+}
 export const auth = getAuth(app);
 
 // ============================================================================
