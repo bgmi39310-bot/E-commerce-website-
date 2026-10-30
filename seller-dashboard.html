@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="page-loader.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- Google Analytics (GA4) -->
@@ -138,6 +139,7 @@
         .low-stock-item:last-child { border-bottom: none; }
         .low-stock-item .warn-count { font-weight: bold; color: #dc3545; }
         .tab-buttons { display: flex; gap: 5px; margin-bottom: 15px; overflow-x: auto; }
+        .btn-share { background: linear-gradient(180deg,#2fe074,#25d366); color:#fff; border:none; padding:10px 16px; border-radius:6px; font-weight:bold; font-size:13.5px; cursor:pointer; box-shadow:0 3px 10px rgba(37,211,102,.4); }
         .tab-btn { padding: 8px 12px; background: #eee; border: none; font-weight: bold; cursor: pointer; border-radius: 5px; font-size: 12px; white-space: nowrap; }
         .tab-btn.active { background: #232f3e; color: white; }
 
@@ -224,6 +226,8 @@
                 <div class="btn-group-profile">
                     <button class="btn-edit" onclick="enableEditMode()">✏️ Edit Profile</button>
                     <button class="btn-view" onclick="viewMyShopPage()">🏪 View My Shop Page</button>
+                    <button class="btn-share" onclick="shareMyShop()">📤 Dukaan Share Karo</button>
+                    <button class="btn-edit" id="sellerEnablePush" style="display:none;">🔔 Notification chalu karo</button>
                 </div>
             </div>
 
@@ -543,6 +547,8 @@
         import { loadSellerQuestions, submitAnswer } from './qa-logic.js';
         import { getFollowerCount } from './follow-logic.js';
         import { showToast } from './toast.js';
+        import { openShopShareCard } from './share-card.js';
+        import { setupPushMenuItem } from './push-logic.js';
         import { findAvailableDeliveryBoys, postOrderToJobBoard, assignOrderToDeliveryBoy, cancelDeliveryRequest, loadAllAvailableDeliveryPartners } from './delivery-logic.js';
         import { submitReport } from './report-logic.js';
 
@@ -767,6 +773,13 @@
             } else {
                 showToast('Your Shop ID: ' + currentLoggedInUser.uid);
             }
+        }
+
+        setupPushMenuItem('sellerEnablePush');
+
+        window.shareMyShop = function() {
+            if (!currentLoggedInUser) { showToast('Please login first.', 'error'); return; }
+            openShopShareCard(db, currentLoggedInUser.uid);
         }
 
         window.viewMyShopPage = function() {
