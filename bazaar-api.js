@@ -85,3 +85,10 @@ export function waLink(phone, text) {
 export function shareLink(postId) {
     return new URL('bazaar.html?post=' + encodeURIComponent(postId), location.href).href;
 }
+
+// "Purab mein 3 km door" / "bilkul paas"
+export function distText(p) {
+    if (p.distanceKm === null || p.distanceKm === undefined) return '';
+    if (p.distanceKm < 1) return 'bilkul paas';
+    return `${p.direction ? p.direction + ' mein ' : ''}${p.distanceKm} km door`;
+}
