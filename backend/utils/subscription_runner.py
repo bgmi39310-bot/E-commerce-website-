@@ -89,11 +89,12 @@ def _place_order(sub, sub_id):
         "paymentStatus": "Cash on Delivery" if method == "COD" else "UPI on Delivery",
         "subscriptionId": sub_id,
     }
-    return _create_orders(
+    order_ids = _create_orders(
         verified, sub["buyerUid"], sub.get("delivery") or {}, None, coupon_seller, coupon_ref,
         payment_method=method, extra_order_fields=extra,
         notif_suffix=" — 🔁 roz ke order (subscription) se",
     )
+    return order_ids, verified
 
 
 def _notify_buyer(uid, title, body):
@@ -104,6 +105,18 @@ def _notify_buyer(uid, title, body):
         })
     except Exception:
         logger.exception("Subscription runner: could not notify %s", uid)
+
+
+def _write_to_khata(sub, order_ids, verified):
+    """If the seller turned on "Subscription order khate me likho" for this buyer, log the
+    charge in their khata (routes/khata.py). A failure here never affects the order itself."""
+    try:
+        from routes.khata import auto_charge_from_order
+        for order_id, item in zip(order_ids, verified):
+            auto_charge_from_order(item["sellerUid"], sub["buyerUid"], order_id,
+                                   item["productName"], item["quantity"], item["unitPrice"])
+    except Exception:
+        logger.exception("Subscription runner: could not write to khata for %s", sub.get("buyerUid"))
 
 
 def run_due_subscriptions(now_ist=None):
@@ -124,7 +137,8 @@ def run_due_subscriptions(now_ist=None):
 
         name = sub.get("productName") or "product"
         try:
-            _place_order(sub, snap.id)
+            order_ids, verified = _place_order(sub, snap.id)
+            _write_to_khata(sub, order_ids, verified)
             snap.reference.update({"ordersPlaced": firestore.Increment(1), "lastResult": f"{today}: order ban gaya"})
             _notify_buyer(sub["buyerUid"], "🔁 Aaj ka order ban gaya",
                           f"{name} x{sub.get('quantity', 1)} ka order {sub.get('shopName') or 'dukaan'} ko bhej diya gaya hai.")
