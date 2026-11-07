@@ -16,6 +16,8 @@ from routes.share import share_bp
 from routes.push import push_bp
 from routes.subscriptions import subscriptions_bp
 from routes.coupons import coupons_bp
+from routes.khata import khata_bp
+from routes.bazaar import bazaar_bp
 from utils.cache import init_redis
 from utils.limiter import limiter
 from utils.product_sync import start_product_sync
@@ -24,6 +26,7 @@ from utils.cache_keeper import start_cache_keeper
 from utils.order_watchdog import start_order_watchdog
 from utils.push_sender import start_push_sender
 from utils.subscription_runner import start_subscription_runner
+from utils.khata_runner import start_khata_runner
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -71,6 +74,8 @@ def create_app():
     app.register_blueprint(push_bp)
     app.register_blueprint(subscriptions_bp)
     app.register_blueprint(coupons_bp)
+    app.register_blueprint(khata_bp)
+    app.register_blueprint(bazaar_bp)
 
     def _startup_background_tasks():
         # Both of these do blocking network I/O (connecting to Redis, then
@@ -96,6 +101,7 @@ def create_app():
         start_order_watchdog()
         start_push_sender()
         start_subscription_runner()
+        start_khata_runner()
 
     threading.Thread(target=_startup_background_tasks, daemon=True).start()
 
