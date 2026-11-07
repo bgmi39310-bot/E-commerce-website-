@@ -93,6 +93,8 @@
     import { mountNotificationBell } from './notif-logic.js';
     import { markAsShipped, confirmDelivery, needsPaymentCollection } from './order-logic.js';
     import { wireImageUpload } from './image-upload.js';
+    import { attachVillagePicker } from './address-autofill.js';
+    let dVillagePicker = null;
     import {
         loadDeliveryProfile, saveDeliveryProfile, setDeliveryAvailability,
         loadJobBoard, claimDeliveryJob, loadMyDeliveries, declineDeliveryAssignment,
@@ -151,7 +153,7 @@
                 <div class="form-grid">
                     <input type="text" id="dName" placeholder="Your Full Name" value="${escapeHtml(p.name || currentUser.displayName || '')}">
                     <input type="tel" id="dPhone" placeholder="Phone Number" value="${escapeHtml(p.phone || '')}">
-                    <input type="text" id="dVillages" placeholder="Villages / areas you serve (comma-separated)" class="full-width" value="${escapeHtml((p.villages || []).join(', '))}">
+                    <input type="text" id="dVillages" placeholder="Aap jin gaon me delivery karte hain (upar PIN daal kar chuniye, ya comma se khud likhiye)" class="full-width" value="${escapeHtml((p.villages || []).join(', '))}">
                     <input type="number" id="dMaxDistance" placeholder="Max distance you'll travel (km, optional)" min="0" value="${p.maxDistanceKm || ''}">
                     <select id="dVehicle" class="full-width">
                         <option value="bike" ${p.vehicleType === 'bike' ? 'selected' : ''}>🏍️ Bike</option>
@@ -206,6 +208,7 @@
             </div>
         `;
         refreshDeliveryLocationMap();
+        dVillagePicker = attachVillagePicker({ input: 'dVillages', initialPins: p.pincodes || [] });
         wireImageUpload('dUpiQrUpload', 'dUpiQr', 'dUpiQrStatus', { aspect: 'orig', maxDimension: 900, quality: 0.92, targetKB: 300 });
     }
 
@@ -252,11 +255,13 @@
 
     window.saveProfileMain = async function() {
         const villages = document.getElementById('dVillages').value.split(',').map(v => v.trim()).filter(Boolean);
+        const pincodes = dVillagePicker ? dVillagePicker.getPins() : [];
         const feeTypeInput = document.querySelector('input[name="dFeeType"]:checked');
         const ok = await saveDeliveryProfile(db, currentUser.uid, {
             name: document.getElementById('dName').value.trim(),
             phone: document.getElementById('dPhone').value.trim(),
             villages,
+            pincodes,
             vehicleType: document.getElementById('dVehicle').value,
             feeType: feeTypeInput ? feeTypeInput.value : 'per_order',
             feeAmount: document.getElementById('dFeeAmount').value,
@@ -358,7 +363,7 @@
     async function loadAndRenderJobBoard() {
         const container = document.getElementById('jobBoardContainer');
         try {
-            const jobs = await loadJobBoard(db, myProfile.villages);
+            const jobs = await loadJobBoard(db, myProfile.villages, myProfile.pincodes);
             if (jobs.length === 0) {
                 container.innerHTML = `<div class="no-data">No open deliveries in your area right now. Check back later!</div>`;
                 return;
