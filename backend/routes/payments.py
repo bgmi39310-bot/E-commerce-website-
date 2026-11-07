@@ -367,6 +367,16 @@ def _reserve_stock(verified_items):
     _notify_low_stock(low_stock_alerts)
 
 
+def _short_text(value, limit=60):
+    t = str(value or "").strip()
+    return t[:limit] or None
+
+
+def _pincode_or_none(value):
+    t = str(value or "").strip()
+    return t if (len(t) == 6 and t.isdigit()) else None
+
+
 def _create_orders(verified_items, buyer_uid, delivery, coupon_code, coupon_seller,
                     coupon_doc_ref, payment_method, extra_order_fields=None, notif_suffix=""):
     """
@@ -396,6 +406,10 @@ def _create_orders(verified_items, buyer_uid, delivery, coupon_code, coupon_sell
             "buyerPhone": delivery.get("phone"),
             "buyerAddress": delivery.get("address"),
             "buyerCity": delivery.get("city"),
+            # PIN-first address (checkout/product pages): clean, lookup-based place names
+            "buyerDistrict": _short_text(delivery.get("district")),
+            "buyerState": _short_text(delivery.get("state")),
+            "buyerPincode": _pincode_or_none(delivery.get("pincode")),
             "deliverySlot": _slot_label(delivery.get("slot")),
             "paymentMethod": payment_method,
             "status": "Pending",
