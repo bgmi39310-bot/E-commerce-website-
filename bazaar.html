@@ -36,14 +36,16 @@
         import { showToast } from './toast.js';
         import { escapeHtml as esc } from './sanitize.js';
         import { uploadToImgBB } from './image-upload.js';
-        import { bazaarApi, KINDS, CAT, catLabel, ANIMALS, UNIT_NAME, priceText, timeAgo, speak, listen, waLink, shareLink, rupees } from './bazaar-api.js';
+        import { bazaarApi, KINDS, CAT, catLabel, ANIMALS, UNIT_NAME, priceText, timeAgo, speak, listen, waLink, shareLink, rupees, distText } from './bazaar-api.js';
+        import { pinPickerHtml, wirePinPicker, read as readPin } from './pin-picker.js';
 
         let user = null;
         let tab = 'sell';                      // sell | rent | job | worker | mera
         let category = '';
         let womenOnly = false;
         let query = '';
-        let area = { state: '', district: '' };
+        let area = {};                          // { pincode, state, district, block, village, lat, lng }
+        let radius = 10;                        // km; 0 = poora zila
         let formPhotos = [];
         let cache = {};                         // id -> post (for open-by-id)
 
@@ -57,8 +59,8 @@
         const emoji = (p) => { const c = (CAT[p.kind] || []).find(x => x[0] === p.category); return c ? c[1] : '📦'; };
 
         // ---- remembered area ----
-        try { area = JSON.parse(localStorage.getItem('bazaarArea') || '{}') || area; } catch {}
-        const saveArea = () => { try { localStorage.setItem('bazaarArea', JSON.stringify(area)); } catch {} };
+        try { const s = JSON.parse(localStorage.getItem('bazaarArea2') || '{}'); area = s.area || {}; if (s.radius !== undefined) radius = s.radius; } catch {}
+        const saveArea = () => { try { localStorage.setItem('bazaarArea2', JSON.stringify({ area, radius })); } catch {} };
 
         // ---------- tabs / filters ----------
         const TABS = [['sell', '🛒', 'Mandi'], ['rent', '🚜', 'Kiraya'], ['job', '📋', 'Kaam'], ['worker', '👷', 'Majdoor'], ['mera', '👤', 'Mera']];
@@ -70,11 +72,14 @@
 
         function renderFilters() {
             const chips = [['', '', 'Sab'], ...CAT[tab]].map(([k, ic, l]) => `<button class="chip ${category === k ? 'on' : ''}" onclick="setCat('${k}')">${ic} ${l}</button>`).join('');
+            const hasArea = !!(area.pincode && area.district);
+            const RAD = [[5, '5 km'], [10, '10 km'], [25, '25 km'], [50, '50 km'], [0, 'Poora zila']];
             $('filters').innerHTML = `
-                <div class="where">
-                    <input id="fState" placeholder="Rajya (jaise: Uttar Pradesh)" value="${esc(area.state || '')}" onchange="setArea()">
-                    <input id="fDistrict" placeholder="Zila (jaise: Kanpur)" value="${esc(area.district || '')}" onchange="setArea()">
+                <div class="areabar">
+                    <div class="a">${hasArea ? `<b>📍 ${esc([area.village, area.block].filter(Boolean)[0] || area.district)}, ${esc(area.district)}</b>${esc(area.state)} · PIN ${esc(area.pincode)}` : '<b>📍 Apna ilaka chuniye</b>PIN code daalte hi gaon, zila apne aap bhar jayega'}</div>
+                    <button class="mini" onclick="openArea()">${hasArea ? 'Badlo' : 'PIN daaliye'}</button>
                 </div>
+                ${hasArea ? `<div class="chips">${RAD.map(([k, l]) => `<button class="chip ${radius === k ? 'on' : ''}" onclick="setRadius(${k})">${l}</button>`).join('')}</div>` : ''}
                 <div class="searchrow">
                     <input id="fQ" type="search" placeholder="🔍 Kya dhoondh rahe hain?" value="${esc(query)}" onkeydown="if(event.key==='Enter')doSearch()">
                     <button onclick="micSearch()" title="Bolkar dhoondhiye">🎤</button>
@@ -85,9 +90,22 @@
         }
         window.setCat = (k) => { category = k; renderFilters(); loadList(); };
         window.toggleWomen = () => { womenOnly = !womenOnly; renderFilters(); loadList(); };
-        window.setArea = () => { area = { state: val('fState'), district: val('fDistrict') }; saveArea(); loadList(); };
-        window.doSearch = () => { query = val('fQ'); area = { state: val('fState'), district: val('fDistrict') }; saveArea(); loadList(); };
+        window.setRadius = (k) => { radius = k; saveArea(); renderFilters(); loadList(); };
+        window.doSearch = () => { query = val('fQ'); loadList(); };
         window.micSearch = () => listen((t) => { $('fQ').value = t; doSearch(); }, (e) => showToast(e.message, 'error'));
+        window.openArea = () => {
+            openModal(`<h3>📍 Mera ilaka</h3>
+                <div class="hint">Sirf PIN code daaliye — rajya, zila aur gaon ki list apne aap aa jayegi. Phir "Aas-paas ke post" 5-50 km ke daayre me dikhenge.</div>
+                ${pinPickerHtml('ar', { landmark: false, gps: true })}
+                <div class="row-btns"><button class="btn grey" onclick="closeModal()">Raho</button><button class="btn" onclick="saveAreaPick()">Save</button></div>`);
+            wirePinPicker('ar', { pincode: area.pincode, village: area.village, state: area.state, district: area.district });
+        };
+        window.saveAreaPick = () => {
+            const v = readPin('ar');
+            if (!v.ready) { showToast('Pehle 6 ank ka PIN code daaliye.', 'error'); return; }
+            area = { pincode: v.pincode, state: v.state, district: v.district, block: v.block, village: v.village, lat: v.lat, lng: v.lng };
+            saveArea(); closeModal(); renderFilters(); loadList();
+        };
 
         // ---------- list ----------
         function cardHtml(p) {
@@ -111,15 +129,17 @@
             return `<div class="card post ${f.emergency ? 'emerg' : ''}" onclick="openPost('${p.id}')">${th}
                 <div class="bd"><div class="tt">${esc(p.title)}</div>
                 <div class="pr">${esc(priceText(p))}</div>
-                <div class="mt">📍 ${esc([p.village, p.district].filter(Boolean).join(', '))} · ${timeAgo(p.createdAt)}${bits.length ? '<br>' + esc(bits.join(' · ')) : ''}</div>
+                <div class="mt">📍 ${esc([p.village, p.district].filter(Boolean).join(', '))}${distText(p) ? ' · <span class="dist">' + esc(distText(p)) + '</span>' : ''} · ${timeAgo(p.createdAt)}${bits.length ? '<br>' + esc(bits.join(' · ')) : ''}</div>
                 <div style="margin-top:4px;">${badges}</div></div></div>`;
         }
         async function loadList() {
             $('list').innerHTML = '<div class="empty">Load ho raha hai...</div>';
             const q = new URLSearchParams({ kind: tab });
             if (category) q.set('category', category);
-            if (area.state) q.set('state', area.state);
-            if (area.district) q.set('district', area.district);
+            const near = area.lat != null && radius > 0;
+            if (near) { q.set('lat', area.lat); q.set('lng', area.lng); q.set('radiusKm', radius); q.set('pincode', area.pincode || ''); }
+            else if (area.district) { q.set('district', area.district); if (area.state) q.set('state', area.state); }
+            if (area.lat != null) { q.set('lat', area.lat); q.set('lng', area.lng); }
             if (query) q.set('q', query);
             if (womenOnly) q.set('womenOnly', '1');
             try {
@@ -127,7 +147,8 @@
                 const w = $('wage');
                 if (w) w.innerHTML = r.avgDailyWage ? `<div class="wagebar">💰 Is list me ausat mazdoori: <b>${rupees(r.avgDailyWage)}/din</b> (bhav ka andaza)</div>` : '';
                 $('list').innerHTML = r.posts.length ? r.posts.map(cardHtml).join('') + (r.total > r.posts.length ? `<div class="sticky-sum">Aur ${r.total - r.posts.length} post hain — zila ya category se chhaantiye.</div>` : '')
-                    : `<div class="empty">Abhi yahan koi post nahi.<br>${area.district ? 'Zila badal kar ya khali karke dekhiye, ya ' : ''}pehle aap <b>➕ Post karo</b> dabaiye!</div>`;
+                    : `<div class="empty">Abhi yahan koi post nahi.<br>${area.district ? (radius > 0 && radius < 50 ? 'Daayra bada karke (25 / 50 km ya Poora zila) dekhiye, ya ' : '') : 'Upar PIN code daal kar apna ilaka chuniye, ya '}pehle aap <b>➕ Post karo</b> dabaiye!</div>`;
+                if (area.pincode && area.lat == null && radius > 0) $('list').insertAdjacentHTML('afterbegin', '<div class="warn">ℹ️ Is PIN ki location abhi nahi mili, isliye poore zila ke post dikha rahe hain. Sahi doori ke liye "Badlo" me <b>📍 Meri location lagao</b> dabaiye.</div>');
             } catch (e) { $('list').innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
         }
 
@@ -148,7 +169,7 @@
         }
         window.openPost = async (id, fresh) => {
             let p = !fresh && cache[id];
-            if (!p) { try { p = (await bazaarApi(user, '/posts/' + id)).post; cache[id] = p; } catch (e) { showToast(e.message, 'error'); return; } }
+            if (!p) { try { const gq = area.lat != null ? `?lat=${area.lat}&lng=${area.lng}` : ''; p = (await bazaarApi(user, '/posts/' + id + gq)).post; cache[id] = p; } catch (e) { showToast(e.message, 'error'); return; } }
             const closed = p.status !== 'active';
             const doneWord = p.kind === 'job' || p.kind === 'worker' ? 'Kaam mil gaya / pura' : 'Bik gaya / band';
             let actions = '';
@@ -165,7 +186,7 @@
                 ${p.photos.length ? `<div class="photos">${p.photos.map(u => `<img src="${esc(u)}" alt="">`).join('')}</div>` : ''}
                 <h3 style="margin-bottom:4px;">${p.fields?.emergency ? '🚨 ' : ''}${esc(p.title)}</h3>
                 <div class="pr" style="font-weight:800;color:#b12704;font-size:18px;">${esc(priceText(p))}</div>
-                <div class="mt" style="font-size:12.5px;color:#666;margin:4px 0;">📍 ${esc([p.village, p.district, p.state].filter(Boolean).join(', '))} · ${esc(catLabel(p.kind, p.category))} · ${timeAgo(p.createdAt)}</div>
+                <div class="mt" style="font-size:12.5px;color:#666;margin:4px 0;">📍 ${esc([p.landmark, p.village, p.block, p.district, p.state].filter(Boolean).join(', '))}${p.pincode ? ' - ' + esc(p.pincode) : ''}${distText(p) ? '<br><span class="dist">' + esc(distText(p)) + '</span>' : ''}<br>${esc(catLabel(p.kind, p.category))} · ${timeAgo(p.createdAt)}</div>
                 <div>${p.ownerVerified ? '<span class="badge ok">✔ Local Verified</span>' : ''}${p.ownerRating ? `<span class="badge gold">⭐ ${p.ownerRating} (${p.ownerRatingCount})</span>` : ''}
                     <span class="badge">👤 ${esc(p.ownerName)}${p.contactLabel && p.contactLabel !== 'Khud' ? ' · sampark: ' + esc(p.contactLabel) : ''}</span></div>
                 ${kvHtml(p)}
@@ -282,8 +303,8 @@
                 <div id="extra"></div>
                 <div class="two">${fld(priceLabel, inp('fPrice', '', 'number', 'min="0" step="0.5"'), priceHint)}${fld('Naap', sel('fUnit', UNITS[kind].map(u => [u, UNIT_NAME[u]])))}</div>
                 ${fld('Aur jaankari (optional)', `<textarea id="fDesc" rows="3" maxlength="600"></textarea>`)}
-                <div class="two">${fld('Rajya', inp('fState', 'Uttar Pradesh', 'text', `value="${esc(area.state || '')}"`))}${fld('Zila', inp('fDistrict', 'Kanpur', 'text', `value="${esc(area.district || '')}"`))}</div>
-                ${fld('Gaon / kasba', inp('fVillage', 'Rampur'))}
+                <label>📍 Aapka gaon / ilaka</label>
+                ${pinPickerHtml('pp', { landmark: true, gps: true })}
                 ${fld('Aapka naam', inp('fOwner', '', 'text', `maxlength="40" value="${esc(user?.displayName || '')}"`))}
                 <label>📷 Photo (max 4)${(kind === 'sell') ? ' — pashu aur vahan ke liye zaroori' : ''}</label>
                 <div class="photo-slots" id="slots"></div><input id="photoIn" type="file" accept="image/*" style="display:none;">
@@ -297,6 +318,7 @@
                 <div class="row-btns"><button class="btn grey" onclick="startPost()">← Wapas</button><button class="btn" onclick="submitPost(this)">Post karo</button></div>`);
             $('fCat').onchange = () => { $('extra').innerHTML = extraFields(kind, val('fCat')); };
             $('extra').innerHTML = extraFields(kind, val('fCat'));
+            wirePinPicker('pp', { pincode: area.pincode, village: area.village, state: area.state, district: area.district });
             renderSlots();
             $('photoIn').onchange = async (e) => {
                 const file = e.target.files[0]; e.target.value = '';
@@ -323,13 +345,16 @@
             else if (kind === 'job') { put('workersNeeded', val('xNeed')); put('durationDays', val('xDays')); put('startDate', val('xStart')); put('womenOnly', chk('xWomen')); put('emergency', chk('xEmerg')); }
             else { put('skills', val('xSkills')); put('experienceYears', val('xExp')); put('availability', val('xAvail')); put('toli', chk('xToli')); if (chk('xToli')) put('groupSize', val('xGroup')); put('womenOnly', chk('xWomen')); }
             const mode = document.querySelector('input[name="fMode"]:checked')?.value || 'masked';
+            const pl = readPin('pp');
+            if (!pl.ready) throw new Error('Apna 6 ank ka PIN code daaliye aur gaon chuniye.');
             await bazaarApi(user, '/posts', 'POST', {
                 kind, category: cat, title: val('fTitle'), description: val('fDesc'), price: val('fPrice') || 0, priceUnit: val('fUnit'),
-                state: val('fState'), district: val('fDistrict'), village: val('fVillage'), ownerName: val('fOwner'),
+                pincode: pl.pincode, state: pl.state, district: pl.district, block: pl.block, village: pl.village, landmark: pl.landmark,
+                lat: pl.lat, lng: pl.lng, ownerName: val('fOwner'),
                 contactPhone: val('fPhone'), contactLabel: val('fLabel'), contactMode: mode, photos: formPhotos, fields: f,
                 adult: (kind === 'job' || kind === 'worker') ? chk('xAdult') : undefined
             });
-            area = { state: val('fState'), district: val('fDistrict') }; saveArea();
+            if (!area.pincode) { area = { pincode: pl.pincode, state: pl.state, district: pl.district, block: pl.block, village: pl.village, lat: pl.lat, lng: pl.lng }; saveArea(); }
             closeModal(); showToast('Post ho gaya ✅');
             tab = kind; category = ''; renderTabs(); renderFilters(); loadList();
         });
