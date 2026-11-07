@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Gaon Bazaar - Admin</title>
+    <link rel="icon" href="icon-192.png">
+    <link rel="stylesheet" href="khata-ui.css">
+</head>
+<body>
+    <header class="k-head"><a href="admin-panel.html">←</a><h1>🛡️ Gaon Bazaar — Admin</h1></header>
+    <div class="wrap">
+        <div class="card">
+            <div style="font-weight:700;margin-bottom:6px;">✔ "Local Verified" badge dena</div>
+            <div style="font-size:12.5px;color:#666;margin-bottom:8px;">Sarpanch, CSC centre ya jaane-pehchane dukandaar ke user ID (uid) par badge lagayein. Badge us user ke saare posts par dikhega.</div>
+            <input id="uid" placeholder="User ID (uid)" style="width:100%;padding:10px;border:1.5px solid #ccd;border-radius:8px;margin-bottom:8px;box-sizing:border-box;">
+            <div class="row-btns" style="margin:0;">
+                <button class="btn green" onclick="verify(true)">Badge do</button>
+                <button class="btn grey" onclick="verify(false)">Badge hatao</button>
+            </div>
+        </div>
+        <h3>🚩 Report hue post</h3>
+        <div id="queue"><div class="empty">Load ho raha hai...</div></div>
+    </div>
+    <div id="modalMount"></div>
+    <script type="module">
+        import { auth } from './firebase-config.js';
+        import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { showToast } from './toast.js';
+        import { escapeHtml as esc } from './sanitize.js';
+        import { bazaarApi } from './bazaar-api.js';
+        let user = null;
+        async function load() {
+            try {
+                const { posts } = await bazaarApi(user, '/admin/queue');
+                document.getElementById('queue').innerHTML = posts.length ? posts.map(p => `<div class="card">
+                    <b>${esc(p.title)}</b> <span class="badge ${p.status === 'hidden' ? 'q' : 'ok'}">${esc(p.status)}</span>
+                    <div style="font-size:12.5px;color:#666;margin:4px 0;">${esc(p.kind)} · ${esc(p.district || '')} · ${esc(p.ownerName || '')} · uid: <code>${esc(p.ownerUid)}</code><br>🚩 ${p.reports} report: ${p.reasons.map(esc).join(' | ')}</div>
+                    <div class="e-actions">
+                        <button class="mini ok" onclick="setSt('${esc(p.id)}','active',true)">✅ Theek hai — chalu karo</button>
+                        <button class="mini danger" onclick="setSt('${esc(p.id)}','hidden',false)">🚫 Chhupa do</button>
+                    </div></div>`).join('') : '<div class="empty">Koi report nahi 🎉</div>';
+            } catch (e) { document.getElementById('queue').innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+        }
+        window.setSt = async (id, status, reset) => { try { await bazaarApi(user, `/admin/posts/${id}/status`, 'POST', { status, resetReports: reset }); showToast('Ho gaya ✅'); load(); } catch (e) { showToast(e.message, 'error'); } };
+        window.verify = async (v) => {
+            const uid = document.getElementById('uid').value.trim();
+            if (!uid) { showToast('User ID likhiye.', 'error'); return; }
+            try { await bazaarApi(user, `/admin/users/${encodeURIComponent(uid)}/verify`, 'POST', { verified: v }); showToast(v ? 'Badge mil gaya ✅' : 'Badge hata diya'); } catch (e) { showToast(e.message, 'error'); }
+        };
+        onAuthStateChanged(auth, (u) => { if (!u) { location.href = 'login.html'; return; } user = u; load(); });
+    </script>
+</body>
+</html>
