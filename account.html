@@ -123,6 +123,10 @@
                     <span class="value" id="accPhone">N/A</span>
                 </div>
                 <div class="info-row">
+                    <span class="label">📮 Pincode</span>
+                    <span class="value" id="accPincode">N/A</span>
+                </div>
+                <div class="info-row">
                     <span class="label">🏙️ City / Village</span>
                     <span class="value" id="accCity">N/A</span>
                 </div>
@@ -278,6 +282,7 @@
                 document.getElementById('accPhone').innerText = data.phone || 'N/A';
                 document.getElementById('accState').innerText = data.state || 'N/A';
                 document.getElementById('accDistrict').innerText = data.district || 'N/A';
+                document.getElementById('accPincode').innerText = data.pincode || 'N/A';
                 document.getElementById('accCity').innerText = data.city || 'N/A';
                 document.getElementById('accPhoto').src = data.photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(fullName) + '&background=232f3e&color=fff';
             } catch (error) {
