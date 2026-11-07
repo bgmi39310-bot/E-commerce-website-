@@ -38,3 +38,11 @@
 .postfab { position: fixed; right: 14px; bottom: 16px; z-index: 30; background: #ff9900; color: #111; border: 0; border-radius: 28px; padding: 14px 20px; font-weight: 800; font-size: 15px; box-shadow: 0 3px 12px rgba(0,0,0,.3); }
 .stbadge { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 11.5px; font-weight: 700; }
 .st-active { background: #eafaf1; color: #1a7f4b; } .st-done { background: #eee; color: #555; } .st-hidden, .st-expired { background: #fde8e6; color: #c0392b; }
+.pinbox { background: #f8faff; border: 1.5px solid #d6e0f5; border-radius: 12px; padding: 10px; margin: 6px 0; }
+.pinbox input, .pinbox select { width: 100%; padding: 10px; border: 1.5px solid #ccd; border-radius: 8px; font-size: 15px; box-sizing: border-box; }
+.pinbox #pPin, .pinbox input[id$="Pin"] { font-size: 20px; letter-spacing: 4px; font-weight: 700; }
+.pin-ok { background: #eafaf1; color: #1a7f4b; border-radius: 8px; padding: 7px 9px; font-weight: 700; font-size: 13.5px; margin-top: 6px; }
+.pin-bad { background: #fff1d6; color: #8a5a00; border-radius: 8px; padding: 7px 9px; font-size: 12.5px; margin-top: 6px; }
+.areabar { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #fff; border-radius: 12px; padding: 10px 12px; box-shadow: 0 1px 4px rgba(0,0,0,.1); margin-bottom: 8px; }
+.areabar .a { font-size: 13.5px; line-height: 1.4; min-width: 0; } .areabar .a b { display: block; }
+.dist { color: #2456b3; font-weight: 700; }
