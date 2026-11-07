@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <script src="page-loader.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mera Khata - DesiMarket</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#232f3e">
+    <link rel="icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="stylesheet" href="shared-ui.css">
+    <link rel="stylesheet" href="khata-ui.css">
+    <script src="pwa-init.js" defer></script>
+    <script src="click-guard.js" defer></script>
+</head>
+<body>
+    <header class="k-head">
+        <a id="backLink" href="index.html">←</a>
+        <h1 id="headTitle">📒 Mera Khata</h1>
+    </header>
+
+    <!-- LIST VIEW -->
+    <div class="wrap" id="listView">
+        <div class="card no-print">
+            <div style="font-weight:700;margin-bottom:6px;">🔗 Dukaan ka khata jodiye</div>
+            <div style="font-size:12.5px;color:#666;margin-bottom:8px;">Dukandaar se 6 akshar ka code lijiye aur yahan likhiye. Uske baad aap apna poora hisab kabhi bhi dekh sakte hain.</div>
+            <div style="display:flex;gap:8px;">
+                <input id="codeInput" maxlength="6" placeholder="ABC123" autocapitalize="characters"
+                       style="flex:1;padding:10px;border:1.5px solid #ccd;border-radius:8px;font-size:18px;letter-spacing:3px;text-transform:uppercase;">
+                <button class="btn" style="flex:0 0 auto;padding:10px 18px;" onclick="linkCode(this)">Jodo</button>
+            </div>
+        </div>
+        <div id="shopList"><div class="empty">Load ho raha hai...</div></div>
+    </div>
+
+    <!-- DETAIL VIEW -->
+    <div class="wrap" id="detailView" style="display:none;">
+        <div class="card" id="shopHead"></div>
+        <div id="payBox"></div>
+        <div class="month-nav">
+            <button onclick="changeMonth(-1)">‹</button>
+            <strong id="monthTitle"></strong>
+            <button onclick="changeMonth(1)">›</button>
+        </div>
+        <div class="stats" id="stats"></div>
+        <div id="entries"></div>
+        <div class="row-btns no-print" style="margin-top:12px;">
+            <button class="btn alt" onclick="downloadLedger()">⬇️ CSV</button>
+            <button class="btn alt" onclick="window.print()">🖨️ Print / PDF</button>
+        </div>
+    </div>
+
+    <div id="modalMount"></div>
+
+    <script type="module">
+        import { auth } from './firebase-config.js';
+        import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { showToast } from './toast.js';
+        import { escapeHtml } from './sanitize.js';
+        import { khataApi, rupees, monthLabel, shiftMonth, currentMonthIST, balanceLabel, entryHtml,
+                 upiLink, downloadCsv, ledgerCsvRows } from './khata-api.js';
+
+        let user = null;
+        let currentId = null;
+        let currentMonth = currentMonthIST();
+        let detail = null;
+
+        const $ = (id) => document.getElementById(id);
+        function openModal(html) {
+            $('modalMount').innerHTML = `<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal">${html}</div></div>`;
+        }
+        window.closeModal = () => { $('modalMount').innerHTML = ''; };
+        async function run(btn, fn) {
+            if (btn) btn.disabled = true;
+            try { await fn(); } catch (e) { showToast(e.message, 'error'); } finally { if (btn) btn.disabled = false; }
+        }
+
+        async function loadList() {
+            try {
+                const { accounts } = await khataApi(user, '/my');
+                if (!accounts.length) {
+                    $('shopList').innerHTML = `<div class="empty">Abhi koi khata juda nahi hai.<br><br>Apne doodhwale, sabziwale ya kisi bhi dukandaar se code maangiye aur upar likhiye.</div>`;
+                    return;
+                }
+                $('shopList').innerHTML = accounts.map(a => {
+                    const b = balanceLabel(a.balance);
+                    return `<div class="card cust ${a.balance <= 0 ? 'paid' : ''}" onclick="openShop('${a.id}')">
+                        <div class="info">
+                            <div class="nm">🏪 ${escapeHtml(a.shopName)}</div>
+                            <div class="meta">${a.defaultItem ? escapeHtml(a.defaultItem.name) + ' ' + a.defaultItem.quantity + ' ' + escapeHtml(a.defaultItem.unit) + ' · ' : ''}Kul maal ${rupees(a.totalCharged)} · Diye ${rupees(a.totalPaid)}</div>
+                        </div>
+                        <div class="bal ${b.cls}">${b.text}</div>
+                    </div>`;
+                }).join('');
+            } catch (e) {
+                $('shopList').innerHTML = `<div class="empty">Khata load nahi ho paya.<br>${escapeHtml(e.message)}</div>`;
+            }
+        }
+
+        window.linkCode = (btn) => run(btn, async () => {
+            const code = $('codeInput').value.trim().toUpperCase();
+            const r = await khataApi(user, '/link', 'POST', { code });
+            $('codeInput').value = '';
+            showToast(`${r.shopName} ka khata jud gaya ✅`);
+            loadList();
+        });
+
+        window.openShop = async (id) => {
+            currentId = id;
+            currentMonth = currentMonthIST();
+            $('listView').style.display = 'none';
+            $('detailView').style.display = 'block';
+            $('backLink').removeAttribute('href');
+            $('backLink').onclick = closeShop;
+            await loadDetail();
+        };
+        function closeShop() {
+            currentId = null;
+            $('detailView').style.display = 'none';
+            $('listView').style.display = 'block';
+            $('backLink').setAttribute('href', 'index.html');
+            $('backLink').onclick = null;
+            $('headTitle').textContent = '📒 Mera Khata';
+            loadList();
+        }
+        window.changeMonth = (d) => { currentMonth = shiftMonth(currentMonth, d); loadDetail(); };
+
+        async function loadDetail() {
+            $('entries').innerHTML = '<div class="empty">Load ho raha hai...</div>';
+            try {
+                detail = await khataApi(user, `/my/${currentId}?month=${currentMonth}`);
+                const a = detail.account;
+                $('headTitle').textContent = '📒 ' + a.shopName;
+                const b = balanceLabel(a.balance);
+                $('shopHead').innerHTML = `
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                        <div><div style="font-weight:700;font-size:16px;">🏪 ${escapeHtml(a.shopName)}</div>
+                        <div style="font-size:12.5px;color:#666;">Khata: ${escapeHtml(a.customerName)}</div></div>
+                        <div class="bal ${b.cls}" style="font-size:18px;">${b.text}</div>
+                    </div>
+                    <div style="font-size:12px;color:#777;margin-top:8px;">Ye hisab dukandaar likhta hai aur aap yahan wahi dekhte hain. Koi entry galat lage to uske neeche "❓ Sawal" dabaiye.</div>`;
+                renderPayBox(a);
+                $('monthTitle').textContent = monthLabel(detail.month);
+                const ob = balanceLabel(detail.openingBalance);
+                $('stats').innerHTML = `
+                    <div class="stat"><div class="v">${rupees(detail.monthCharged)}</div><div class="l">Is mahine ka maal</div></div>
+                    <div class="stat"><div class="v">${rupees(detail.monthPaid)}</div><div class="l">Is mahine diye</div></div>
+                    <div class="stat wide"><div class="l">Mahine ki shuruat ka hisab: ${ob.text}</div></div>`;
+                $('entries').innerHTML = detail.entries.length
+                    ? [...detail.entries].reverse().map(e => entryHtml(e, 'buyer')).join('')
+                    : '<div class="empty">Is mahine koi entry nahi.</div>';
+            } catch (e) {
+                $('entries').innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`;
+            }
+        }
+
+        function renderPayBox(a) {
+            if (!(a.balance > 0)) { $('payBox').innerHTML = ''; return; }
+            $('payBox').innerHTML = `<div class="pay-box no-print">
+                <div style="font-weight:700;">💸 Baaki chukana hai: ${rupees(a.balance)}</div>
+                ${a.shopUpiId ? `<div class="row-btns">
+                    <button class="btn green" onclick="payUpi()">UPI se chukao</button>
+                    <button class="btn alt" onclick="openClaim()">Maine pay kar diya</button></div>
+                    <div style="font-size:12px;color:#555;margin-top:6px;">UPI se paise bhejne ke baad "Maine pay kar diya" dabaiye. Dukandaar check karke confirm karega, tab hisab me dikhega.</div>`
+                : `<div style="font-size:12.5px;color:#555;margin-top:4px;">Dukandaar ko paise dijiye — wo hisab me likh dega aur yahan dikh jayega.</div>
+                   <div class="row-btns"><button class="btn alt" onclick="openClaim()">Maine pay kar diya</button></div>`}
+            </div>`;
+        }
+        window.payUpi = () => {
+            const a = detail.account;
+            window.location.href = upiLink(a.shopUpiId, a.shopName, a.balance, 'Khata ' + a.customerName);
+        };
+        window.openClaim = () => {
+            const a = detail.account;
+            openModal(`
+                <h3>💸 Maine pay kar diya</h3>
+                <div class="hint">Ye sirf dukandaar ko batata hai. Paise unke confirm karne par hi hisab me ghatenge.</div>
+                <label>Kitne rupaye bheje (₹)</label><input id="cAmt" type="number" step="0.5" min="0" value="${(a.balance / 100).toString()}">
+                <label>UPI reference number (optional)</label><input id="cNote" maxlength="60" placeholder="jaise: 4123XXXXXXXX">
+                <div class="row-btns">
+                    <button class="btn grey" onclick="closeModal()">Raho</button>
+                    <button class="btn green" onclick="sendClaim(this)">Dukandaar ko batao</button>
+                </div>`);
+        };
+        window.sendClaim = (btn) => run(btn, async () => {
+            await khataApi(user, `/my/${currentId}/pay-claim`, 'POST', {
+                amount: document.getElementById('cAmt').value.trim(), note: document.getElementById('cNote').value.trim() });
+            closeModal(); showToast('Dukandaar ko bata diya ✅'); loadDetail();
+        });
+        window.downloadLedger = () => {
+            if (!detail) return;
+            const a = detail.account;
+            downloadCsv(`khata-${a.shopName}-${detail.month}.csv`, [
+                [`${a.shopName} — ${a.customerName} (${detail.month})`], [], ...ledgerCsvRows(detail), [],
+                ['', '', '', '', 'Mahine ka maal', detail.monthCharged / 100], ['', '', '', '', 'Mahine me diye', detail.monthPaid / 100],
+                ['', '', '', '', 'Abhi baaki', a.balance / 100]
+            ]);
+        };
+
+        window.askDoubt = (eid) => {
+            openModal(`
+                <h3>❓ Is entry par sawal</h3>
+                <div class="hint">Dukandaar ko aapka sawal dikhega aur wo yahin jawab dega.</div>
+                <label>Aapka sawal</label><textarea id="qText" maxlength="200" rows="3" placeholder="jaise: us din hum ghar par nahi the"></textarea>
+                <div class="row-btns">
+                    <button class="btn grey" onclick="closeModal()">Raho</button>
+                    <button class="btn" onclick="sendDoubt('${eid}', this)">Bhejo</button>
+                </div>`);
+        };
+        window.sendDoubt = (eid, btn) => run(btn, async () => {
+            const message = document.getElementById('qText').value.trim();
+            await khataApi(user, `/my/${currentId}/entries/${eid}/dispute`, 'POST', { message });
+            closeModal(); showToast('Sawal bhej diya ✅'); loadDetail();
+        });
+
+        onAuthStateChanged(auth, (u) => {
+            if (!u || u.isAnonymous) { window.location.href = 'login.html'; return; }
+            user = u;
+            loadList();
+        });
+    </script>
+</body>
+</html>
