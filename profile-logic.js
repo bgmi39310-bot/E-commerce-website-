@@ -2,6 +2,11 @@ import { doc, getDoc, setDoc, collection, query, where, getDocs, writeBatch, ser
 import { NO_IMAGE_PLACEHOLDER } from './img-utils.js';
 import { showToast } from './toast.js';
 import { initPickerMap } from './map-utils.js';
+import { attachAddressAutofill, attachVillagePicker } from './address-autofill.js';
+
+let shopAf = null;           // PIN autofill for the shop's own address
+let villagePicker = null;     // PIN -> villages chips for "delivers to"
+let loadedShopExtra = {};     // pincode/block already saved (used only if the PIN is unchanged)
 
 // Module state for the shop-location picker map. Only ever created ONCE
 // per page load — Leaflet errors if you try to initialize a second map in
@@ -74,7 +79,7 @@ export async function loadSellerProfileFromFirestore(db, uid) {
             document.getElementById('dispAddress').innerText = profile.address || 'N/A';
             document.getElementById('dispLogo').src = profile.logo || NO_IMAGE_PLACEHOLDER;
             const dispCityEl = document.getElementById('dispCity');
-            if (dispCityEl) dispCityEl.innerText = profile.city || 'N/A';
+            if (dispCityEl) dispCityEl.innerText = [profile.city, profile.district, profile.pincode].filter(Boolean).join(', ') || 'N/A';
             const dispVillagesEl = document.getElementById('dispVillages');
             if (dispVillagesEl) dispVillagesEl.innerText = (profile.deliveryVillages && profile.deliveryVillages.length) ? profile.deliveryVillages.join(', ') : 'N/A';
 
@@ -83,6 +88,16 @@ export async function loadSellerProfileFromFirestore(db, uid) {
             document.getElementById('shopPhone').value = profile.phone || '';
             document.getElementById('shopLogoFile').value = profile.logo || '';
             document.getElementById('shopAddress').value = profile.address || '';
+            loadedShopExtra = { pincode: profile.pincode || '', block: profile.block || '' };
+            const pinField = document.getElementById('shopPincode');
+            if (pinField) {
+                pinField.value = profile.pincode || '';
+                const sF = document.getElementById('shopState'), dF = document.getElementById('shopDistrict');
+                if (sF) sF.value = profile.state || '';
+                if (dF) dF.value = profile.district || '';
+                if (!shopAf) shopAf = attachAddressAutofill({ pin: 'shopPincode', state: 'shopState', city: 'shopCity', district: 'shopDistrict' });
+                if (!villagePicker) villagePicker = attachVillagePicker({ input: 'shopVillages', initialPins: profile.deliveryPincodes || [] });
+            }
             const cityField = document.getElementById('shopCity');
             if (cityField) cityField.value = profile.city || '';
             const villagesField = document.getElementById('shopVillages');
@@ -102,6 +117,10 @@ export async function loadSellerProfileFromFirestore(db, uid) {
             document.getElementById('profileDisplay').style.display = 'none';
             document.getElementById('profileForm').style.display = 'grid';
             refreshShopLocationMap(); // new seller — form is visible immediately
+            if (document.getElementById('shopPincode')) {      // new seller: PIN-first helpers on the blank form too
+                if (!shopAf) shopAf = attachAddressAutofill({ pin: 'shopPincode', state: 'shopState', city: 'shopCity', district: 'shopDistrict' });
+                if (!villagePicker) villagePicker = attachVillagePicker({ input: 'shopVillages', initialPins: [] });
+            }
         }
     } catch (error) {
         console.error("Error loading profile:", error);
@@ -139,6 +158,10 @@ export async function saveSellerProfile(db, currentLoggedInUser, loadProfileCall
         ? villagesField.value.split(',').map(v => v.trim()).filter(v => v)
         : [];
 
+    const ownPin = (document.getElementById('shopPincode') ? document.getElementById('shopPincode').value.trim() : '');
+    const geo = shopAf ? shopAf.geo() : null;
+    const deliveryPincodes = [...new Set([ownPin, ...(villagePicker ? villagePicker.getPins() : [])].filter(p => /^\d{6}$/.test(p)))];
+
     const profile = {
         uid: currentLoggedInUser.uid,
         shopName,
@@ -147,6 +170,13 @@ export async function saveSellerProfile(db, currentLoggedInUser, loadProfileCall
         address: document.getElementById('shopAddress').value.trim(),
         city: document.getElementById('shopCity') ? document.getElementById('shopCity').value.trim() : '',
         deliveryVillages,
+        pincode: /^\d{6}$/.test(ownPin) ? ownPin : '',
+        state: document.getElementById('shopState') ? document.getElementById('shopState').value.trim() : '',
+        district: document.getElementById('shopDistrict') ? document.getElementById('shopDistrict').value.trim() : '',
+        block: geo ? (geo.block || '') : (loadedShopExtra.pincode === ownPin ? loadedShopExtra.block : ''),
+        // PINs this shop delivers to (its own PIN + the PINs whose villages were ticked) —
+        // lets buyers match by PIN even when a village is spelled differently.
+        deliveryPincodes,
         upiId: upiField ? upiField.value.trim() : '',
         upiQr: document.getElementById('shopUpiQr') ? document.getElementById('shopUpiQr').value.trim() : '',
         logo: logoUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
