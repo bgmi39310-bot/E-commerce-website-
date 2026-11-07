@@ -238,26 +238,24 @@
         <div id="buySavedAddressList" style="margin-bottom:14px;"></div>
 
         <div class="form-group">
+            <label>📮 Pincode (sabse pehle ye daaliye — rajya, zila, gaon apne aap aa jayenge)</label>
+            <input type="text" id="buyPincode" placeholder="e.g. 226001" maxlength="6">
+        </div>
+        <div class="form-group">
             <label>Full Name</label>
             <input type="text" id="buyName" placeholder="Your name">
         </div>
-        <div class="form-row">
-            <div class="form-group">
+        <div class="form-group">
                 <label>Mobile Number</label>
                 <input type="tel" id="buyPhone" placeholder="10-digit number" maxlength="10">
             </div>
-            <div class="form-group">
-                <label>Pincode</label>
-                <input type="text" id="buyPincode" placeholder="e.g. 226001" maxlength="6">
-            </div>
-        </div>
         <div class="form-group">
             <label>Complete Address (House No, Street, Landmark)</label>
             <textarea id="buyAddress" rows="2" placeholder="Enter full delivery address"></textarea>
         </div>
         <div class="form-row">
             <div class="form-group">
-                <label>City / Village</label>
+                <label>City / Village (PIN ke baad list se chuniye)</label>
                 <input type="text" id="buyCity" placeholder="City">
             </div>
             <div class="form-group">
@@ -301,6 +299,7 @@
     import { mountNotificationBell } from './notif-logic.js';
     import { placeOrderViaBackend } from './order-api.js';
     import { loadAddresses } from './address-logic.js';
+    import { attachAddressAutofill } from './address-autofill.js';
     import { openSubscribeModal } from './subscribe-ui.js';
     import { validateCoupon } from './coupon-logic.js';
     // report-logic.js and chat-logic.js are ONLY needed if the person
@@ -836,6 +835,8 @@
         renderBuyOrderSummary();
     };
 
+    const buyAf = attachAddressAutofill({ pin: 'buyPincode', state: 'buyState', city: 'buyCity' });
+
     window.selectBuySavedAddress = function(addr, cardEl) {
         document.querySelectorAll('#buySavedAddressList .saved-addr-card').forEach(c => c.classList.remove('selected'));
         if (cardEl) cardEl.classList.add('selected');
@@ -846,11 +847,13 @@
         document.getElementById('buyAddress').value = addr.addressLine || '';
         document.getElementById('buyCity').value = addr.city || '';
         document.getElementById('buyState').value = addr.state || '';
+        if (buyAf) buyAf.refresh(addr.city);
     };
 
     window.clearBuyAddressSelection = function() {
         document.querySelectorAll('#buySavedAddressList .saved-addr-card').forEach(c => c.classList.remove('selected'));
         ['buyName', 'buyPhone', 'buyPincode', 'buyAddress', 'buyCity', 'buyState'].forEach(id => document.getElementById(id).value = '');
+        if (buyAf) buyAf.refresh();
     };
 
     async function loadBuySavedAddresses() {
@@ -934,7 +937,10 @@
         btn.innerText = 'Placing order...';
 
         try {
-            const fullAddress = `${address}, ${city}, ${state} ${pincode ? '- ' + pincode : ''}`;
+            const geo = buyAf ? buyAf.geo() : null;
+            const extra = geo ? { district: geo.district, state: geo.state || state, pincode } : { state, pincode };
+            const placeBits = [city, geo && geo.block && geo.block.toLowerCase() !== city.toLowerCase() ? geo.block : '', geo ? geo.district : ''].filter(Boolean);
+            const fullAddress = `${address}, ${placeBits.join(', ')}, ${state} ${pincode ? '- ' + pincode : ''}`;
 
             // Price, seller, shop name and stock are all re-derived
             // server-side from Firestore by the backend — nothing here
@@ -950,7 +956,7 @@
                     selectedColor: selectedVariants.color || null,
                     quantity: currentQty
                 }],
-                delivery: { name, phone, address: fullAddress, city },
+                delivery: { name, phone, address: fullAddress, city, ...extra },
                 couponCode: appliedBuyCoupon ? appliedBuyCoupon.code : null,
                 paymentMethod: payment
             });
