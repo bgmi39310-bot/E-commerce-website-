@@ -18,6 +18,7 @@ from routes.subscriptions import subscriptions_bp
 from routes.coupons import coupons_bp
 from routes.khata import khata_bp
 from routes.bazaar import bazaar_bp
+from routes.geo import geo_bp
 from utils.cache import init_redis
 from utils.limiter import limiter
 from utils.product_sync import start_product_sync
@@ -76,6 +77,7 @@ def create_app():
     app.register_blueprint(coupons_bp)
     app.register_blueprint(khata_bp)
     app.register_blueprint(bazaar_bp)
+    app.register_blueprint(geo_bp)
 
     def _startup_background_tasks():
         # Both of these do blocking network I/O (connecting to Redis, then
