@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <script src="page-loader.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gaon Bazaar - DesiMarket</title>
+    <meta name="description" content="Apne gaon ka bazaar: pashu, fasal, vahan bechiye, machine kiraye par dijiye, majdoor dhoondhiye ya kaam paiye.">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#232f3e">
+    <link rel="icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="stylesheet" href="shared-ui.css">
+    <link rel="stylesheet" href="khata-ui.css">
+    <link rel="stylesheet" href="bazaar-ui.css">
+    <script src="pwa-init.js" defer></script>
+    <script src="click-guard.js" defer></script>
+</head>
+<body>
+    <header class="k-head">
+        <a href="index.html">←</a>
+        <h1>🌾 Gaon Bazaar</h1>
+    </header>
+    <nav class="tabs" id="tabs"></nav>
+
+    <div class="wrap" id="main">
+        <div id="filters"></div>
+        <div id="list"><div class="empty">Load ho raha hai...</div></div>
+    </div>
+    <button class="postfab" id="postFab" onclick="startPost()">➕ Post karo</button>
+    <div id="modalMount"></div>
+
+    <script type="module">
+        import { auth } from './firebase-config.js';
+        import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { showToast } from './toast.js';
+        import { escapeHtml as esc } from './sanitize.js';
+        import { uploadToImgBB } from './image-upload.js';
+        import { bazaarApi, KINDS, CAT, catLabel, ANIMALS, UNIT_NAME, priceText, timeAgo, speak, listen, waLink, shareLink, rupees } from './bazaar-api.js';
+
+        let user = null;
+        let tab = 'sell';                      // sell | rent | job | worker | mera
+        let category = '';
+        let womenOnly = false;
+        let query = '';
+        let area = { state: '', district: '' };
+        let formPhotos = [];
+        let cache = {};                         // id -> post (for open-by-id)
+
+        const $ = (id) => document.getElementById(id);
+        const val = (id) => ($(id)?.value ?? '').trim();
+        const chk = (id) => !!$(id)?.checked;
+        function openModal(html) { $('modalMount').innerHTML = `<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal">${html}</div></div>`; }
+        window.closeModal = () => { $('modalMount').innerHTML = ''; try { speechSynthesis.cancel(); } catch {} };
+        async function run(btn, fn) { if (btn) btn.disabled = true; try { await fn(); } catch (e) { showToast(e.message, 'error'); } finally { if (btn) btn.disabled = false; } }
+        const needLogin = () => { if (!user || user.isAnonymous) { showToast('Pehle login kijiye.', 'error'); setTimeout(() => location.href = 'login.html', 700); return true; } return false; };
+        const emoji = (p) => { const c = (CAT[p.kind] || []).find(x => x[0] === p.category); return c ? c[1] : '📦'; };
+
+        // ---- remembered area ----
+        try { area = JSON.parse(localStorage.getItem('bazaarArea') || '{}') || area; } catch {}
+        const saveArea = () => { try { localStorage.setItem('bazaarArea', JSON.stringify(area)); } catch {} };
+
+        // ---------- tabs / filters ----------
+        const TABS = [['sell', '🛒', 'Mandi'], ['rent', '🚜', 'Kiraya'], ['job', '📋', 'Kaam'], ['worker', '👷', 'Majdoor'], ['mera', '👤', 'Mera']];
+        function renderTabs() {
+            $('tabs').innerHTML = TABS.map(([k, ic, l]) => `<div class="tab ${tab === k ? 'on' : ''}" onclick="setTab('${k}')"><span class="ic">${ic}</span>${l}</div>`).join('');
+            $('postFab').style.display = tab === 'mera' ? 'none' : 'block';
+        }
+        window.setTab = (k) => { tab = k; category = ''; womenOnly = false; query = ''; history.replaceState(null, '', k === 'mera' ? '#mera' : location.pathname); renderTabs(); k === 'mera' ? loadMera() : (renderFilters(), loadList()); };
+
+        function renderFilters() {
+            const chips = [['', '', 'Sab'], ...CAT[tab]].map(([k, ic, l]) => `<button class="chip ${category === k ? 'on' : ''}" onclick="setCat('${k}')">${ic} ${l}</button>`).join('');
+            $('filters').innerHTML = `
+                <div class="where">
+                    <input id="fState" placeholder="Rajya (jaise: Uttar Pradesh)" value="${esc(area.state || '')}" onchange="setArea()">
+                    <input id="fDistrict" placeholder="Zila (jaise: Kanpur)" value="${esc(area.district || '')}" onchange="setArea()">
+                </div>
+                <div class="searchrow">
+                    <input id="fQ" type="search" placeholder="🔍 Kya dhoondh rahe hain?" value="${esc(query)}" onkeydown="if(event.key==='Enter')doSearch()">
+                    <button onclick="micSearch()" title="Bolkar dhoondhiye">🎤</button>
+                    <button onclick="doSearch()">🔎</button>
+                </div>
+                <div class="chips">${chips}${(tab === 'job' || tab === 'worker') ? `<button class="chip ${womenOnly ? 'on' : ''}" onclick="toggleWomen()">👩 Sirf mahila</button>` : ''}</div>
+                <div id="wage"></div>`;
+        }
+        window.setCat = (k) => { category = k; renderFilters(); loadList(); };
+        window.toggleWomen = () => { womenOnly = !womenOnly; renderFilters(); loadList(); };
+        window.setArea = () => { area = { state: val('fState'), district: val('fDistrict') }; saveArea(); loadList(); };
+        window.doSearch = () => { query = val('fQ'); area = { state: val('fState'), district: val('fDistrict') }; saveArea(); loadList(); };
+        window.micSearch = () => listen((t) => { $('fQ').value = t; doSearch(); }, (e) => showToast(e.message, 'error'));
+
+        // ---------- list ----------
+        function cardHtml(p) {
+            cache[p.id] = p;
+            const f = p.fields || {};
+            const th = p.photos[0] ? `<img class="th" src="${esc(p.photos[0])}" loading="lazy" alt="">` : `<div class="th">${emoji(p)}</div>`;
+            const bits = [];
+            if (p.category === 'pashu') {
+                const a = ANIMALS.find(x => x[0] === f.animalType); if (a) bits.push(a[1]);
+                if (f.ageYears != null) bits.push(f.ageYears + ' saal');
+                if (f.milkPerDay) bits.push(f.milkPerDay + ' L/din');
+            }
+            const badges = [
+                f.emergency ? '<span class="badge red">🚨 Emergency</span>' : '',
+                p.ownerVerified ? '<span class="badge ok">✔ Local Verified</span>' : '',
+                p.ownerRating ? `<span class="badge gold">⭐ ${p.ownerRating} (${p.ownerRatingCount})</span>` : '',
+                f.womenOnly ? '<span class="badge pink">👩 Mahila</span>' : '',
+                f.groupName ? '<span class="badge">🤝 ' + esc(f.groupName) + '</span>' : '',
+                f.toli ? '<span class="badge">👥 Toli' + (f.groupSize ? ' ' + f.groupSize : '') + '</span>' : '',
+            ].join('');
+            return `<div class="card post ${f.emergency ? 'emerg' : ''}" onclick="openPost('${p.id}')">${th}
+                <div class="bd"><div class="tt">${esc(p.title)}</div>
+                <div class="pr">${esc(priceText(p))}</div>
+                <div class="mt">📍 ${esc([p.village, p.district].filter(Boolean).join(', '))} · ${timeAgo(p.createdAt)}${bits.length ? '<br>' + esc(bits.join(' · ')) : ''}</div>
+                <div style="margin-top:4px;">${badges}</div></div></div>`;
+        }
+        async function loadList() {
+            $('list').innerHTML = '<div class="empty">Load ho raha hai...</div>';
+            const q = new URLSearchParams({ kind: tab });
+            if (category) q.set('category', category);
+            if (area.state) q.set('state', area.state);
+            if (area.district) q.set('district', area.district);
+            if (query) q.set('q', query);
+            if (womenOnly) q.set('womenOnly', '1');
+            try {
+                const r = await bazaarApi(null, '/posts?' + q.toString());
+                const w = $('wage');
+                if (w) w.innerHTML = r.avgDailyWage ? `<div class="wagebar">💰 Is list me ausat mazdoori: <b>${rupees(r.avgDailyWage)}/din</b> (bhav ka andaza)</div>` : '';
+                $('list').innerHTML = r.posts.length ? r.posts.map(cardHtml).join('') + (r.total > r.posts.length ? `<div class="sticky-sum">Aur ${r.total - r.posts.length} post hain — zila ya category se chhaantiye.</div>` : '')
+                    : `<div class="empty">Abhi yahan koi post nahi.<br>${area.district ? 'Zila badal kar ya khali karke dekhiye, ya ' : ''}pehle aap <b>➕ Post karo</b> dabaiye!</div>`;
+            } catch (e) { $('list').innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+        }
+
+        // ---------- detail ----------
+        const LBL = { animalType: 'Janwar', breed: 'Nasl', ageYears: 'Umr (saal)', milkPerDay: 'Doodh (L/din)', lactation: 'Byant (baar)', healthNote: 'Sehat',
+            condition: 'Halat', vehicleType: 'Prakaar', modelName: 'Model', year: 'Saal', kmDriven: 'KM chala', docsOk: 'Kagaz poore', groupName: 'Samooh',
+            machine: 'Machine', withOperator: 'Driver saath', startDate: 'Shuruat', workersNeeded: 'Kitne log', durationDays: 'Kitne din',
+            womenOnly: 'Sirf mahila', toli: 'Toli', groupSize: 'Toli me log', experienceYears: 'Anubhav (saal)', skills: 'Hunar', availability: 'Kab free' };
+        function kvHtml(p) {
+            const f = p.fields || {}, rows = [];
+            if (f.quantity) rows.push(['Matra', f.quantity + (f.quantityUnit ? ' ' + f.quantityUnit : '')]);
+            for (const k of Object.keys(LBL)) {
+                const v = f[k];
+                if (v === undefined || v === false || v === '') continue;
+                rows.push([LBL[k], v === true ? 'Haan' : k === 'animalType' ? (ANIMALS.find(a => a[0] === v)?.[1] || v) : v]);
+            }
+            return rows.length ? `<div class="kv">${rows.map(([a, b]) => `<div><b>${esc(a)}</b>${esc(b)}</div>`).join('')}</div>` : '';
+        }
+        window.openPost = async (id, fresh) => {
+            let p = !fresh && cache[id];
+            if (!p) { try { p = (await bazaarApi(user, '/posts/' + id)).post; cache[id] = p; } catch (e) { showToast(e.message, 'error'); return; } }
+            const closed = p.status !== 'active';
+            const doneWord = p.kind === 'job' || p.kind === 'worker' ? 'Kaam mil gaya / pura' : 'Bik gaya / band';
+            let actions = '';
+            if (p.isOwner) actions = `<div class="warn">Ye aapka apna post hai. "Mera" tab se sambhaliye.</div>`;
+            else if (closed) actions = `<div class="warn">⛔ Ye post ab chalu nahi hai (${esc(doneWord)}).</div>`;
+            else {
+                if (p.contactMode === 'direct') actions += `<div class="row-btns"><button class="btn green" onclick="showDirect('${p.id}')">📞 Call / WhatsApp</button></div>`;
+                actions += `<div class="row-btns"><button class="btn" onclick="openLead('${p.id}')">📩 Sampark bhejiye</button></div>`;
+                if (p.contactMode !== 'direct') actions += `<div class="hint">🔒 Poster ne number chhupa rakha hai. Aap request bhejiye — manzoor hone par number dikhega.</div>`;
+            }
+            const warnAnimal = p.category === 'pashu' ? `<div class="warn">⚠️ Pashu ki khareed-bikri aur le jaane ke rajya-wise kanoon alag hain. Janwar sirf kheti/doodh/paalan ke liye hai. Paise dene se pehle janwar khud dekhiye, aur zaroorat ho to pashu doctor se jaanch karaiye.</div>` : '';
+            const warnJob = (p.kind === 'job' || p.kind === 'worker') ? `<div class="warn">⚠️ Kaam ke naam par kabhi "fees" ya advance paise mat dijiye. Pehli baar milne par kisi ko saath le jaiye.</div>` : '';
+            openModal(`
+                ${p.photos.length ? `<div class="photos">${p.photos.map(u => `<img src="${esc(u)}" alt="">`).join('')}</div>` : ''}
+                <h3 style="margin-bottom:4px;">${p.fields?.emergency ? '🚨 ' : ''}${esc(p.title)}</h3>
+                <div class="pr" style="font-weight:800;color:#b12704;font-size:18px;">${esc(priceText(p))}</div>
+                <div class="mt" style="font-size:12.5px;color:#666;margin:4px 0;">📍 ${esc([p.village, p.district, p.state].filter(Boolean).join(', '))} · ${esc(catLabel(p.kind, p.category))} · ${timeAgo(p.createdAt)}</div>
+                <div>${p.ownerVerified ? '<span class="badge ok">✔ Local Verified</span>' : ''}${p.ownerRating ? `<span class="badge gold">⭐ ${p.ownerRating} (${p.ownerRatingCount})</span>` : ''}
+                    <span class="badge">👤 ${esc(p.ownerName)}${p.contactLabel && p.contactLabel !== 'Khud' ? ' · sampark: ' + esc(p.contactLabel) : ''}</span></div>
+                ${kvHtml(p)}
+                ${p.description ? `<div style="font-size:14px;line-height:1.55;margin:8px 0;white-space:pre-wrap;">${esc(p.description)}</div>` : ''}
+                ${warnAnimal}${warnJob}${actions}
+                <div class="row-btns">
+                    <button class="btn alt" onclick="shareWa('${p.id}')">📲 WhatsApp par share</button>
+                    ${p.isOwner ? '' : `<button class="btn grey" onclick="openReport('${p.id}')">🚩 Report</button>`}
+                </div>
+                <div class="row-btns"><button class="btn grey" onclick="closeModal()">Band karo</button></div>`);
+        };
+        window.shareWa = (id) => {
+            const p = cache[id]; if (!p) return;
+            const t = `${p.title} — ${priceText(p)} (${[p.village, p.district].filter(Boolean).join(', ')})\nGaon Bazaar par dekhiye: ${shareLink(id)}`;
+            window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank');
+        };
+        window.showDirect = (id) => run(null, async () => {
+            if (needLogin()) return;
+            const r = await bazaarApi(user, `/posts/${id}/contact`);
+            const p = cache[id];
+            openModal(`<h3>📞 Sampark</h3>
+                <div style="font-size:15px;line-height:1.7;">${esc(p.ownerName)}${r.label && r.label !== 'Khud' ? ' (' + esc(r.label) + ')' : ''}<br><b style="font-size:20px;">${esc(r.phone)}</b></div>
+                <div class="hint">Kisi ko bhi advance paise mat dijiye. Pehle samaan/kaam khud dekhiye.</div>
+                <div class="row-btns"><a class="btn green" style="text-align:center;text-decoration:none;" href="tel:${esc(r.phone)}">📞 Call</a>
+                <a class="btn alt" style="text-align:center;text-decoration:none;" target="_blank" href="${esc(waLink(r.phone, 'Namaste, Gaon Bazaar par aapka post dekha: ' + p.title))}">💬 WhatsApp</a></div>
+                <div class="row-btns"><button class="btn grey" onclick="openPost('${id}')">← Wapas</button></div>`);
+        });
+
+        // ---------- lead / report ----------
+        window.openLead = (id) => {
+            if (needLogin()) return;
+            const p = cache[id];
+            openModal(`<h3>📩 Sampark bhejiye</h3>
+                <div class="hint">Poster ko aapka naam, number aur sandesh dikhega. Wo manzoor karega to uska number aapko dikhega.</div>
+                <label>Aapka naam</label><input id="lName" maxlength="40" value="${esc(user.displayName || '')}">
+                <label>Aapka mobile number</label><input id="lPhone" type="tel" inputmode="numeric" maxlength="10" value="${esc((user.phoneNumber || '').replace(/^\+91/, ''))}">
+                ${p.kind === 'rent' ? `<label>Kis tareekh se kis tareekh tak chahiye</label><div class="two"><input id="lFrom" type="date"><input id="lTo" type="date"></div>` : ''}
+                <label>Sandesh (optional)</label><textarea id="lMsg" rows="3" maxlength="200" placeholder="${p.kind === 'job' ? 'jaise: main kal subah aa sakta hoon' : p.kind === 'worker' ? 'jaise: kal 5 log ka kaam hai, khet Rampur me' : 'jaise: kya aaj dekhne aa sakta hoon?'}"></textarea>
+                <div class="row-btns"><button class="btn grey" onclick="openPost('${id}')">Wapas</button><button class="btn" onclick="sendLead('${id}', this)">Bhejo</button></div>`);
+        };
+        window.sendLead = (id, btn) => run(btn, async () => {
+            const body = { name: val('lName'), phone: val('lPhone'), message: val('lMsg') };
+            if ($('lFrom') && val('lFrom')) body.dates = { from: val('lFrom'), to: val('lTo') || val('lFrom') };
+            await bazaarApi(user, `/posts/${id}/lead`, 'POST', body);
+            closeModal(); showToast('Sampark bhej diya ✅ — jawab ka intezaar kijiye.');
+        });
+        window.openReport = (id) => {
+            if (needLogin()) return;
+            openModal(`<h3>🚩 Report karo</h3><div class="hint">Farzi, galat ya dhokhe wala post ho to batayiye. 3 alag log report karein to post apne aap chhup jata hai aur admin dekhta hai.</div>
+                <label>Kya galat hai?</label><input id="rReason" maxlength="140" placeholder="jaise: photo kisi aur ki hai / paise maang raha hai">
+                <div class="row-btns"><button class="btn grey" onclick="openPost('${id}')">Wapas</button><button class="btn" style="background:#c0392b;color:#fff;" onclick="sendReport('${id}', this)">Report bhejo</button></div>`);
+        };
+        window.sendReport = (id, btn) => run(btn, async () => { await bazaarApi(user, `/posts/${id}/report`, 'POST', { reason: val('rReason') }); closeModal(); showToast('Report mil gayi. Shukriya 🙏'); });
+
+        // ---------- create post ----------
+        window.startPost = () => {
+            if (needLogin()) return;
+            openModal(`<h3>➕ Kya post karna hai?</h3><div class="kindgrid">
+                ${Object.entries(KINDS).map(([k, v]) => `<button onclick="openForm('${k}')"><span class="ic">${v.icon}</span>${v.postLabel}</button>`).join('')}
+                </div><div class="row-btns"><button class="btn grey" onclick="closeModal()">Raho</button></div>`);
+        };
+        const fld = (label, inner, hint = '') => `<div class="fld"><label>${label}</label>${inner}${hint ? `<div class="hint">${hint}</div>` : ''}<button type="button" class="sp" data-say="${esc(label + '. ' + hint.replace(/<[^>]+>/g, ''))}" onclick="say(this)">🔊</button></div>`;
+        window.say = (b) => { if (!speak(b.dataset.say)) showToast('Is phone me awaaz sunne ki suvidha nahi hai.', 'error'); };
+        const sel = (id, opts, cur = '') => `<select id="${id}">${opts.map(([v, l]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+        const inp = (id, ph = '', type = 'text', extra = '') => `<input id="${id}" type="${type}" placeholder="${esc(ph)}" ${extra}>`;
+        const check = (id, text) => `<label style="display:flex;gap:8px;align-items:flex-start;font-weight:600;"><input id="${id}" type="checkbox" style="width:auto;min-height:auto;margin-top:3px;">${text}</label>`;
+        const UNITS = { sell: ['total', 'per_kilo', 'per_quintal', 'per_nag'], rent: ['per_ghanta', 'per_din', 'per_acre', 'total'], job: ['per_din', 'total'], worker: ['per_din', 'per_ghanta', 'total'] };
+        let formKind = 'sell';
+
+        function extraFields(kind, cat) {
+            if (kind === 'sell' && cat === 'pashu') return `
+                ${fld('Kaun sa janwar', sel('xAnimal', ANIMALS))}
+                ${fld('Nasl (optional)', inp('xBreed', 'jaise: Jersey, Murrah, Sahiwal'))}
+                <div class="two">${fld('Umr (saal)', inp('xAge', '3', 'number', 'step="0.5" min="0"'))}${fld('Doodh (litre/din)', inp('xMilk', '12', 'number', 'step="0.5" min="0"'), 'doodh dene wale janwar ke liye')}</div>
+                ${fld('Byant (kitni baar bachha diya)', inp('xLact', '2', 'number', 'min="0"'))}
+                ${fld('Sehat / teekakaran (optional)', inp('xHealth', 'jaise: sab teeke lage hain'))}
+                <div class="warn">⚠️ Pashu ki bikri ke rajya-wise kanoon hote hain. Janwar sirf <b>kheti, doodh ya paalan</b> ke liye bechna hai — katai ke liye nahi. Kam se kam ek photo zaroori hai.</div>
+                ${check('xAgri', 'Main ye janwar sirf kheti / doodh / paalan ke liye bech raha/rahi hoon, katai ke liye nahi.')}`;
+            if (kind === 'sell' && cat === 'vahan') return `
+                <div class="two">${fld('Prakaar', inp('xVType', 'Tractor / Bike / Rickshaw'))}${fld('Model', inp('xModel', 'Mahindra 575'))}</div>
+                <div class="two">${fld('Saal', inp('xYear', '2018', 'number'))}${fld('KM / ghante chala', inp('xKm', '25000', 'number'))}</div>
+                ${check('xDocs', 'Gaadi ke kagaz (RC) poore hain')}
+                <div class="warn">⚠️ Kam se kam ek photo zaroori hai. Kagaz khud dekh kar hi paise dijiye.</div>`;
+            if (kind === 'sell') return `
+                <div class="two">${fld('Matra', inp('xQty', '50', 'number', 'min="0"'))}${fld('Naap', inp('xQUnit', 'kilo / bori / trolley'))}</div>
+                ${cat === 'saman' ? fld('Halat', sel('xCond', [['', '—'], ['naya', 'Naya'], ['theek', 'Theek-thaak'], ['purana', 'Purana']])) : ''}
+                ${(cat === 'mahila-utpad' || cat === 'hastshilp') ? fld('Samooh (SHG) ka naam (optional)', inp('xGroup', 'jaise: Durga Mahila Samooh'), 'samooh milkar bechte hain to naam likhiye') : ''}`;
+            if (kind === 'rent') return `
+                <div class="two">${fld('Machine / vahan', inp('xMachine', 'Tractor + Rotavator'))}${''}</div>
+                ${check('xOper', 'Driver / operator saath me milega')}`;
+            if (kind === 'job') return `
+                <div class="two">${fld('Kitne log chahiye', inp('xNeed', '5', 'number', 'min="1"'))}${fld('Kitne din ka kaam', inp('xDays', '2', 'number', 'min="1"'))}</div>
+                ${fld('Kab se', inp('xStart', '', 'date'))}
+                ${check('xWomen', '👩 Sirf mahila samooh / mahila ke khet ka kaam')}
+                ${check('xEmerg', '🚨 Emergency (jaise baarish se pehle) — aas-paas ke majdooron ko turant notification jayegi')}
+                ${check('xAdult', 'Kaam 18 saal ya usse bade logon ke liye hai.')}`;
+            return `
+                ${fld('Aapka hunar', inp('xSkills', 'kataai, buaai, nirai'))}
+                <div class="two">${fld('Anubhav (saal)', inp('xExp', '5', 'number', 'min="0"'))}${fld('Kab free hain', inp('xAvail', 'roz / sirf season me'))}</div>
+                ${check('xToli', '👥 Ye poori toli ka card hai')}
+                ${fld('Toli me kitne log', inp('xGroup', '10', 'number', 'min="1"'), 'sirf toli ke liye')}
+                ${check('xWomen', '👩 Mahila / mahila samooh — sirf surakshit mahaul ka kaam')}
+                ${check('xAdult', 'Main 18 saal ya usse bada/badi hoon.')}`;
+        }
+        window.openForm = (kind) => {
+            formKind = kind; formPhotos = [];
+            const cats = CAT[kind].map(([k, ic, l]) => [k, `${ic} ${l}`]);
+            const priceLabel = { sell: 'Keemat (₹)', rent: 'Kiraye ki dar (₹)', job: 'Mazdoori (₹)', worker: 'Mazdoori ki dar (₹, optional)' }[kind];
+            const priceHint = { sell: 'mol-bhav ke liye khali chhodiye', rent: '', job: 'prati din ya kul', worker: '' }[kind];
+            openModal(`
+                <h3>${KINDS[kind].icon} ${esc(KINDS[kind].postLabel)}</h3>
+                ${fld('Category', sel('fCat', cats, cats[0][0]))}
+                ${fld('Title', inp('fTitle', kind === 'job' ? 'Kal 5 majdoor chahiye kataai ke liye' : kind === 'worker' ? 'Khet majdoor / mistri' : kind === 'rent' ? 'Tractor kiraye par' : 'Jersey gaay 3 saal'), 'chhota aur saaf likhiye')}
+                <div id="extra"></div>
+                <div class="two">${fld(priceLabel, inp('fPrice', '', 'number', 'min="0" step="0.5"'), priceHint)}${fld('Naap', sel('fUnit', UNITS[kind].map(u => [u, UNIT_NAME[u]])))}</div>
+                ${fld('Aur jaankari (optional)', `<textarea id="fDesc" rows="3" maxlength="600"></textarea>`)}
+                <div class="two">${fld('Rajya', inp('fState', 'Uttar Pradesh', 'text', `value="${esc(area.state || '')}"`))}${fld('Zila', inp('fDistrict', 'Kanpur', 'text', `value="${esc(area.district || '')}"`))}</div>
+                ${fld('Gaon / kasba', inp('fVillage', 'Rampur'))}
+                ${fld('Aapka naam', inp('fOwner', '', 'text', `maxlength="40" value="${esc(user?.displayName || '')}"`))}
+                <label>📷 Photo (max 4)${(kind === 'sell') ? ' — pashu aur vahan ke liye zaroori' : ''}</label>
+                <div class="photo-slots" id="slots"></div><input id="photoIn" type="file" accept="image/*" style="display:none;">
+                <div class="hint" id="photoSt"></div>
+                <div class="warn">🔒 <b>Number ki suraksha</b><br>
+                    ${fld('Sampark kiska number hai', sel('fLabel', [['Khud', 'Mera apna'], ['Pati', 'Pati'], ['Bhai', 'Bhai'], ['Pita', 'Pita'], ['Beta', 'Beta'], ['Parivar', 'Parivar ka sadasya']]))}
+                    ${fld('Sampark ka mobile number', inp('fPhone', '98XXXXXXXX', 'tel', 'maxlength="10" inputmode="numeric"'))}
+                    <label style="display:flex;gap:8px;font-weight:600;"><input type="radio" name="fMode" value="direct" ${kind === 'worker' ? '' : 'checked'} style="width:auto;min-height:auto;"> 📞 Seedha call / WhatsApp (login kiye hue log dekh sakte hain)</label>
+                    <label style="display:flex;gap:8px;font-weight:600;"><input type="radio" name="fMode" value="masked" ${kind === 'worker' ? 'checked' : ''} style="width:auto;min-height:auto;"> 🔒 Number chhupao — pehle request aayegi, main manzoor karunga/karungi</label>
+                </div>
+                <div class="row-btns"><button class="btn grey" onclick="startPost()">← Wapas</button><button class="btn" onclick="submitPost(this)">Post karo</button></div>`);
+            $('fCat').onchange = () => { $('extra').innerHTML = extraFields(kind, val('fCat')); };
+            $('extra').innerHTML = extraFields(kind, val('fCat'));
+            renderSlots();
+            $('photoIn').onchange = async (e) => {
+                const file = e.target.files[0]; e.target.value = '';
+                if (!file) return;
+                $('photoSt').textContent = '⏳ Photo upload ho rahi hai...';
+                try { formPhotos.push(await uploadToImgBB(file)); $('photoSt').textContent = ''; renderSlots(); }
+                catch (err) { $('photoSt').textContent = '❌ ' + err.message; }
+            };
+        };
+        function renderSlots() {
+            const s = formPhotos.map((u, i) => `<div class="ps" onclick="dropPhoto(${i})" title="Hatane ke liye dabaiye"><img src="${esc(u)}" alt=""></div>`);
+            if (formPhotos.length < 4) s.push(`<div class="ps" onclick="document.getElementById('photoIn').click()">＋</div>`);
+            $('slots').innerHTML = s.join('');
+        }
+        window.dropPhoto = (i) => { formPhotos.splice(i, 1); renderSlots(); };
+
+        window.submitPost = (btn) => run(btn, async () => {
+            const kind = formKind, cat = val('fCat'), f = {};
+            const put = (k, v) => { if (v !== '' && v !== false && v != null) f[k] = v; };
+            if (kind === 'sell' && cat === 'pashu') { put('animalType', val('xAnimal')); put('breed', val('xBreed')); put('ageYears', val('xAge')); put('milkPerDay', val('xMilk')); put('lactation', val('xLact')); put('healthNote', val('xHealth')); put('agriDeclared', chk('xAgri')); }
+            else if (kind === 'sell' && cat === 'vahan') { put('vehicleType', val('xVType')); put('modelName', val('xModel')); put('year', val('xYear')); put('kmDriven', val('xKm')); put('docsOk', chk('xDocs')); }
+            else if (kind === 'sell') { put('quantity', val('xQty')); put('quantityUnit', val('xQUnit')); put('condition', val('xCond')); put('groupName', val('xGroup')); }
+            else if (kind === 'rent') { put('machine', val('xMachine')); put('withOperator', chk('xOper')); }
+            else if (kind === 'job') { put('workersNeeded', val('xNeed')); put('durationDays', val('xDays')); put('startDate', val('xStart')); put('womenOnly', chk('xWomen')); put('emergency', chk('xEmerg')); }
+            else { put('skills', val('xSkills')); put('experienceYears', val('xExp')); put('availability', val('xAvail')); put('toli', chk('xToli')); if (chk('xToli')) put('groupSize', val('xGroup')); put('womenOnly', chk('xWomen')); }
+            const mode = document.querySelector('input[name="fMode"]:checked')?.value || 'masked';
+            await bazaarApi(user, '/posts', 'POST', {
+                kind, category: cat, title: val('fTitle'), description: val('fDesc'), price: val('fPrice') || 0, priceUnit: val('fUnit'),
+                state: val('fState'), district: val('fDistrict'), village: val('fVillage'), ownerName: val('fOwner'),
+                contactPhone: val('fPhone'), contactLabel: val('fLabel'), contactMode: mode, photos: formPhotos, fields: f,
+                adult: (kind === 'job' || kind === 'worker') ? chk('xAdult') : undefined
+            });
+            area = { state: val('fState'), district: val('fDistrict') }; saveArea();
+            closeModal(); showToast('Post ho gaya ✅');
+            tab = kind; category = ''; renderTabs(); renderFilters(); loadList();
+        });
+
+        // ---------- mera (my posts + my requests) ----------
+        async function loadMera() {
+            $('filters').innerHTML = '';
+            if (needLogin()) { $('list').innerHTML = '<div class="empty">Login kijiye.</div>'; return; }
+            $('list').innerHTML = '<div class="empty">Load ho raha hai...</div>';
+            try {
+                const [mp, ml] = await Promise.all([bazaarApi(user, '/my/posts'), bazaarApi(user, '/my/leads')]);
+                mp.posts.forEach(p => cache[p.id] = p);
+                const stLabel = { active: 'Chalu', done: 'Band', hidden: 'Report se band', expired: 'Samay khatam' };
+                const posts = mp.posts.map(p => {
+                    const doneWord = (p.kind === 'job' || p.kind === 'worker') ? '✅ Kaam mil gaya' : '✅ Bik gaya';
+                    return `<div class="card">
+                        <div style="display:flex;justify-content:space-between;gap:8px;"><b onclick="openPost('${p.id}')" style="cursor:pointer;">${emoji(p)} ${esc(p.title)}</b><span class="stbadge st-${esc(p.status)}">${esc(stLabel[p.status] || p.status)}</span></div>
+                        <div class="mt" style="font-size:12.5px;color:#666;margin:3px 0;">${esc(priceText(p))} · ${timeAgo(p.createdAt)} · 🔒 ${p.contactMode === 'masked' ? 'number chhupa' : 'number seedha'} (${esc(p.contactPhone || '')}, ${esc(p.contactLabel || '')})</div>
+                        <div class="e-actions" style="flex-wrap:wrap;">
+                            <button class="mini" onclick="openLeads('${p.id}')">📩 Requests (${p.leadCount})</button>
+                            ${p.status === 'active' ? `<button class="mini" onclick="setStatus('${p.id}','done')">${doneWord}</button>` : ''}
+                            ${(p.status === 'done' || p.status === 'expired') ? `<button class="mini ok" onclick="renew('${p.id}')">🔁 Dobara chalu</button>` : ''}
+                            ${p.status === 'active' ? `<button class="mini" onclick="renew('${p.id}')">🔁 Taaza karo</button>` : ''}
+                            <button class="mini danger" onclick="delPost('${p.id}')">🗑️</button></div>
+                        ${p.reports ? `<div class="note void">🚩 ${p.reports} report mili hain.</div>` : ''}</div>`;
+                }).join('') || '<div class="empty">Aapne abhi koi post nahi kiya.</div>';
+                const leads = ml.leads.map(l => `<div class="card">
+                        <div style="display:flex;justify-content:space-between;gap:8px;"><b onclick="openPost('${l.postId}', true)" style="cursor:pointer;">${esc(l.title)}</b>
+                        <span class="stbadge ${l.status === 'accepted' ? 'st-active' : l.status === 'declined' ? 'st-hidden' : 'st-done'}">${l.status === 'accepted' ? '✅ Manzoor' : l.status === 'declined' ? '❌ Mana' : '⏳ Intezaar'}</span></div>
+                        ${l.status === 'accepted' ? `<div style="margin-top:6px;font-size:14px;">${esc(l.ownerName || '')}${l.ownerLabel && l.ownerLabel !== 'Khud' ? ' (' + esc(l.ownerLabel) + ')' : ''}: <b>${esc(l.ownerPhone || '')}</b></div>
+                        <div class="e-actions"><a class="mini ok" style="text-decoration:none;" href="tel:${esc(l.ownerPhone || '')}">📞 Call</a>
+                        <a class="mini" style="text-decoration:none;" target="_blank" href="${esc(waLink(l.ownerPhone || '', 'Namaste, Gaon Bazaar par aapka post: ' + l.title))}">💬 WhatsApp</a>
+                        ${l.iRated ? '<span class="badge">⭐ Rating de di</span>' : `<button class="mini" onclick="openRate('${esc(l.leadId)}')">⭐ Rating do</button>`}</div>` : ''}</div>`).join('') || '<div class="empty">Aapne abhi kisi ko sampark nahi bheja.</div>';
+                $('list').innerHTML = `<h3 style="margin:4px 0 8px;">📋 Mere post</h3>${posts}<h3 style="margin:16px 0 8px;">📩 Meri bheji hui requests</h3>${leads}`;
+            } catch (e) { $('list').innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+        }
+        window.setStatus = (id, status) => run(null, async () => { await bazaarApi(user, '/posts/' + id, 'PATCH', { status }); showToast('Ho gaya ✅'); loadMera(); });
+        window.renew = (id) => run(null, async () => { await bazaarApi(user, '/posts/' + id, 'PATCH', { renew: true }); showToast('Post phir se chalu ✅'); loadMera(); });
+        window.delPost = (id) => run(null, async () => { if (!confirm('Ye post hata dein?')) return; await bazaarApi(user, '/posts/' + id, 'DELETE'); showToast('Hata diya'); loadMera(); });
+
+        window.openLeads = (id) => run(null, async () => {
+            const { leads } = await bazaarApi(user, `/posts/${id}/leads`);
+            const rows = leads.map(l => `<div class="card" style="box-shadow:none;border:1px solid #eee;">
+                <div style="display:flex;justify-content:space-between;"><b>${esc(l.name)}</b>${l.verified ? '<span class="badge ok">✔ Verified</span>' : ''}${l.rating ? `<span class="badge gold">⭐ ${l.rating}</span>` : ''}</div>
+                <div style="font-size:14px;margin:4px 0;">📞 <b>${esc(l.phone)}</b>${l.dates ? '<br>📅 ' + esc(l.dates.from) + ' se ' + esc(l.dates.to) : ''}${l.message ? '<br>💬 ' + esc(l.message) : ''}</div>
+                <div class="e-actions" style="flex-wrap:wrap;">
+                    ${l.status === 'pending' ? `<button class="mini ok" onclick="decide('${id}','${esc(l.requesterUid)}','accept')">✅ Manzoor</button><button class="mini danger" onclick="decide('${id}','${esc(l.requesterUid)}','decline')">❌ Mana</button>` : `<span class="badge">${l.status === 'accepted' ? '✅ Manzoor' : '❌ Mana'}</span>`}
+                    <a class="mini" style="text-decoration:none;" href="tel:${esc(l.phone)}">📞</a>
+                    <a class="mini" style="text-decoration:none;" target="_blank" href="${esc(waLink(l.phone, 'Namaste, Gaon Bazaar par aapne sampark kiya tha.'))}">💬</a>
+                    ${l.status === 'accepted' ? (l.iRated ? '<span class="badge">⭐ Rating de di</span>' : `<button class="mini" onclick="openRate('${esc(l.leadId)}')">⭐ Rating do</button>`) : ''}
+                </div></div>`).join('') || '<div class="empty">Abhi koi request nahi aayi.</div>';
+            openModal(`<h3>📩 Requests</h3>${rows}<div class="row-btns"><button class="btn grey" onclick="closeModal()">Band karo</button></div>`);
+        });
+        window.decide = (pid, uid, action) => run(null, async () => { await bazaarApi(user, `/posts/${pid}/leads/${uid}/decide`, 'POST', { action }); showToast(action === 'accept' ? 'Manzoor kiya ✅' : 'Mana kar diya'); openLeads(pid); loadMera(); });
+
+        let stars = 5;
+        window.openRate = (leadId) => {
+            stars = 5;
+            openModal(`<h3>⭐ Rating do</h3><div class="hint">Kaam/sauda kaisa raha? Aapki rating dusre ko dikhegi.</div>
+                <div class="stars" id="stars">${[1, 2, 3, 4, 5].map(i => `<button class="on" onclick="setStars(${i})">★</button>`).join('')}</div>
+                <label>Chhota review (optional)</label><input id="rvText" maxlength="140" placeholder="jaise: time par aaya, kaam badhiya kiya">
+                <div class="row-btns"><button class="btn grey" onclick="closeModal()">Raho</button><button class="btn" onclick="sendRate('${leadId}', this)">Bhejo</button></div>`);
+        };
+        window.setStars = (n) => { stars = n; [...$('stars').children].forEach((b, i) => b.classList.toggle('on', i < n)); };
+        window.sendRate = (leadId, btn) => run(btn, async () => { await bazaarApi(user, '/ratings', 'POST', { leadId, stars, comment: val('rvText') }); closeModal(); showToast('Rating mil gayi 🙏'); loadMera(); });
+
+        // ---------- boot ----------
+        renderTabs();
+        onAuthStateChanged(auth, (u) => {
+            user = u;
+            const params = new URLSearchParams(location.search);
+            if (location.hash === '#mera') { tab = 'mera'; renderTabs(); loadMera(); }
+            else { renderFilters(); loadList(); }
+            const pid = params.get('post');
+            if (pid && !window.__opened) { window.__opened = true; openPost(pid, true); }
+        });
+    </script>
+</body>
+</html>
