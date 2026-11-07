@@ -2,6 +2,7 @@
 // Creates a subscription through the backend (POST /api/subscriptions).
 import { auth } from './firebase-config.js';
 import { loadAddresses } from './address-logic.js';
+import { attachAddressAutofill } from './address-autofill.js';
 import { BACKEND_BASE_URL } from './order-api.js';
 import { showToast } from './toast.js';
 
@@ -66,13 +67,16 @@ export async function openSubscribeModal({ db, product, productId, selectedVaria
                 ${radio('subPay', 'UPI', '📱 UPI se, delivery par', false)}
             </div>
 
+            <label style="font-size:13px; font-weight:700;">📮 Pincode (pehle ye daalein — rajya, zila, gaon apne aap aayenge)</label>
+            <input id="subPincode" inputmode="numeric" maxlength="6" style="${field}" value="${esc(addr.pincode || '')}" placeholder="jaise 250001">
+            <input id="subState" type="hidden" value="${esc(addr.state || '')}">
             <label style="font-size:13px; font-weight:700;">Naam</label>
             <input id="subName" style="${field}" value="${esc(addr.name || '')}" placeholder="Aapka naam">
             <label style="font-size:13px; font-weight:700;">Phone (10 digit)</label>
             <input id="subPhone" inputmode="numeric" maxlength="10" style="${field}" value="${esc(addr.phone || '')}" placeholder="10 digit mobile number">
             <label style="font-size:13px; font-weight:700;">Pura pata</label>
             <textarea id="subAddress" rows="2" style="${field}" placeholder="Ghar / gali / landmark">${esc([addr.addressLine, addr.state].filter(Boolean).join(', '))}</textarea>
-            <label style="font-size:13px; font-weight:700;">Shehar / Gaon</label>
+            <label style="font-size:13px; font-weight:700;">Shehar / Gaon (PIN ke baad list se chuniye)</label>
             <input id="subCity" style="${field}" value="${esc(addr.city || '')}" placeholder="Shehar ya gaon">
 
             <div style="background:#f1f8f2; border:1px solid #bfe0c4; border-radius:10px; padding:10px 12px; font-size:12.5px; color:#1b5e20; line-height:1.55; margin-bottom:12px;">
@@ -93,6 +97,8 @@ export async function openSubscribeModal({ db, product, productId, selectedVaria
     const val = (id) => wrap.querySelector('#' + id).value.trim();
     const pick = (name) => wrap.querySelector(`input[name="${name}"]:checked`).value;
 
+    const subAf = attachAddressAutofill({ pin: 'subPincode', state: 'subState', city: 'subCity' });
+    if (subAf && addr.pincode) subAf.refresh(addr.city);
     wrap.querySelector('#subGo').onclick = async (ev) => {
         const btn = ev.currentTarget;
         const phone = val('subPhone');
@@ -112,7 +118,7 @@ export async function openSubscribeModal({ db, product, productId, selectedVaria
                     paymentMethod: pick('subPay'),
                     selectedSize: selectedVariants ? selectedVariants.size : null,
                     selectedColor: selectedVariants ? selectedVariants.color : null,
-                    delivery: { name: val('subName'), phone, address: val('subAddress'), city: val('subCity'), slot: val('subSlot') }
+                    delivery: { name: val('subName'), phone, address: val('subAddress'), city: val('subCity'), district: (subAf && subAf.geo() ? subAf.geo().district : ''), state: val('subState'), pincode: val('subPincode'), slot: val('subSlot') }
                 })
             });
             const data = await res.json().catch(() => ({}));
