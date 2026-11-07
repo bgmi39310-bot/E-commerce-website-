@@ -92,26 +92,24 @@
             <h2>🚚 Delivery Details</h2>
             <div id="savedAddressList" style="margin-bottom:14px;"></div>
             <div class="form-group">
+            <label>📮 Pincode (sabse pehle ye daaliye — rajya, zila, gaon apne aap aa jayenge)</label>
+            <input type="text" id="cPincode" placeholder="e.g. 226001" maxlength="6">
+        </div>
+        <div class="form-group">
                 <label>Full Name</label>
                 <input type="text" id="cName" placeholder="Enter your name">
             </div>
-            <div class="form-row">
-                <div class="form-group">
+            <div class="form-group">
                     <label>Phone Number</label>
                     <input type="tel" id="cPhone" placeholder="10-digit mobile number" maxlength="10">
                 </div>
-                <div class="form-group">
-                    <label>Pincode</label>
-                    <input type="text" id="cPincode" placeholder="e.g. 226001" maxlength="6">
-                </div>
-            </div>
             <div class="form-group">
                 <label>Complete Address (House No, Street, Landmark)</label>
                 <textarea id="cAddress" rows="2" placeholder="Enter complete address"></textarea>
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label>City / Village</label>
+                    <label>City / Village (PIN ke baad list se chuniye)</label>
                     <input type="text" id="cCity" placeholder="City">
                 </div>
                 <div class="form-group">
@@ -155,6 +153,9 @@
         import { mountNotificationBell } from './notif-logic.js';
         import { getCart, clearCart, migrateLegacyCartData } from './cart-storage.js';
         import { placeOrderViaBackend, BACKEND_BASE_URL } from './order-api.js';
+        import { attachAddressAutofill } from './address-autofill.js';
+
+        const af = attachAddressAutofill({ pin: 'cPincode', state: 'cState', city: 'cCity' });
 
         let currentBuyerUid = null;
         let currentBuyerUser = null;
@@ -199,11 +200,13 @@
             document.getElementById('cAddress').value = addr.addressLine || '';
             document.getElementById('cCity').value = addr.city || '';
             document.getElementById('cState').value = addr.state || '';
+            if (af) af.refresh(addr.city);
         };
 
         window.clearAddressSelection = function() {
             document.querySelectorAll('.saved-addr-card').forEach(c => c.classList.remove('selected'));
             ['cName', 'cPhone', 'cPincode', 'cAddress', 'cCity', 'cState'].forEach(id => document.getElementById(id).value = '');
+            if (af) af.refresh();
         };
 
         let selectedPayment = 'COD';
@@ -471,10 +474,13 @@
             btn.disabled = true;
             btn.innerText = 'Placing order...';
 
-            const fullAddress = `${address}, ${city}, ${state}${pincode ? ' - ' + pincode : ''}`;
+            const geo = af ? af.geo() : null;
+            const extra = geo ? { district: geo.district, state: geo.state || state, pincode } : { state, pincode };
+            const placeBits = [city, geo && geo.block && geo.block.toLowerCase() !== city.toLowerCase() ? geo.block : '', geo ? geo.district : ''].filter(Boolean);
+            const fullAddress = `${address}, ${placeBits.join(', ')}, ${state}${pincode ? ' - ' + pincode : ''}`;
 
             if (selectedPayment === 'RAZORPAY') {
-                await placeOrderViaRazorpay({ name, phone, address: fullAddress, city, btn });
+                await placeOrderViaRazorpay({ name, phone, address: fullAddress, city, extra, btn });
                 return;
             }
 
@@ -495,7 +501,7 @@
 
                 await placeOrderViaBackend(currentBuyerUser, {
                     items,
-                    delivery: { name, phone, address: fullAddress, city },
+                    delivery: { name, phone, address: fullAddress, city, ...extra },
                     couponCode: appliedCoupon ? appliedCoupon.code : null,
                     paymentMethod: selectedPayment === 'UPI_DELIVERY' ? 'UPI' : selectedPayment,
                     upiUtr: upiUtr || undefined
@@ -529,7 +535,7 @@
 
         document.getElementById('placeOrderBtn').addEventListener('click', window.placeOrder);
 
-        async function placeOrderViaRazorpay({ name, phone, address, city, btn }) {
+        async function placeOrderViaRazorpay({ name, phone, address, city, extra = {}, btn }) {
             try {
                 // IMPORTANT: stock is deliberately NOT touched here. It used
                 // to be decremented before the payment popup even opened,
@@ -584,7 +590,7 @@
                                     razorpay_payment_id: response.razorpay_payment_id,
                                     razorpay_signature: response.razorpay_signature,
                                     items,
-                                    delivery: { name, phone, address, city },
+                                    delivery: { name, phone, address, city, ...extra },
                                     couponCode: appliedCoupon ? appliedCoupon.code : null
                                 })
                             });
