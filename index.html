@@ -237,7 +237,9 @@
             <span class="village-link" onclick="toggleShowAllShops()" id="showAllToggleLink">Show all shops</span>
         </div>
         <div class="village-bar" id="villageEditRow">
-            <input type="text" id="villageInput" placeholder="Enter your village / area name">
+            <input type="text" id="villagePin" inputmode="numeric" maxlength="6" placeholder="📮 Apna PIN code daaliye (gaon list apne aap aayegi)">
+            <input type="hidden" id="villageState">
+            <input type="text" id="villageInput" placeholder="Apne gaon / area ka naam (list se chuniye ya khud likhiye)">
             <button onclick="saveMyVillage()">📍 Save</button>
         </div>
         <div class="village-bar">
@@ -317,6 +319,7 @@
         import { getCart, getWishlist, saveWishlist, migrateLegacyCartData } from './cart-storage.js';
         import { distanceKm } from './map-utils.js';
         import { setupPushMenuItem } from './push-logic.js';
+        import { attachAddressAutofill } from './address-autofill.js';
 
         let allProducts = [];
         let currentCategory = 'all';
@@ -790,7 +793,10 @@
         // NOT every seller on the platform. "Show all shops" is available
         // any time as an explicit opt-out for browsing further afield.
         const MY_VILLAGE_KEY = 'dm_my_village';
+        const MY_PIN_KEY = 'dm_my_pin';
         let myVillage = (localStorage.getItem(MY_VILLAGE_KEY) || '').trim();
+        let myPin = (localStorage.getItem(MY_PIN_KEY) || '').trim();
+        const villageAf = attachAddressAutofill({ pin: 'villagePin', state: 'villageState', city: 'villageInput' });
         let showAllSellersMode = false;
         let myLat = null; // set only after the person taps "Sort by Distance" and allows location
         let myLng = null;
@@ -811,16 +817,23 @@
         }
 
         window.startEditVillage = function() {
-            document.getElementById('villageInput').value = myVillage;
+            document.getElementById('villageInput').value = myVillage.startsWith('PIN ') ? '' : myVillage;
+            document.getElementById('villagePin').value = myPin;
+            if (villageAf && myPin) villageAf.refresh(myVillage);
             document.getElementById('villageDisplay').style.display = 'none';
             document.getElementById('villageEditRow').style.display = 'flex';
         };
 
         window.saveMyVillage = function() {
-            const val = document.getElementById('villageInput').value.trim();
-            if (!val) { showToast('Please enter your village or area name.', 'error'); return; }
+            let val = document.getElementById('villageInput').value.trim();
+            const pin = document.getElementById('villagePin').value.trim();
+            const pinOk = /^\d{6}$/.test(pin);
+            if (!val && !pinOk) { showToast('Apna PIN code ya gaon ka naam daaliye.', 'error'); return; }
+            if (!val) val = 'PIN ' + pin;          // PIN only: shops are matched by PIN, name is just for display
             myVillage = val;
+            myPin = pinOk ? pin : '';
             localStorage.setItem(MY_VILLAGE_KEY, myVillage);
+            localStorage.setItem(MY_PIN_KEY, myPin);
             showAllSellersMode = false;
             renderVillageBar();
             applySellerVillageFilter();
@@ -840,6 +853,12 @@
                 .replace(/\b(village|gram|gaon|gaw|dist|district|city)\b/g, ' ')
                 .replace(/[^a-z0-9\u0900-\u097f]+/g, ' ')
                 .trim();
+        }
+
+        // Same PIN as the shop's own PIN, or a PIN the shop said it delivers to.
+        function sellerCoversPin(seller) {
+            if (!myPin) return false;
+            return seller.pincode === myPin || (Array.isArray(seller.deliveryPincodes) && seller.deliveryPincodes.includes(myPin));
         }
 
         function sellerCoversVillage(seller, villageNorm) {
@@ -863,7 +882,7 @@
             } else {
                 const villageNorm = normalizePlace(myVillage);
                 filtered = allSellers.filter(s =>
-                    sellerCoversVillage(s, villageNorm) || followedSellerIds.has(s.id) || s.id === currentBuyerUid
+                    sellerCoversVillage(s, villageNorm) || sellerCoversPin(s) || followedSellerIds.has(s.id) || s.id === currentBuyerUid
                 );
             }
 
