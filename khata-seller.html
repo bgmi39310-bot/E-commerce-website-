@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <script src="page-loader.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Khata (Hisab-Kitab) - DesiMarket Seller</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#232f3e">
+    <link rel="icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="stylesheet" href="shared-ui.css">
+    <link rel="stylesheet" href="khata-ui.css">
+    <script src="pwa-init.js" defer></script>
+    <script src="click-guard.js" defer></script>
+</head>
+<body>
+    <header class="k-head">
+        <a id="backLink" href="seller-dashboard.html">←</a>
+        <h1 id="headTitle">📒 Khata (Hisab-Kitab)</h1>
+    </header>
+
+    <!-- LIST VIEW -->
+    <div class="wrap" id="listView">
+        <div class="sum">
+            <div class="small">Sabka kul baaki</div>
+            <div class="big" id="totalPending">₹0</div>
+            <div class="small" id="custCount"></div>
+        </div>
+        <div class="row-btns">
+            <button class="btn alt" onclick="openAddCustomer()">➕ Naya grahak</button>
+            <button class="btn" onclick="openDaily()">⚡ Aaj ka sabko lagao</button>
+        </div>
+        <div class="row-btns">
+            <button class="btn alt" onclick="openReport()">📊 Report</button>
+            <button class="btn alt" onclick="remindAll(this)">🔔 Sabko yaad dilao</button>
+        </div>
+        <input class="search" id="searchBox" type="search" placeholder="🔍 Naam ya phone se dhoondhiye" oninput="setQuery(this.value)">
+        <div class="chips" id="chips"></div>
+        <div id="custList"><div class="empty">Load ho raha hai...</div></div>
+    </div>
+
+    <!-- DETAIL VIEW -->
+    <div class="wrap" id="detailView" style="display:none;">
+        <div class="card" id="custHead"></div>
+        <div class="month-nav">
+            <button onclick="changeMonth(-1)">‹</button>
+            <strong id="monthTitle"></strong>
+            <button onclick="changeMonth(1)">›</button>
+        </div>
+        <div class="stats" id="stats"></div>
+        <div id="entries"></div>
+        <div class="row-btns no-print" style="margin-top:12px;">
+            <button class="btn alt" onclick="downloadLedger()">⬇️ CSV</button>
+            <button class="btn alt" onclick="window.print()">🖨️ Print / PDF</button>
+        </div>
+        <div class="fab-bar" id="fabBar">
+            <button class="btn" onclick="openCharge()">➕ Saaman diya</button>
+            <button class="btn green" onclick="openPayment()">💰 Paise mile</button>
+            <button class="btn grey" onclick="openSkip()">🚫 Nahi diya</button>
+        </div>
+    </div>
+
+    <!-- REPORT VIEW -->
+    <div class="wrap" id="reportView" style="display:none;">
+        <div class="month-nav">
+            <button onclick="changeReportMonth(-1)">‹</button>
+            <strong id="repMonthTitle"></strong>
+            <button onclick="changeReportMonth(1)">›</button>
+        </div>
+        <div id="repBody"><div class="empty">Load ho raha hai...</div></div>
+    </div>
+
+    <div id="modalMount"></div>
+
+    <script type="module">
+        import { auth } from './firebase-config.js';
+        import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { showToast } from './toast.js';
+        import { escapeHtml } from './sanitize.js';
+        import { khataApi, rupees, monthLabel, shiftMonth, currentMonthIST, todayIST, balanceLabel, entryHtml,
+                 downloadCsv, ledgerCsvRows, itemLine } from './khata-api.js';
+
+        let user = null;
+        let accounts = [];
+        let currentId = null;
+        let currentMonth = currentMonthIST();
+        let detail = null;
+        let view = 'list';            // list | detail | report
+        let filter = 'all';
+        let query = '';
+        let reportMonth = currentMonthIST();
+        let report = null;
+
+        // ---------- small helpers ----------
+        const $ = (id) => document.getElementById(id);
+        const val = (id) => ($(id)?.value ?? '').trim();
+        function openModal(html) {
+            $('modalMount').innerHTML = `<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal">${html}</div></div>`;
+        }
+        window.closeModal = () => { $('modalMount').innerHTML = ''; };
+        async function run(btn, fn) {
+            if (btn) btn.disabled = true;
+            try { await fn(); } catch (e) { showToast(e.message, 'error'); } finally { if (btn) btn.disabled = false; }
+        }
+        const rupeesToInput = (paise) => (paise / 100).toString();
+        const isPaused = (a) => !!(a.pause && a.pause.from <= todayIST() && todayIST() <= a.pause.to);
+        const sharePageUrl = (token) => new URL('khata-view.html?t=' + encodeURIComponent(token), location.href).href;
+
+        function showView(v) {
+            view = v;
+            $('listView').style.display = v === 'list' ? 'block' : 'none';
+            $('detailView').style.display = v === 'detail' ? 'block' : 'none';
+            $('reportView').style.display = v === 'report' ? 'block' : 'none';
+            const back = $('backLink');
+            if (v === 'list') { back.setAttribute('href', 'seller-dashboard.html'); back.onclick = null; $('headTitle').textContent = '📒 Khata (Hisab-Kitab)'; }
+            else { back.removeAttribute('href'); back.onclick = () => { showView('list'); loadList(); }; }
+        }
+
+        // ---------- list ----------
+        const CHIPS = [['all', 'Sab'], ['owe', 'Baaki wale'], ['today', '⏳ Aaj baaki'], ['doubt', '❓ Sawal'], ['claim', '💸 UPI dawa']];
+        function renderChips() {
+            $('chips').innerHTML = CHIPS.map(([k, l]) => `<button class="chip ${filter === k ? 'on' : ''}" onclick="setFilter('${k}')">${l}</button>`).join('');
+        }
+        window.setFilter = (k) => { filter = k; renderList(); };
+        window.setQuery = (q) => { query = q.trim().toLowerCase(); renderList(); };
+
+        function matches(a) {
+            if (query && !(a.customerName || '').toLowerCase().includes(query) && !(a.customerPhone || '').includes(query)) return false;
+            if (filter === 'owe') return a.balance > 0;
+            if (filter === 'today') return a.defaultItems.length && a.lastEntryDate !== todayIST() && !isPaused(a);
+            if (filter === 'doubt') return a.openDisputes > 0;
+            if (filter === 'claim') return a.pendingClaims > 0;
+            return true;
+        }
+
+        function renderList() {
+            renderChips();
+            const rows = accounts.filter(matches);
+            if (!accounts.length) {
+                $('custList').innerHTML = `<div class="empty">Abhi koi khata nahi hai.<br><br>Doodh, sabzi ya akhbaar jaise roz ke grahak ko <strong>"➕ Naya grahak"</strong> se jodiye. Roz ka hisab likhiye, mahine ke end me ek saath paise lijiye — grahak apne phone par poora hisab dekh sakta hai.</div>`;
+                return;
+            }
+            if (!rows.length) { $('custList').innerHTML = '<div class="empty">Koi grahak nahi mila.</div>'; return; }
+            $('custList').innerHTML = rows.map(a => {
+                const b = balanceLabel(a.balance);
+                const pending = a.defaultItems.length && a.lastEntryDate !== todayIST() && !isPaused(a);
+                return `<div class="card cust ${a.balance <= 0 ? 'paid' : ''}" onclick="openCustomer('${a.id}')">
+                    <div class="info">
+                        <div class="nm">${escapeHtml(a.customerName)}</div>
+                        <div class="meta">📞 ${escapeHtml(a.customerPhone)}
+                            ${a.defaultItems.length ? ' · ' + a.defaultItems.map(i => escapeHtml(i.name)).join(', ') : ''}</div>
+                        <div class="meta" style="margin-top:5px;">
+                            ${a.linked ? '<span class="badge ok">📱 Phone se juda</span>' : '<span class="badge">Code: ' + escapeHtml(a.linkCode || '') + '</span>'}
+                            ${a.openDisputes ? '<span class="badge q">❓ ' + a.openDisputes + ' sawal</span>' : ''}
+                            ${a.pendingClaims ? '<span class="badge claim">💸 ' + a.pendingClaims + ' UPI dawa</span>' : ''}
+                            ${isPaused(a) ? '<span class="badge pause">🏖️ Chhutti</span>' : ''}
+                            ${pending ? '<span class="badge warn">⏳ Aaj baaki</span>' : ''}
+                        </div>
+                    </div>
+                    <div class="bal ${b.cls}">${b.text}</div>
+                </div>`;
+            }).join('');
+        }
+
+        async function loadList() {
+            try {
+                const data = await khataApi(user, '/seller/accounts');
+                accounts = data.accounts;
+                $('totalPending').textContent = rupees(data.totalPending);
+                $('custCount').textContent = `${accounts.length} grahak`;
+                renderList();
+            } catch (e) {
+                $('custList').innerHTML = `<div class="empty">Khata load nahi ho paya.<br>${escapeHtml(e.message)}</div>`;
+            }
+        }
+
+        // ---------- items editor (up to 5 saaman) ----------
+        function itemRow(i = {}) {
+            return `<div class="it">
+                <input class="i-name" maxlength="60" placeholder="Saaman" value="${escapeHtml(i.name || '')}">
+                <input class="i-qty" type="number" step="0.5" min="0" placeholder="Matra" value="${i.quantity ?? ''}">
+                <input class="i-unit" maxlength="12" placeholder="Naap" value="${escapeHtml(i.unit || '')}">
+                <input class="i-rate" type="number" step="0.5" min="0" placeholder="₹ rate" value="${i.rate ? rupeesToInput(i.rate) : ''}">
+            </div>`;
+        }
+        function itemsEditor(items, minRows) {
+            const rows = items.length ? items : [];
+            while (rows.length < minRows) rows.push({});
+            return `<div class="items-edit">
+                <div class="ih"><span>Saaman</span><span>Matra</span><span>Naap</span><span>Rate ₹</span></div>
+                <div id="itemRows">${rows.map(itemRow).join('')}</div>
+                <button type="button" class="mini" style="margin-top:4px;" onclick="addItemRow()">+ ek aur saaman</button>
+            </div>`;
+        }
+        window.addItemRow = () => {
+            const box = $('itemRows');
+            if (box.children.length >= 5) { showToast('Ek grahak ke liye max 5 saaman.', 'error'); return; }
+            box.insertAdjacentHTML('beforeend', itemRow());
+        };
+        function readItems() {
+            return [...document.querySelectorAll('#itemRows .it')].map(r => ({
+                name: r.querySelector('.i-name').value.trim(),
+                quantity: r.querySelector('.i-qty').value || 1,
+                unit: r.querySelector('.i-unit').value.trim() || 'piece',
+                rate: r.querySelector('.i-rate').value
+            })).filter(i => i.name);
+        }
+
+        // ---------- add customer ----------
+        window.openAddCustomer = () => {
+            openModal(`
+                <h3>➕ Naya grahak</h3>
+                <label>Grahak ka naam</label><input id="fName" maxlength="60" placeholder="jaise: Sharma ji">
+                <label>Phone number (10 ank)</label><input id="fPhone" type="tel" inputmode="numeric" maxlength="10" placeholder="98XXXXXXXX">
+                <label>Roz ka saaman (optional — ek tap me hisab likhne ke liye)</label>
+                ${itemsEditor([], 2)}
+                <div class="row-btns">
+                    <button class="btn grey" onclick="closeModal()">Raho</button>
+                    <button class="btn" onclick="saveCustomer(this)">Khata banao</button>
+                </div>`);
+        };
+        window.saveCustomer = (btn) => run(btn, async () => {
+            const r = await khataApi(user, '/seller/accounts', 'POST',
+                { customerName: val('fName'), customerPhone: val('fPhone'), defaultItems: readItems() });
+            closeModal();
+            showToast('Khata ban gaya ✅');
+            await loadList();
+            openCustomer(r.id);
+        });
+
+        // ---------- daily for everyone ----------
+        window.openDaily = () => {
+            if (!accounts.length) { showToast('Pehle koi grahak jodiye.', 'error'); return; }
+            const rows = accounts.map(a => {
+                const has = a.defaultItems.length > 0, paused = isPaused(a), done = a.lastEntryDate === todayIST();
+                const total = a.defaultItems.reduce((t, i) => t + Math.round(i.quantity * i.rate), 0);
+                const sub = paused ? '🏖️ Chhutti par' : done ? 'Aaj ki entry ho chuki' : has ? `${a.defaultItems.map(i => escapeHtml(i.name)).join(' + ')} = ${rupees(total)}` : 'Roz ka saaman set nahi';
+                const pick = paused ? 'nahi' : (!has || done) ? 'chhodo' : 'diya';
+                return `<div class="daily-row">
+                    <div class="l"><b>${escapeHtml(a.customerName)}</b><div class="s">${sub}</div></div>
+                    <select data-id="${a.id}">
+                        <option value="diya" ${pick === 'diya' ? 'selected' : ''} ${has ? '' : 'disabled'}>✅ Diya</option>
+                        <option value="nahi" ${pick === 'nahi' ? 'selected' : ''}>🚫 Nahi diya</option>
+                        <option value="chhodo" ${pick === 'chhodo' ? 'selected' : ''}>— Chhodo</option>
+                    </select></div>`;
+            }).join('');
+            openModal(`
+                <h3>⚡ Aaj ka sabko lagao</h3>
+                <label>Tareekh</label><input id="dDate" type="date" value="${todayIST()}" max="${todayIST()}">
+                <div class="hint">Jis grahak ki is din ki entry pehle se hai, usse dobara nahi judegi.</div>
+                <div style="margin-top:8px;">${rows}</div>
+                <div class="row-btns">
+                    <button class="btn grey" onclick="closeModal()">Raho</button>
+                    <button class="btn" onclick="submitDaily(this)">Likh do</button>
+                </div>`);
+        };
+        window.submitDaily = (btn) => run(btn, async () => {
+            const diya = [], nahi = [];
+            document.querySelectorAll('#modalMount select[data-id]').forEach(s => {
+                if (s.value === 'diya') diya.push(s.dataset.id);
+                if (s.value === 'nahi') nahi.push(s.dataset.id);
+            });
+            if (!diya.length && !nahi.length) throw new Error('Kam se kam ek grahak chuniye.');
+            const r = await khataApi(user, '/seller/daily', 'POST', {
+                date: val('dDate'), accountIds: [...diya, ...nahi], skipAccountIds: nahi
+            });
+            closeModal();
+            showToast(`${r.added} grahak ki entry likhi gayi` + (r.alreadyDone ? ` · ${r.alreadyDone} pehle se thi` : ''));
+            loadList();
+        });
+
+        // ---------- remind everyone ----------
+        window.remindAll = (btn) => run(btn, async () => {
+            const r = await khataApi(user, '/seller/remind-all', 'POST');
+            unlinked = r.notLinked;
+            const unl = unlinked.map((c, i) => `
+                <div class="daily-row"><div class="l"><b>${escapeHtml(c.name)}</b><div class="s">${rupees(c.balance)} baaki · app se juda nahi</div></div>
+                <button class="mini" onclick="waRemind(${i})">📲 WhatsApp</button></div>`).join('');
+            openModal(`
+                <h3>🔔 Yaad bhej di gayi</h3>
+                <div style="font-size:14px;line-height:1.6;">✅ <b>${r.notified}</b> grahakon ko app me notification gayi.
+                ${r.recentlyReminded ? `<br>⏱️ ${r.recentlyReminded} ko abhi hi yaad bheji thi, dobara nahi bheji.` : ''}</div>
+                ${r.notLinked.length ? `<label>Jo app se jude nahi hain (WhatsApp se bhejiye)</label>${unl}` : ''}
+                <div class="row-btns"><button class="btn" onclick="closeModal()">Theek hai</button></div>`);
+        });
+        let unlinked = [];
+        window.waRemind = (i) => {
+            const c = unlinked[i];
+            if (!c) return;
+            const msg = `Namaste ${c.name} ji, aapka ${rupees(c.balance)} baaki hai. Kripya jald chukayein. Dhanyavaad 🙏`;
+            window.open(`https://wa.me/91${c.phone}?text=${encodeURIComponent(msg)}`, '_blank');
+        };
+
+        // ---------- detail ----------
+        window.openCustomer = async (id) => {
+            currentId = id;
+            currentMonth = currentMonthIST();
+            showView('detail');
+            await loadDetail();
+        };
+        window.changeMonth = (d) => { currentMonth = shiftMonth(currentMonth, d); loadDetail(); };
+
+        async function loadDetail() {
+            $('entries').innerHTML = '<div class="empty">Load ho raha hai...</div>';
+            try {
+                detail = await khataApi(user, `/seller/accounts/${currentId}?month=${currentMonth}`);
+                const a = detail.account;
+                $('headTitle').textContent = '📒 ' + a.customerName;
+                const b = balanceLabel(a.balance);
+                $('custHead').innerHTML = `
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                        <div><div style="font-weight:700;font-size:16px;">${escapeHtml(a.customerName)}</div>
+                        <div style="font-size:12.5px;color:#666;">📞 ${escapeHtml(a.customerPhone)}</div></div>
+                        <div class="bal ${b.cls}" style="font-size:18px;">${b.text}</div>
+                    </div>
+                    <div style="margin-top:8px;">
+                        ${a.linked ? '<span class="badge ok">📱 Grahak apna hisab dekh sakta hai</span>' : ''}
+                        ${a.shareToken ? '<span class="badge ok">🔗 Link chalu</span>' : ''}
+                        ${isPaused(a) ? `<span class="badge pause">🏖️ Chhutti ${escapeHtml(a.pause.from)} se ${escapeHtml(a.pause.to)}</span>` : ''}
+                        ${a.reminderDay ? `<span class="badge">🔔 Har mahine ${a.reminderDay} tareekh</span>` : ''}
+                        ${a.autoFromSubscription ? '<span class="badge">🔁 Subscription auto</span>' : ''}
+                    </div>
+                    ${a.linked ? '' : `<div class="codebox" style="margin-top:10px;">Grahak ko ye code do taaki wo apne phone par hisab dekh sake
+                                    <b>${escapeHtml(a.linkCode || '')}</b>DesiMarket → "Mera Khata" me "Jodo"</div>`}
+                    <div class="row-btns" style="margin:10px 0 0;">
+                        <button class="btn alt" onclick="remind()">📲 WhatsApp yaad</button>
+                        <button class="btn alt" onclick="openShare()">🔗 Hisab ka link</button>
+                    </div>
+                    <div class="row-btns" style="margin:8px 0 0;">
+                        <button class="btn grey" onclick="openEdit()">⚙️ Settings</button>
+                        <button class="btn grey" onclick="newCode()">🔑 Naya code</button>
+                    </div>`;
+                $('monthTitle').textContent = monthLabel(detail.month);
+                const ob = balanceLabel(detail.openingBalance);
+                $('stats').innerHTML = `
+                    <div class="stat"><div class="v">${rupees(detail.monthCharged)}</div><div class="l">Is mahine ka maal</div></div>
+                    <div class="stat"><div class="v">${rupees(detail.monthPaid)}</div><div class="l">Is mahine mile</div></div>
+                    <div class="stat wide"><div class="l">Mahine ki shuruat ka hisab: ${ob.text}</div></div>`;
+                $('entries').innerHTML = detail.entries.length
+                    ? [...detail.entries].reverse().map(e => entryHtml(e, 'seller')).join('')
+                    : '<div class="empty">Is mahine koi entry nahi.</div>';
+            } catch (e) {
+                $('entries').innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`;
+            }
+        }
+        window.downloadLedger = () => {
+            if (!detail) return;
+            const a = detail.account;
+            downloadCsv(`khata-${a.customerName}-${detail.month}.csv`, [
+                [`${a.shopName} — ${a.customerName} (${detail.month})`], [], ...ledgerCsvRows(detail), [],
+                ['', '', '', '', 'Mahine ka maal', detail.monthCharged / 100], ['', '', '', '', 'Mahine me mile', detail.monthPaid / 100],
+                ['', '', '', '', 'Abhi baaki', a.balance / 100]
+            ]);
+        };
+
+        // ---------- entries ----------
+        window.openCharge = () => {
+            const d = detail.account.defaultItems[0] || {};
+            openModal(`
+                <h3>➕ Saaman diya</h3>
+                <label>Tareekh</label><input id="eDate" type="date" value="${todayIST()}" max="${todayIST()}">
+                <label>Saaman</label><input id="eItem" maxlength="60" value="${escapeHtml(d.name || '')}" placeholder="jaise: Doodh">
+                <div class="two">
+                    <div><label>Matra</label><input id="eQty" type="number" step="0.5" min="0" value="${d.quantity || 1}" oninput="calcAmt()"></div>
+                    <div><label>Rate (₹)</label><input id="eRate" type="number" step="0.5" min="0" value="${d.rate ? rupeesToInput(d.rate) : ''}" oninput="calcAmt()"></div>
+                </div>
+                <div class="hint" id="eAmt"></div>
+                <label>Note (optional)</label><input id="eNote" maxlength="140">
+                <div class="row-btns">
+                    <button class="btn grey" onclick="closeModal()">Raho</button>
+                    <button class="btn" onclick="saveCharge(this)">Likh do</button>
+                </div>`);
+            calcAmt();
+        };
+        window.calcAmt = () => {
+            const t = (parseFloat(val('eQty')) || 0) * (parseFloat(val('eRate')) || 0);
+            $('eAmt').innerHTML = t > 0 ? `Kul: <b>${rupees(Math.round(t * 100))}</b>` : '';
+        };
+        window.saveCharge = (btn) => run(btn, async () => {
+            await khataApi(user, `/seller/accounts/${currentId}/entries`, 'POST', {
+                type: 'charge', date: val('eDate'), itemName: val('eItem'),
+                quantity: val('eQty'), rate: val('eRate'), note: val('eNote')
+            });
+            closeModal(); showToast('Likh diya ✅'); loadDetail();
+        });
+
+        window.openPayment = () => {
+            const bal = detail.account.balance;
+            openModal(`
+                <h3>💰 Paise mile</h3>
+                <label>Tareekh</label><input id="eDate" type="date" value="${todayIST()}" max="${todayIST()}">
+                <label>Kitne rupaye mile (₹)</label><input id="eAmount" type="number" step="0.5" min="0" value="${bal > 0 ? rupeesToInput(bal) : ''}">
+                <div class="hint">Abhi baaki: ${rupees(Math.max(bal, 0))}</div>
+                <label>Note (optional) — jaise: UPI / Cash</label><input id="eNote" maxlength="140">
+                <div class="row-btns">
+                    <button class="btn grey" onclick="closeModal()">Raho</button>
+                    <button class="btn green" onclick="savePayment(this)">Likh do</button>
+                </div>`);
+        };
+        window.savePayment = (btn) => run(btn, async () => {
+            await khataApi(user, `/seller/accounts/${currentId}/entries`, 'POST', {
+                type: 'payment', date: val('eDate'), amount: val('eAmount'), note: val('eNote')
+            });
+            closeModal(); showToast('Payment likh di ✅'); loadDetail();
+        });
+
+        window.openSkip = () => {
+            openModal(`
+                <h3>🚫 Nahi diya</h3>
+                <div class="hint">Is din ka saaman nahi diya gaya — grahak ko bhi ye dikhega, koi paisa nahi judega.</div>
+                <label>Tareekh</label><input id="eDate" type="date" value="${todayIST()}" max="${todayIST()}">
+                <label>Karan (optional)</label><input id="eNote" maxlength="140" placeholder="jaise: grahak bahar the">
+                <div class="row-btns">
+                    <button class="btn grey" onclick="closeModal()">Raho</button>
+                    <button class="btn" onclick="saveSkip(this)">Likh do</button>
+                </div>`);
+        };
+        window.saveSkip = (btn) => run(btn, async () => {
+            await khataApi(user, `/seller/accounts/${currentId}/entries`, 'POST', {
+                type: 'skip', date: val('eDate'), note: val('eNote'),
+                itemName: detail.account.defaultItems[0]?.name || ''
+            });
+            closeModal(); showToast('Likh diya'); loadDetail();
+        });
+
+        // ---------- edit / cancel / reply / claims ----------
+        window.editEntry = (eid) => {
+            const e = detail.entries.find(x => x.id === eid);
+            if (!e) return;
+            const body = e.type === 'charge' ? `
+                <label>Saaman</label><input id="xItem" maxlength="60" value="${escapeHtml(e.itemName || '')}">
+                <div class="two">
+                    <div><label>Matra</label><input id="xQty" type="number" step="0.5" min="0" value="${e.quantity}"></div>
+                    <div><label>Rate (₹)</label><input id="xRate" type="number" step="0.5" min="0" value="${rupeesToInput(e.rate)}"></div>
+                </div>` : `
+                <label>Amount (₹)</label><input id="xAmount" type="number" step="0.5" min="0" value="${rupeesToInput(e.amount)}">`;
+            openModal(`
+                <h3>✏️ Entry sudharo</h3>
+                <div class="hint">Purani entry kati hui dikhegi, uski jagah ye nayi entry aayegi. Grahak ko dono dikhenge.</div>
+                <label>Tareekh</label><input id="xDate" type="date" value="${escapeHtml(e.date)}" max="${todayIST()}">
+                ${body}
+                <label>Note (optional)</label><input id="xNote" maxlength="140" value="${escapeHtml(e.note || '')}">
+                <div class="row-btns">
+                    <button class="btn grey" onclick="closeModal()">Raho</button>
+                    <button class="btn" onclick="saveEdit2('${eid}','${e.type}', this)">Save</button>
+                </div>`);
+        };
+        window.saveEdit2 = (eid, type, btn) => run(btn, async () => {
+            const body = { date: val('xDate'), note: val('xNote') };
+            if (type === 'charge') Object.assign(body, { itemName: val('xItem'), quantity: val('xQty'), rate: val('xRate') });
+            else body.amount = val('xAmount');
+            await khataApi(user, `/seller/accounts/${currentId}/entries/${eid}/edit`, 'POST', body);
+            closeModal(); showToast('Entry sudhar di ✅'); loadDetail();
+        });
+
+        window.voidEntry = (eid) => {
+            openModal(`
+                <h3>✕ Entry cancel karo</h3>
+                <div class="hint">Entry mitegi nahi — kati hui dikhegi aur grahak ko karan dikhega.</div>
+                <label>Karan</label><input id="vReason" maxlength="140" placeholder="jaise: galti se do baar likh gaya">
+                <div class="row-btns">
+                    <button class="btn grey" onclick="closeModal()">Raho</button>
+                    <button class="btn" style="background:#c0392b;color:#fff;" onclick="doVoid('${eid}', this)">Cancel karo</button>
+                </div>`);
+        };
+        window.doVoid = (eid, btn) => run(btn, async () => {
+            await khataApi(user, `/seller/accounts/${currentId}/entries/${eid}/void`, 'POST', { reason: val('vReason') });
+            closeModal(); showToast('Cancel ho gayi'); loadDetail();
+        });
+
+        window.replyDispute = (eid) => {
+            openModal(`
+                <h3>💬 Grahak ko jawab do</h3>
+                <label>Jawab</label><textarea id="rText" maxlength="200" rows="3"></textarea>
+                <div class="row-btns">
+                    <button class="btn grey" onclick="closeModal()">Raho</button>
+                    <button class="btn" onclick="doReply('${eid}', this)">Bhejo</button>
+                </div>`);
+        };
+        window.doReply = (eid, btn) => run(btn, async () => {
+            await khataApi(user, `/seller/accounts/${currentId}/entries/${eid}/reply`, 'POST', { reply: val('rText') });
+            closeModal(); showToast('Jawab bhej diya ✅'); loadDetail();
+        });
+
+        window.resolveClaim = (eid, action, amount) => {
+            if (action === 'confirm') {
+                openModal(`
+                    <h3>✅ UPI payment confirm karo</h3>
+                    <div class="hint">Pehle apne UPI/bank app me paise aaye ya nahi, check kar lijiye. Confirm karte hi ye payment khate me likh di jayegi.</div>
+                    <label>Kitne rupaye mile (₹)</label><input id="cAmount" type="number" step="0.5" min="0" value="${rupeesToInput(amount)}">
+                    <div class="row-btns">
+                        <button class="btn grey" onclick="closeModal()">Raho</button>
+                        <button class="btn green" onclick="doClaim('${eid}','confirm', this)">Confirm</button>
+                    </div>`);
+            } else {
+                openModal(`
+                    <h3>❌ Dawa reject karo</h3>
+                    <label>Karan (grahak ko dikhega)</label><input id="cReason" maxlength="140" placeholder="jaise: paise abhi tak nahi aaye">
+                    <div class="row-btns">
+                        <button class="btn grey" onclick="closeModal()">Raho</button>
+                        <button class="btn" style="background:#c0392b;color:#fff;" onclick="doClaim('${eid}','reject', this)">Reject</button>
+                    </div>`);
+            }
+        };
+        window.doClaim = (eid, action, btn) => run(btn, async () => {
+            const body = action === 'confirm' ? { action, amount: val('cAmount') } : { action, reason: val('cReason') };
+            await khataApi(user, `/seller/accounts/${currentId}/entries/${eid}/claim`, 'POST', body);
+            closeModal(); showToast(action === 'confirm' ? 'Payment likh di ✅' : 'Reject kar diya'); loadDetail();
+        });
+
+        // ---------- settings: items / chhutti / reminder / auto ----------
+        window.openEdit = () => {
+            const a = detail.account;
+            openModal(`
+                <h3>⚙️ Settings</h3>
+                <label>Grahak ka naam</label><input id="fName" maxlength="60" value="${escapeHtml(a.customerName)}">
+                <label>Roz ka saaman (max 5)</label>
+                ${itemsEditor(a.defaultItems.map(i => ({ ...i })), 2)}
+                <div class="hint">Naya rate sirf aage ki entries par lagega — purani entries nahi badlengi.</div>
+                <label>🏖️ Chhutti (is beech "Aaj ka sabko lagao" me nahi judega)</label>
+                <div class="two">
+                    <div><input id="pFrom" type="date" value="${escapeHtml(a.pause?.from || '')}"></div>
+                    <div><input id="pTo" type="date" value="${escapeHtml(a.pause?.to || '')}"></div>
+                </div>
+                <div class="hint">Dono khali chhodne par chhutti hat jayegi.</div>
+                <label>🔔 Har mahine reminder ki tareekh</label>
+                <select id="rDay"><option value="0">Reminder nahi</option>
+                    ${Array.from({ length: 28 }, (_, i) => `<option value="${i + 1}" ${a.reminderDay === i + 1 ? 'selected' : ''}>${i + 1} tareekh</option>`).join('')}
+                </select>
+                <div class="hint">Us din subah 9 baje ke baad, agar grahak ka paisa baaki hai aur wo app se juda hai, to notification jayegi.</div>
+                <label style="display:flex;gap:8px;align-items:center;margin-top:14px;">
+                    <input id="aSub" type="checkbox" style="width:auto;min-height:auto;" ${a.autoFromSubscription ? 'checked' : ''}>
+                    🔁 Subscription ke order khate me likho
+                </label>
+                <div class="hint">Agar is grahak ka DesiMarket par roz ka (subscription) order aapki dukaan se hai, to har order ka paisa khate me apne aap judega. Order cancel ho to entry khud cancel kijiye.</div>
+                <div class="row-btns">
+                    <button class="btn grey" onclick="closeModal()">Raho</button>
+                    <button class="btn" onclick="saveEdit(this)">Save</button>
+                </div>
+                ${a.balance === 0 ? `<div class="row-btns"><button class="btn alt" onclick="closeKhata()">Khata band karo</button></div>` : ''}`);
+        };
+        window.saveEdit = (btn) => run(btn, async () => {
+            const from = val('pFrom'), to = val('pTo');
+            if ((from && !to) || (!from && to)) throw new Error('Chhutti ki dono tareekh bhariye.');
+            await khataApi(user, `/seller/accounts/${currentId}`, 'PATCH', {
+                customerName: val('fName'), defaultItems: readItems(),
+                pause: from && to ? { from, to } : null,
+                reminderDay: Number(val('rDay')) || null,
+                autoFromSubscription: $('aSub').checked
+            });
+            closeModal(); showToast('Save ho gaya ✅'); loadDetail();
+        });
+        window.closeKhata = () => run(null, async () => {
+            if (!confirm('Ye khata band ho jayega. Pakka?')) return;
+            await khataApi(user, `/seller/accounts/${currentId}`, 'PATCH', { close: true });
+            closeModal(); showToast('Khata band ho gaya'); showView('list'); loadList();
+        });
+        window.newCode = () => run(null, async () => {
+            if (!confirm('Naya code banega aur purana phone alag ho jayega. Pakka?')) return;
+            await khataApi(user, `/seller/accounts/${currentId}/new-code`, 'POST');
+            showToast('Naya code ban gaya'); loadDetail();
+        });
+
+        // ---------- share link / whatsapp ----------
+        window.openShare = () => {
+            const a = detail.account;
+            if (!a.shareToken) {
+                openModal(`
+                    <h3>🔗 Bina app ke hisab dikhao</h3>
+                    <div style="font-size:14px;line-height:1.6;">Ek private link banega. Jiske paas link hoga wo grahak ka poora hisab <b>sirf dekh</b> sakta hai (app ya login ki zaroorat nahi). Phone number aur code nahi dikhte. Jab chahein link band kar sakte hain.</div>
+                    <div class="row-btns">
+                        <button class="btn grey" onclick="closeModal()">Raho</button>
+                        <button class="btn" onclick="setShare(true, this)">Link banao</button>
+                    </div>`);
+                return;
+            }
+            const url = sharePageUrl(a.shareToken);
+            openModal(`
+                <h3>🔗 Hisab ka link</h3>
+                <input id="shareUrl" readonly value="${escapeHtml(url)}" onclick="this.select()">
+                <div class="row-btns">
+                    <button class="btn alt" onclick="copyShare()">📋 Copy</button>
+                    <button class="btn green" onclick="waShare()">📲 WhatsApp</button>
+                </div>
+                <div class="row-btns"><button class="btn grey" onclick="setShare(false, this)">Link band karo</button></div>`);
+        };
+        window.setShare = (enable, btn) => run(btn, async () => {
+            await khataApi(user, `/seller/accounts/${currentId}/share`, 'POST', { enable });
+            closeModal();
+            showToast(enable ? 'Link ban gaya ✅' : 'Link band ho gaya');
+            await loadDetail();
+            if (enable) openShare();
+        });
+        window.copyShare = async () => {
+            try { await navigator.clipboard.writeText(val('shareUrl')); showToast('Copy ho gaya ✅'); }
+            catch (e) { $('shareUrl').select(); showToast('Link chun liya, copy kar lijiye.'); }
+        };
+        function reminderText() {
+            const a = detail.account;
+            let msg = `Namaste ${a.customerName} ji, ${a.shopName} se. `;
+            msg += a.balance > 0 ? `Aapka ${rupees(a.balance)} baaki hai. ` : 'Aapka hisab barabar hai. ';
+            if (a.shareToken) msg += `Poora hisab yahan dekhiye: ${sharePageUrl(a.shareToken)}`;
+            else if (a.linked) msg += 'Poora hisab DesiMarket app me "Mera Khata" me dekh sakte hain.';
+            else msg += `Poora hisab dekhne ke liye DesiMarket par "Mera Khata" kholiye aur ye code dalein: ${a.linkCode}`;
+            return msg;
+        }
+        window.waShare = () => window.open(`https://wa.me/91${detail.account.customerPhone}?text=${encodeURIComponent(reminderText())}`, '_blank');
+        window.remind = () => window.waShare();
+
+        // ---------- report ----------
+        window.openReport = async () => {
+            showView('report');
+            $('headTitle').textContent = '📊 Report';
+            reportMonth = currentMonthIST();
+            await loadReport();
+        };
+        window.changeReportMonth = (d) => { reportMonth = shiftMonth(reportMonth, d); loadReport(); };
+        async function loadReport() {
+            $('repMonthTitle').textContent = monthLabel(reportMonth);
+            $('repBody').innerHTML = '<div class="empty">Load ho raha hai...</div>';
+            try {
+                report = await khataApi(user, `/seller/report?month=${reportMonth}`);
+                const r = report;
+                $('repBody').innerHTML = `
+                    <div class="stats">
+                        <div class="stat"><div class="v">${rupees(r.monthCharged)}</div><div class="l">Is mahine ka maal</div></div>
+                        <div class="stat"><div class="v">${rupees(r.monthPaid)}</div><div class="l">Is mahine vasool</div></div>
+                        <div class="stat"><div class="v">${rupees(r.totalPending)}</div><div class="l">Kul baaki (abhi)</div></div>
+                        <div class="stat"><div class="v">${rupees(r.todayCharged)}</div><div class="l">Aaj ka maal</div></div>
+                        ${r.collectionPercent !== null ? `<div class="stat wide"><div class="l">Is mahine ke maal me se ${r.collectionPercent}% vasool hua${r.totalAdvance ? ' · Advance ' + rupees(r.totalAdvance) : ''}</div></div>` : ''}
+                    </div>
+                    <div style="overflow-x:auto;">
+                    <table class="tbl"><tr><th>Grahak</th><th>Maal</th><th>Mile</th><th>Baaki</th></tr>
+                    ${r.customers.map(c => `<tr><td>${escapeHtml(c.name)}</td><td>${rupees(c.monthCharged)}</td><td>${rupees(c.monthPaid)}</td>
+                        <td style="font-weight:800;color:${c.balance > 0 ? '#c0392b' : '#1a7f4b'}">${rupees(c.balance)}</td></tr>`).join('')}
+                    </table></div>
+                    <div class="row-btns no-print" style="margin-top:12px;">
+                        <button class="btn alt" onclick="downloadReport()">⬇️ CSV</button>
+                        <button class="btn alt" onclick="window.print()">🖨️ Print / PDF</button>
+                    </div>
+                    <div class="sticky-sum no-print">PDF ke liye "Print" dabaiye aur "Save as PDF" chuniye.</div>`;
+            } catch (e) {
+                $('repBody').innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`;
+            }
+        }
+        window.downloadReport = () => {
+            if (!report) return;
+            downloadCsv(`khata-report-${report.month}.csv`, [
+                [`${report.shopName || 'Dukaan'} — Khata report ${report.month}`], [],
+                ['Grahak', 'Phone', 'Is mahine ka maal (Rs)', 'Is mahine mile (Rs)', 'Abhi baaki (Rs)'],
+                ...report.customers.map(c => [c.name, c.phone, c.monthCharged / 100, c.monthPaid / 100, c.balance / 100]), [],
+                ['Kul', '', report.monthCharged / 100, report.monthPaid / 100, report.totalPending / 100]
+            ]);
+        };
+
+        onAuthStateChanged(auth, (u) => {
+            if (!u || u.isAnonymous) { window.location.href = 'login.html'; return; }
+            user = u;
+            renderChips();
+            loadList();
+        });
+    </script>
+</body>
+</html>
