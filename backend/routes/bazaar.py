@@ -43,12 +43,19 @@ Trust & safety built in (all enforced HERE, not just in the page):
     POST /api/bazaar/admin/posts/<id>/status
     POST /api/bazaar/admin/users/<uid>/verify
 
+Place is chosen by PIN code (see routes/geo.py): the server fills state /
+district / block from the PIN itself, so spelling is never typed by hand, and
+each post keeps an approximate lat/lng (rounded to ~1 km — exact home
+coordinates are never stored or shown) so lists can be filtered "within
+5/10/25 km" and show "Purab mein 3 km door".
+
 Collections (backend-only, Firestore rules deny the browser):
   bazaar_posts/{id}, bazaar_leads/{postId_requesterUid},
   bazaar_ratings/{leadId_raterUid}, bazaar_profiles/{uid}
 """
 
 import logging
+import math
 import re
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
@@ -60,6 +67,7 @@ from flask import Blueprint, jsonify, request, g
 from utils.auth import require_auth, require_admin
 from utils.firebase_admin_init import db
 from utils.limiter import limiter
+from routes.geo import lookup_pincode, valid_pin
 
 logger = logging.getLogger(__name__)
 
@@ -193,6 +201,32 @@ def _try_uid():
         return None
 
 
+DIRECTIONS = ("Uttar", "Uttar-Purab", "Purab", "Dakshin-Purab", "Dakshin", "Dakshin-Paschim", "Paschim", "Uttar-Paschim")
+
+
+def _coord(lat, lng):
+    """(lat, lng) rounded to ~1 km if they are valid and inside India's bounding box, else (None, None)."""
+    try:
+        la, lo = float(lat), float(lng)
+    except (TypeError, ValueError):
+        return None, None
+    if not (6.0 <= la <= 38.0 and 68.0 <= lo <= 98.0):
+        return None, None
+    return round(la, 2), round(lo, 2)
+
+
+def _distance_and_direction(a_lat, a_lng, b_lat, b_lng):
+    """Km from A (viewer) to B (post) and the compass direction of B as seen from A."""
+    p1, p2 = math.radians(a_lat), math.radians(b_lat)
+    dl = math.radians(b_lng - a_lng)
+    h = math.sin((p2 - p1) / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    km = 2 * 6371.0 * math.asin(math.sqrt(h))
+    y = math.sin(dl) * math.cos(p2)
+    x = math.cos(p1) * math.sin(p2) - math.sin(p1) * math.cos(p2) * math.cos(dl)
+    bearing = (math.degrees(math.atan2(y, x)) + 360) % 360
+    return round(km, 1), DIRECTIONS[int((bearing + 22.5) // 45) % 8]
+
+
 def _profile(uid, cache):
     if uid in cache:
         return cache[uid]
@@ -268,7 +302,8 @@ def _post_public(pid, p, cache, viewer_uid=None):
         "id": pid, "kind": p.get("kind"), "category": p.get("category"),
         "title": p.get("title"), "description": p.get("description"),
         "price": p.get("price", 0), "priceUnit": p.get("priceUnit", "total"),
-        "state": p.get("state"), "district": p.get("district"), "village": p.get("village"),
+        "state": p.get("state"), "district": p.get("district"), "block": p.get("block"),
+        "village": p.get("village"), "pincode": p.get("pincode"), "landmark": p.get("landmark"),
         "photos": p.get("photos") or [], "fields": p.get("fields") or {},
         "status": p.get("status"), "ownerName": p.get("ownerName"),
         "contactMode": p.get("contactMode"), "contactLabel": p.get("contactLabel"),
@@ -310,9 +345,16 @@ def list_posts():
     district = _norm(request.args.get("district"))
     q = _norm(request.args.get("q"))
     women_only = request.args.get("womenOnly") in ("1", "true")
+    v_lat, v_lng = _coord(request.args.get("lat"), request.args.get("lng"))
+    v_pin = re.sub(r"\D", "", request.args.get("pincode") or "")
+    try:
+        radius = min(float(request.args.get("radiusKm") or 0), 300)
+    except ValueError:
+        radius = 0
+    near_mode = v_lat is not None and radius > 0          # "within N km of me"
 
     query = db.collection("bazaar_posts").where("kind", "==", kind)
-    if district:
+    if district and not near_mode:
         query = query.where("districtKey", "==", district)
     now = _now()
     rows = []
@@ -322,18 +364,32 @@ def list_posts():
             continue
         if category and p.get("category") != category:
             continue
-        if state and p.get("stateKey") != state:
+        if state and not near_mode and p.get("stateKey") != state:
             continue
+        dist = direction = None
+        if v_lat is not None and p.get("lat") is not None:
+            dist, direction = _distance_and_direction(v_lat, v_lng, p["lat"], p["lng"])
+        if near_mode:
+            same_pin = bool(v_pin) and p.get("pincode") == v_pin
+            if not ((dist is not None and dist <= radius) or (dist is None and same_pin)):
+                continue
+            if same_pin and dist is None:
+                dist, direction = 0.0, None
         if women_only and not (p.get("fields") or {}).get("womenOnly"):
             continue
         if q and q not in " ".join([p.get("title", ""), p.get("description", ""),
                                     p.get("village", ""), p.get("district", "")]).lower():
             continue
-        rows.append((d.id, p))
+        rows.append((d.id, p, dist, direction))
     rows.sort(key=lambda r: ((r[1].get("fields") or {}).get("emergency") is not True,
+                             r[2] if (v_lat is not None and r[2] is not None) else 10 ** 6,
                              -(r[1].get("createdAt") or now).timestamp()))
     cache = {}
-    posts = [_post_public(i, p, cache) for i, p in rows[:LIST_RETURN_CAP]]
+    posts = []
+    for i, p, dist, direction in rows[:LIST_RETURN_CAP]:
+        out = _post_public(i, p, cache)
+        out["distanceKm"], out["direction"] = dist, direction
+        posts.append(out)
     avg = None
     if kind in ("job", "worker"):
         wages = [p["price"] for p in posts if p["priceUnit"] == "per_din" and p["price"] > 0]
@@ -352,6 +408,10 @@ def get_post(post_id):
     if p.get("status") == "hidden" and uid != p.get("ownerUid"):
         return jsonify({"error": "Ye post nahi mila."}), 404
     out = _post_public(snap.id, p, {}, uid)
+    v_lat, v_lng = _coord(request.args.get("lat"), request.args.get("lng"))
+    out["distanceKm"] = out["direction"] = None
+    if v_lat is not None and p.get("lat") is not None:
+        out["distanceKm"], out["direction"] = _distance_and_direction(v_lat, v_lng, p["lat"], p["lng"])
     if p.get("expiresAt") and p["expiresAt"] <= _now() and p.get("status") == "active":
         out["status"] = "expired"
     return jsonify({"post": out})
@@ -373,9 +433,19 @@ def create_post():
         if len(title) < 3:
             return jsonify({"error": "Title likhiye (kam se kam 3 akshar)."}), 400
         description = _clean(data.get("description"), 600)
-        district = _clean(data.get("district"), 60)
+        pin = re.sub(r"\D", "", str(data.get("pincode") or ""))
+        geo = lookup_pincode(pin) if valid_pin(pin) else None
+        if data.get("pincode") and not valid_pin(pin):
+            return jsonify({"error": "6 ank ka sahi PIN code likhiye."}), 400
+        if geo:        # trust the PIN lookup over whatever the phone sent
+            state, district, block = geo["state"], geo["district"], geo.get("block") or ""
+        else:          # PIN lookup unavailable / old clients: fall back to typed names
+            state, district, block = _clean(data.get("state"), 40), _clean(data.get("district"), 60), _clean(data.get("block"), 60)
         if not district:
-            return jsonify({"error": "Apna zila (district) likhiye."}), 400
+            return jsonify({"error": "Apna PIN code likhiye taaki zila apne aap bhar jaye."}), 400
+        lat, lng = _coord(data.get("lat"), data.get("lng"))          # phone GPS (rounded to ~1 km)
+        if lat is None and geo and geo.get("lat") is not None:
+            lat, lng = _coord(geo["lat"], geo["lng"])
         unit = data.get("priceUnit") or "total"
         if unit not in PRICE_UNITS:
             return jsonify({"error": "Keemat ka naap sahi nahi hai."}), 400
@@ -426,8 +496,10 @@ def create_post():
     ref.set({
         "kind": kind, "category": category, "title": title, "description": description,
         "price": price, "priceUnit": unit, "fields": fields, "photos": photos,
-        "state": _clean(data.get("state"), 40), "stateKey": _norm(data.get("state")),
+        "state": state, "stateKey": _norm(state), "block": block,
         "district": district, "districtKey": _norm(district), "village": _clean(data.get("village"), 60),
+        "pincode": pin if valid_pin(pin) else None, "landmark": _clean(data.get("landmark"), 80) or None,
+        "lat": lat, "lng": lng,
         "ownerUid": g.uid, "ownerName": owner_name.split(" ")[0],
         "contactPhone": contact_phone, "contactLabel": _clean(data.get("contactLabel"), 20) or "Khud",
         "contactMode": mode, "status": "active", "reports": 0, "reporterUids": [], "leadCount": 0,
