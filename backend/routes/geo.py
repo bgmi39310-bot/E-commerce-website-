@@ -15,7 +15,7 @@ Data sources (all free, no key):
            to district-level filtering (or the person can tap "📍 meri location").
   * OpenStreetMap Nominatim (fallback only, when India Post is down/slow)
         -> state, district and lat/lng, but NO post-office list, so the person
-           types their village by hand. Cached for just 1 day so the proper
+           types their village by hand. Cached for just 10 minutes so the proper
            India Post answer replaces it as soon as that service is back.
 Every successful lookup is cached in Firestore (geo_pincodes/<pin>) for 90 days,
 so these outside services are called at most once per PIN per quarter and the
@@ -29,7 +29,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 import requests
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 
 from utils.firebase_admin_init import db
 from utils.limiter import limiter
@@ -45,7 +45,12 @@ HTTP_TIMEOUT = 15              # India Post is often slow; 6 s was too short
 ATTEMPTS = 2
 OSM_URL = "https://nominatim.openstreetmap.org/search"
 OSM_HEADERS = {"User-Agent": "DesiMarket/1.0 (PIN lookup; contact via site)"}
-FALLBACK_CACHE_DAYS = 1
+FALLBACK_CACHE_SECONDS = 600     # retry India Post again after 10 minutes
+# Some public APIs refuse the default "python-requests" User-Agent from cloud servers, so look like a browser.
+INDIA_POST_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+}
 PIN_RE = re.compile(r"^[1-9]\d{5}$")
 
 
@@ -66,27 +71,41 @@ def _get_json(url, **kw):
     raise last
 
 
+_JUNK = {"", "na", "n/a", "null", "none", "-"}
+
+
+def _most_common(values, avoid=()):
+    """Most frequent usable value (India Post rows are messy: 'NA' blocks, missing states...)."""
+    counts = {}
+    bad = {a.strip().lower() for a in avoid if a} | _JUNK
+    for v in values:
+        v = (v or "").strip()
+        if v.lower() not in bad:
+            counts[v] = counts.get(v, 0) + 1
+    return max(counts, key=counts.get) if counts else ""
+
+
 def _fetch_india_post(pin):
     """dict if found, None if India Post definitively has no such PIN. Raises if it is unreachable."""
-    body = _get_json(INDIA_POST_URL.format(pin=pin))
+    body = _get_json(INDIA_POST_URL.format(pin=pin), headers=INDIA_POST_HEADERS)
     entry = body[0] if isinstance(body, list) and body else {}
     offices = entry.get("PostOffice") or []
     if entry.get("Status") != "Success" or not offices:
         return None
-    first = offices[0]
     seen, names = set(), []
     for o in offices:
         n = (o.get("Name") or "").strip()
         if n and n.lower() not in seen:
             seen.add(n.lower())
             names.append({"name": n, "type": o.get("BranchType") or "",
-                          "delivery": o.get("DeliveryStatus") or "", "block": (o.get("Block") or "").strip()})
-    return {
-        "state": (first.get("State") or "").strip(),
-        "district": (first.get("District") or "").strip(),
-        "block": (first.get("Block") or "").strip(),
-        "offices": names[:60],
-    }
+                          "delivery": o.get("DeliveryStatus") or "",
+                          "block": "" if (o.get("Block") or "").strip().lower() in _JUNK else (o.get("Block") or "").strip()})
+    state = _most_common([o.get("State") for o in offices]) or _most_common([o.get("Circle") for o in offices])
+    district = _most_common([o.get("District") for o in offices])
+    block = _most_common([o.get("Block") for o in offices], avoid=(state, district))
+    if not state or not district:
+        return None
+    return {"state": state, "district": district, "block": block, "offices": names[:60]}
 
 
 def _fetch_centre(pin):
@@ -102,6 +121,9 @@ def _fetch_centre(pin):
         return (round(sum(p[0] for p in pts) / len(pts), 4), round(sum(p[1] for p in pts) / len(pts), 4))
     except Exception:
         return None, None
+
+
+_LAST_ERROR = {}    # pin -> why India Post failed (only shown with ?debug=1)
 
 
 def _fetch_osm(pin):
@@ -141,24 +163,27 @@ def lookup_pincode_ex(pin):
         snap = ref.get()
         if snap.exists:
             d = snap.to_dict() or {}
-            ttl = FALLBACK_CACHE_DAYS if d.get("source") == "osm" else CACHE_DAYS
+            ttl = timedelta(seconds=FALLBACK_CACHE_SECONDS) if d.get("source") == "osm" else timedelta(days=CACHE_DAYS)
             fetched = d.get("fetchedAt")
-            if fetched and now - fetched < timedelta(days=ttl):
+            if fetched and now - fetched < ttl:
                 return d, "ok"
     except Exception:
         logger.exception("geo cache read failed for %s", pin)
 
-    data, source = None, "indiapost"
+    data, source, india_error = None, "indiapost", None
     try:
         data = _fetch_india_post(pin)
         if data is None:
             return None, "notfound"
-    except Exception:
+    except Exception as e:
+        india_error = f"{type(e).__name__}: {e}"[:200]
         logger.exception("India Post lookup failed for %s — trying fallback", pin)
         data = _fetch_osm(pin)
         source = "osm"
         if data is None:
+            _LAST_ERROR[pin] = india_error
             return None, "unavailable"
+        data["indiaPostError"] = india_error
 
     if source == "indiapost":
         lat, lng = _fetch_centre(pin)
@@ -185,7 +210,13 @@ def pincode(pin):
     if status == "notfound":
         return jsonify({"error": "Ye PIN code India Post me nahi mila. Ek baar dobara check kijiye."}), 404
     if status == "unavailable":
-        return jsonify({"error": "PIN jaanchne wali service abhi busy hai."}), 503
-    return jsonify({"pin": pin, "state": d["state"], "district": d["district"], "block": d.get("block", ""),
-                    "offices": d.get("offices", []), "lat": d.get("lat"), "lng": d.get("lng"),
-                    "source": d.get("source", "indiapost")})
+        body = {"error": "PIN jaanchne wali service abhi busy hai."}
+        if request.args.get("debug") == "1":
+            body["indiaPostError"] = _LAST_ERROR.get(pin)
+        return jsonify(body), 503
+    out = {"pin": pin, "state": d["state"], "district": d["district"], "block": d.get("block", ""),
+           "offices": d.get("offices", []), "lat": d.get("lat"), "lng": d.get("lng"),
+           "source": d.get("source", "indiapost")}
+    if request.args.get("debug") == "1" and d.get("indiaPostError"):
+        out["indiaPostError"] = d["indiaPostError"]       # why the proper source failed (for the site owner)
+    return jsonify(out)
