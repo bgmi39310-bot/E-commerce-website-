@@ -54,6 +54,11 @@ export function wirePinPicker(p, init = {}, onChange = () => {}) {
             opts.push('<option value="__other">Anya — apna gaon khud likhiye</option>');
             $('Vill').innerHTML = opts.join('');
             $('VillWrap').style.display = 'block';
+            if (!g.offices.length) {      // list unavailable (fallback data source): type the village directly
+                $('Vill').value = '__other';
+                $('VillOther').style.display = 'block';
+                $('Info').innerHTML += '<div class="pin-bad">Gaon ki list abhi nahi mili — apna gaon khud likhiye.</div>';
+            }
             if (init.village && g.offices.some(o => o.name === init.village)) $('Vill').value = init.village;
             else if (init.village && init.pincode === pin) { $('Vill').value = '__other'; $('VillOther').value = init.village; $('VillOther').style.display = 'block'; }
         } catch (e) {
