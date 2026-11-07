@@ -127,7 +127,7 @@ export async function loadDeliveryProfile(db, uid) {
 // DesiMarket doesn't compute per-km pricing automatically — it's shown so
 // sellers/buyers know the rate to expect and agree the actual amount with
 // the delivery partner directly.
-export async function saveDeliveryProfile(db, uid, { name, phone, villages, vehicleType, feeType, feeAmount, maxDistanceKm, upiId, upiQr }) {
+export async function saveDeliveryProfile(db, uid, { name, phone, villages, pincodes, vehicleType, feeType, feeAmount, maxDistanceKm, upiId, upiQr }) {
     const cleanVillages = (villages || []).map(v => v.trim()).filter(Boolean);
     if (!name || !phone || cleanVillages.length === 0) {
         showToast("Please fill in your name, phone, and at least one village/area you serve.", 'error');
@@ -142,6 +142,7 @@ export async function saveDeliveryProfile(db, uid, { name, phone, villages, vehi
         await setDoc(doc(db, "delivery_profiles", uid), {
             uid, name, phone,
             villages: cleanVillages,
+            pincodes: (pincodes || []).filter(p => /^\d{6}$/.test(p)).slice(0, 30),
             village: cleanVillages[0], // kept in sync for any old code path that still reads the singular field
             vehicleType: vehicleType || 'bike',
             feeType: validFeeTypes.includes(feeType) ? feeType : 'per_order',
@@ -179,19 +180,20 @@ export async function setDeliveryAvailability(db, uid, isAvailable) {
 // You" elsewhere in the app — no GPS required to use this.
 // ============================================================================
 
-export async function loadJobBoard(db, villages) {
+export async function loadJobBoard(db, villages, pincodes) {
     const list = (villages || []).slice(0, 30); // Firestore "in" supports at most 30 values
-    if (list.length === 0) return [];
+    const pins = (pincodes || []).filter(p => /^\d{6}$/.test(p)).slice(0, 30);
+    if (list.length === 0 && pins.length === 0) return [];
     try {
-        const q = query(
-            collection(db, "orders"),
-            where("deliveryRequestStatus", "==", "open"),
-            where("buyerCity", "in", list),
-            limit(50)
-        );
-        const snap = await getDocs(q);
+        // Match by village name (buyerCity) AND by PIN (buyerPincode): the PIN-first address
+        // form fills both, so a different spelling of the same place still reaches the partner.
+        const queries = [];
+        if (list.length) queries.push(query(collection(db, "orders"), where("deliveryRequestStatus", "==", "open"), where("buyerCity", "in", list), limit(50)));
+        if (pins.length) queries.push(query(collection(db, "orders"), where("deliveryRequestStatus", "==", "open"), where("buyerPincode", "in", pins), limit(50)));
+        const snaps = await Promise.all(queries.map(q => getDocs(q)));
+        const seen = new Set();
         const jobs = [];
-        snap.forEach(d => jobs.push({ id: d.id, ...d.data() }));
+        snaps.forEach(snap => snap.forEach(d => { if (!seen.has(d.id)) { seen.add(d.id); jobs.push({ id: d.id, ...d.data() }); } }));
         return jobs;
     } catch (error) {
         console.error("Error loading job board:", error);
