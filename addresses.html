@@ -82,26 +82,24 @@
             </select>
         </div>
         <div class="form-group">
+            <label>📮 Pincode (sabse pehle ye daaliye — rajya, zila, gaon apne aap aa jayenge)</label>
+            <input type="text" id="addrPincode" placeholder="e.g. 226001" maxlength="6">
+        </div>
+        <div class="form-group">
             <label>Full Name</label>
             <input type="text" id="addrName" placeholder="Recipient's name">
         </div>
-        <div class="form-row">
-            <div class="form-group">
+        <div class="form-group">
                 <label>Phone Number</label>
                 <input type="tel" id="addrPhone" placeholder="10-digit mobile" maxlength="10">
             </div>
-            <div class="form-group">
-                <label>Pincode</label>
-                <input type="text" id="addrPincode" placeholder="e.g. 226001" maxlength="6">
-            </div>
-        </div>
         <div class="form-group">
             <label>Complete Address</label>
             <textarea id="addrLine" rows="2" placeholder="House no, street, landmark"></textarea>
         </div>
         <div class="form-row">
             <div class="form-group">
-                <label>City / Village</label>
+                <label>City / Village (PIN ke baad list se chuniye)</label>
                 <input type="text" id="addrCity" placeholder="City">
             </div>
             <div class="form-group">
@@ -128,8 +126,11 @@
         import { showToast } from './toast.js';
         import { escapeHtml } from './sanitize.js';
         import { initPickerMap } from './map-utils.js';
+        import { attachAddressAutofill } from './address-autofill.js';
 
     let currentUid = null;
+    const af = attachAddressAutofill({ pin: 'addrPincode', state: 'addrState', city: 'addrCity' });
+    let editingExtra = {};     // district/block of the address being edited (used only if its PIN is unchanged)
     let addrMapController = null; // created once, reused across every open of the modal
     let pickedAddrLat = null;
     let pickedAddrLng = null;
@@ -174,7 +175,7 @@
                 </div>
                 <div class="addr-text">
                     ${escapeHtml(a.name)}, ${escapeHtml(a.phone)}<br>
-                    ${escapeHtml(a.addressLine)}, ${escapeHtml(a.city)}, ${escapeHtml(a.state)} ${a.pincode ? '- ' + escapeHtml(a.pincode) : ''}
+                    ${escapeHtml(a.addressLine)}, ${escapeHtml(a.city)}${a.district ? ', ' + escapeHtml(a.district) : ''}, ${escapeHtml(a.state)} ${a.pincode ? '- ' + escapeHtml(a.pincode) : ''}
                 </div>
                 <div class="addr-actions">
                     ${!a.isDefault ? `<button class="btn-default" onclick="makeDefault('${a.id}')">Set as Default</button>` : ''}
@@ -198,6 +199,8 @@
         });
         pickedAddrLat = null;
         pickedAddrLng = null;
+        editingExtra = {};
+        if (af) af.refresh();
         document.getElementById('addrLocationStatus').textContent = 'Tap the map, or drag the pin, to mark exactly where this address is.';
         document.getElementById('addrModal').classList.add('active');
         setTimeout(async () => {
@@ -220,6 +223,8 @@
         document.getElementById('addrLine').value = addr.addressLine || '';
         document.getElementById('addrCity').value = addr.city || '';
         document.getElementById('addrState').value = addr.state || '';
+        editingExtra = { pincode: addr.pincode || '', district: addr.district || '', block: addr.block || '' };
+        if (af) af.refresh(addr.city);
         pickedAddrLat = typeof addr.lat === 'number' ? addr.lat : null;
         pickedAddrLng = typeof addr.lng === 'number' ? addr.lng : null;
         document.getElementById('addrLocationStatus').textContent = pickedAddrLat
@@ -261,12 +266,17 @@
             return;
         }
 
+        const geo = af ? af.geo() : null;
+        const pinNow = document.getElementById('addrPincode').value.trim();
         const addressData = {
             label: document.getElementById('addrLabel').value,
             name, phone,
             pincode: document.getElementById('addrPincode').value.trim(),
             addressLine,
             city,
+            village: city,
+            district: (geo ? geo.district : (editingExtra.pincode === pinNow ? editingExtra.district : '')) || '',
+            block: (geo ? geo.block : (editingExtra.pincode === pinNow ? editingExtra.block : '')) || '',
             state: document.getElementById('addrState').value.trim(),
             lat: pickedAddrLat,
             lng: pickedAddrLng
