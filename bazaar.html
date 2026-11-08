@@ -13,8 +13,10 @@
     <link rel="stylesheet" href="shared-ui.css">
     <link rel="stylesheet" href="khata-ui.css">
     <link rel="stylesheet" href="bazaar-ui.css">
+    <link rel="stylesheet" href="ui-kit.css">
     <script src="pwa-init.js" defer></script>
     <script src="click-guard.js" defer></script>
+    <script src="bottom-nav.js" defer></script>
 </head>
 <body>
     <header class="k-head">
@@ -68,7 +70,7 @@
             $('tabs').innerHTML = TABS.map(([k, ic, l]) => `<div class="tab ${tab === k ? 'on' : ''}" onclick="setTab('${k}')"><span class="ic">${ic}</span>${l}</div>`).join('');
             $('postFab').style.display = tab === 'mera' ? 'none' : 'block';
         }
-        window.setTab = (k) => { tab = k; category = ''; womenOnly = false; query = ''; history.replaceState(null, '', k === 'mera' ? '#mera' : location.pathname); renderTabs(); k === 'mera' ? loadMera() : (renderFilters(), loadList()); };
+        window.setTab = (k) => { tab = k; category = ''; womenOnly = false; query = ''; history.replaceState(null, '', k === 'sell' ? location.pathname : '#' + k); renderTabs(); k === 'mera' ? loadMera() : (renderFilters(), loadList()); };
 
         function renderFilters() {
             const chips = [['', '', 'Sab'], ...CAT[tab]].map(([k, ic, l]) => `<button class="chip ${category === k ? 'on' : ''}" onclick="setCat('${k}')">${ic} ${l}</button>`).join('');
@@ -76,7 +78,7 @@
             const RAD = [[5, '5 km'], [10, '10 km'], [25, '25 km'], [50, '50 km'], [0, 'Poora zila']];
             $('filters').innerHTML = `
                 <div class="areabar">
-                    <div class="a">${hasArea ? `<b>📍 ${esc([area.village, area.block].filter(Boolean)[0] || area.district)}, ${esc(area.district)}</b>${esc(area.state)} · PIN ${esc(area.pincode)}` : '<b>📍 Apna ilaka chuniye</b>PIN code daalte hi gaon, zila apne aap bhar jayega'}</div>
+                    <div class="a">${hasArea ? `<b>📍 ${esc([area.village, area.postOffice, area.block].filter(Boolean)[0] || area.district)}, ${esc(area.district)}</b>${esc(area.state)} · PIN ${esc(area.pincode)}` : '<b>📍 Apna ilaka chuniye</b>PIN code daalte hi gaon, zila apne aap bhar jayega'}</div>
                     <button class="mini" onclick="openArea()">${hasArea ? 'Badlo' : 'PIN daaliye'}</button>
                 </div>
                 ${hasArea ? `<div class="chips">${RAD.map(([k, l]) => `<button class="chip ${radius === k ? 'on' : ''}" onclick="setRadius(${k})">${l}</button>`).join('')}</div>` : ''}
@@ -98,12 +100,12 @@
                 <div class="hint">Sirf PIN code daaliye — rajya, zila aur gaon ki list apne aap aa jayegi. Phir "Aas-paas ke post" 5-50 km ke daayre me dikhenge.</div>
                 ${pinPickerHtml('ar', { landmark: false, gps: true })}
                 <div class="row-btns"><button class="btn grey" onclick="closeModal()">Raho</button><button class="btn" onclick="saveAreaPick()">Save</button></div>`);
-            wirePinPicker('ar', { pincode: area.pincode, village: area.village, state: area.state, district: area.district });
+            wirePinPicker('ar', { pincode: area.pincode, village: area.village, postOffice: area.postOffice, state: area.state, district: area.district });
         };
         window.saveAreaPick = () => {
             const v = readPin('ar');
             if (!v.ready) { showToast('Pehle 6 ank ka PIN code daaliye.', 'error'); return; }
-            area = { pincode: v.pincode, state: v.state, district: v.district, block: v.block, village: v.village, lat: v.lat, lng: v.lng };
+            area = { pincode: v.pincode, state: v.state, district: v.district, block: v.block, village: v.village, postOffice: v.postOffice, lat: v.lat, lng: v.lng };
             saveArea(); closeModal(); renderFilters(); loadList();
         };
 
@@ -129,7 +131,7 @@
             return `<div class="card post ${f.emergency ? 'emerg' : ''}" onclick="openPost('${p.id}')">${th}
                 <div class="bd"><div class="tt">${esc(p.title)}</div>
                 <div class="pr">${esc(priceText(p))}</div>
-                <div class="mt">📍 ${esc([p.village, p.district].filter(Boolean).join(', '))}${distText(p) ? ' · <span class="dist">' + esc(distText(p)) + '</span>' : ''} · ${timeAgo(p.createdAt)}${bits.length ? '<br>' + esc(bits.join(' · ')) : ''}</div>
+                <div class="mt">📍 ${esc([p.village || p.postOffice, p.district].filter(Boolean).join(', '))}${distText(p) ? ' · <span class="dist">' + esc(distText(p)) + '</span>' : ''} · ${timeAgo(p.createdAt)}${bits.length ? '<br>' + esc(bits.join(' · ')) : ''}</div>
                 <div style="margin-top:4px;">${badges}</div></div></div>`;
         }
         async function loadList() {
@@ -186,7 +188,7 @@
                 ${p.photos.length ? `<div class="photos">${p.photos.map(u => `<img src="${esc(u)}" alt="">`).join('')}</div>` : ''}
                 <h3 style="margin-bottom:4px;">${p.fields?.emergency ? '🚨 ' : ''}${esc(p.title)}</h3>
                 <div class="pr" style="font-weight:800;color:#b12704;font-size:18px;">${esc(priceText(p))}</div>
-                <div class="mt" style="font-size:12.5px;color:#666;margin:4px 0;">📍 ${esc([p.landmark, p.village, p.block, p.district, p.state].filter(Boolean).join(', '))}${p.pincode ? ' - ' + esc(p.pincode) : ''}${distText(p) ? '<br><span class="dist">' + esc(distText(p)) + '</span>' : ''}<br>${esc(catLabel(p.kind, p.category))} · ${timeAgo(p.createdAt)}</div>
+                <div class="mt" style="font-size:12.5px;color:#666;margin:4px 0;">📍 ${esc([p.landmark, p.village, p.postOffice && p.postOffice.toLowerCase() !== (p.village || '').toLowerCase() ? 'Post ' + p.postOffice : '', p.block, p.district, p.state].filter(Boolean).join(', '))}${p.pincode ? ' - ' + esc(p.pincode) : ''}${distText(p) ? '<br><span class="dist">' + esc(distText(p)) + '</span>' : ''}<br>${esc(catLabel(p.kind, p.category))} · ${timeAgo(p.createdAt)}</div>
                 <div>${p.ownerVerified ? '<span class="badge ok">✔ Local Verified</span>' : ''}${p.ownerRating ? `<span class="badge gold">⭐ ${p.ownerRating} (${p.ownerRatingCount})</span>` : ''}
                     <span class="badge">👤 ${esc(p.ownerName)}${p.contactLabel && p.contactLabel !== 'Khud' ? ' · sampark: ' + esc(p.contactLabel) : ''}</span></div>
                 ${kvHtml(p)}
@@ -318,7 +320,7 @@
                 <div class="row-btns"><button class="btn grey" onclick="startPost()">← Wapas</button><button class="btn" onclick="submitPost(this)">Post karo</button></div>`);
             $('fCat').onchange = () => { $('extra').innerHTML = extraFields(kind, val('fCat')); };
             $('extra').innerHTML = extraFields(kind, val('fCat'));
-            wirePinPicker('pp', { pincode: area.pincode, village: area.village, state: area.state, district: area.district });
+            wirePinPicker('pp', { pincode: area.pincode, village: area.village, postOffice: area.postOffice, state: area.state, district: area.district });
             renderSlots();
             $('photoIn').onchange = async (e) => {
                 const file = e.target.files[0]; e.target.value = '';
@@ -349,12 +351,12 @@
             if (!pl.ready) throw new Error('Apna 6 ank ka PIN code daaliye aur gaon chuniye.');
             await bazaarApi(user, '/posts', 'POST', {
                 kind, category: cat, title: val('fTitle'), description: val('fDesc'), price: val('fPrice') || 0, priceUnit: val('fUnit'),
-                pincode: pl.pincode, state: pl.state, district: pl.district, block: pl.block, village: pl.village, landmark: pl.landmark,
+                pincode: pl.pincode, state: pl.state, district: pl.district, block: pl.block, village: pl.village, postOffice: pl.postOffice, landmark: pl.landmark,
                 lat: pl.lat, lng: pl.lng, ownerName: val('fOwner'),
                 contactPhone: val('fPhone'), contactLabel: val('fLabel'), contactMode: mode, photos: formPhotos, fields: f,
                 adult: (kind === 'job' || kind === 'worker') ? chk('xAdult') : undefined
             });
-            if (!area.pincode) { area = { pincode: pl.pincode, state: pl.state, district: pl.district, block: pl.block, village: pl.village, lat: pl.lat, lng: pl.lng }; saveArea(); }
+            if (!area.pincode) { area = { pincode: pl.pincode, state: pl.state, district: pl.district, block: pl.block, village: pl.village, postOffice: pl.postOffice, lat: pl.lat, lng: pl.lng }; saveArea(); }
             closeModal(); showToast('Post ho gaya ✅');
             tab = kind; category = ''; renderTabs(); renderFilters(); loadList();
         });
@@ -426,8 +428,11 @@
         onAuthStateChanged(auth, (u) => {
             user = u;
             const params = new URLSearchParams(location.search);
-            if (location.hash === '#mera') { tab = 'mera'; renderTabs(); loadMera(); }
-            else { renderFilters(); loadList(); }
+            const hashTab = location.hash.slice(1);
+            if (['sell', 'rent', 'job', 'worker', 'mera'].includes(hashTab)) tab = hashTab;     // deep links from Sab Suvidhayein
+            renderTabs();
+            if (tab === 'mera') loadMera(); else { renderFilters(); loadList(); }
+            if (params.get('new') === '1' && !window.__newOpened && user && !user.isAnonymous) { window.__newOpened = true; startPost(); }
             const pid = params.get('post');
             if (pid && !window.__opened) { window.__opened = true; openPost(pid, true); }
         });
