@@ -1,0 +1,73 @@
+/* ============================================================================
+   DesiMarket UI kit — one look for the newer feature pages (Khata, Gaon Bazaar).
+   Load it AFTER khata-ui.css / bazaar-ui.css; it only restyles, class names stay.
+   Tokens:  --brand (deep teal-navy)  --accent (marigold orange)  --good / --bad
+   ============================================================================ */
+:root {
+    --brand: #1f3a4d; --brand-2: #0e6f7a; --accent: #ff9900; --ink: #17212b; --muted: #6b7782;
+    --bg: #f2f5f7; --line: #e3e9ed; --good: #1a7f4b; --bad: #c0392b; --r: 16px;
+    --shadow: 0 4px 16px rgba(23, 33, 43, .08); --shadow-lg: 0 10px 30px rgba(23, 33, 43, .16);
+}
+body { background: var(--bg); color: var(--ink); -webkit-tap-highlight-color: transparent; padding-bottom: 76px; }
+
+/* ---- header: gradient with rounded bottom ---- */
+header.k-head { background: linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%); padding: 15px 16px 20px; border-radius: 0 0 24px 24px; box-shadow: 0 8px 20px rgba(14, 111, 122, .25); position: sticky; top: 0; z-index: 20; }
+header.k-head h1 { font-size: 19px; font-weight: 800; letter-spacing: .2px; }
+header.k-head a { display: inline-flex; width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,.16); align-items: center; justify-content: center; font-size: 19px; }
+
+/* ---- buttons ---- */
+.btn { border-radius: 14px; padding: 13px 10px; font-weight: 800; font-size: 14.5px; letter-spacing: .1px; border: 0; color: #1c1c1c;
+    background: linear-gradient(180deg, #ffb73a 0%, var(--accent) 100%); box-shadow: 0 5px 14px rgba(255, 153, 0, .32); cursor: pointer; }
+.btn:active { transform: scale(.97); box-shadow: 0 2px 6px rgba(255, 153, 0, .3); }
+.btn.alt { background: #fff; color: var(--brand); border: 1.5px solid #cfd9e0; box-shadow: none; }
+.btn.green { background: linear-gradient(180deg, #2bad6f, var(--good)); color: #fff; box-shadow: 0 5px 14px rgba(26, 127, 75, .3); }
+.btn.grey { background: #e9eef2; color: #33414d; box-shadow: none; }
+.btn:disabled { opacity: .55; box-shadow: none; }
+.mini { border-radius: 10px; padding: 7px 12px; font-size: 12.5px; border-width: 1.5px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+.mini:active { transform: scale(.96); }
+
+/* ---- cards / badges / chips ---- */
+.card { border-radius: var(--r); border: 1px solid #edf1f4; box-shadow: var(--shadow); }
+.badge { border-radius: 8px; padding: 3px 9px; font-weight: 700; }
+.chip { padding: 8px 14px; border-radius: 20px; border: 1.5px solid #d3dde4; font-weight: 700; color: var(--brand); box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+.chip.on { background: var(--brand); border-color: var(--brand); color: #fff; box-shadow: 0 4px 10px rgba(31, 58, 77, .25); }
+.empty { border-radius: var(--r); box-shadow: var(--shadow); padding: 34px 20px; font-size: 14.5px; }
+
+/* ---- summary hero ---- */
+.sum { background: linear-gradient(135deg, #1f3a4d 0%, #0e6f7a 100%); border-radius: 22px; padding: 20px 16px; box-shadow: var(--shadow-lg); position: relative; overflow: hidden; }
+.sum::after { content: ''; position: absolute; right: -30px; top: -30px; width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,.07); }
+.sum .big { font-size: 34px; font-weight: 800; color: #ffc861; letter-spacing: .3px; margin: 2px 0; }
+.sum .small { font-size: 12.5px; opacity: .9; }
+
+/* ---- month / stats / entries ---- */
+.month-nav { border-radius: 14px; }
+.stat { border-radius: 14px; box-shadow: var(--shadow); } .stat .v { font-size: 17px; }
+.entry { border-radius: 14px; box-shadow: var(--shadow); border-left-width: 5px; }
+
+/* ---- bottom sheet modal ---- */
+.modal-bg { z-index: 2000; background: rgba(15, 25, 35, .55); backdrop-filter: blur(2px); animation: kfade .18s ease; }
+.modal { border-radius: 26px 26px 0 0; padding: 12px 18px 26px; animation: kslide .24s cubic-bezier(.2, .9, .3, 1); box-shadow: var(--shadow-lg); }
+.modal::before { content: ''; display: block; width: 46px; height: 5px; border-radius: 3px; background: #d4dbe1; margin: 0 auto 14px; }
+.modal h3 { font-size: 18px; font-weight: 800; }
+.modal input, .modal select, .modal textarea { border-radius: 12px; border-color: #d3dde4; background: #fbfcfd; }
+.modal input:focus, .modal select:focus, .modal textarea:focus { outline: none; border-color: var(--brand-2); box-shadow: 0 0 0 3px rgba(14, 111, 122, .16); }
+@keyframes kfade { from { opacity: 0; } } @keyframes kslide { from { transform: translateY(40px); opacity: .6; } }
+
+/* ---- floating / sticky bars sit above the bottom navigation ---- */
+.postfab { bottom: 84px; border-radius: 30px; background: linear-gradient(180deg, #ffb73a, var(--accent)); box-shadow: 0 8px 22px rgba(255, 153, 0, .45); }
+.fab-bar { border-radius: 22px 22px 0 0; box-shadow: 0 -6px 24px rgba(0,0,0,.14); padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+
+/* ---- Gaon Bazaar tabs: pill bar ---- */
+.tabs { margin: 12px 12px 4px; border-radius: 18px; box-shadow: var(--shadow); top: 76px; overflow: hidden; border: 1px solid #edf1f4; }
+.tab { padding: 9px 2px; font-size: 12px; border-bottom: 0; color: var(--muted); }
+.tab .ic { font-size: 22px; transition: transform .15s; }
+.tab.on { color: #fff; background: linear-gradient(135deg, var(--brand), var(--brand-2)); }
+.tab.on .ic { transform: scale(1.12); }
+.areabar { border-radius: 16px; border-left: 5px solid var(--accent); box-shadow: var(--shadow); }
+.post { border-radius: 16px; }
+.post .th { border-radius: 14px; }
+.pinbox { border-radius: 14px; }
+.kindgrid button { border: 1px solid #edf1f4; border-radius: 18px; background: #fff; box-shadow: var(--shadow); color: var(--ink); }
+.kindgrid button:active { transform: scale(.96); }
+
+@media (min-width: 900px) { body { padding-bottom: 0; } }
