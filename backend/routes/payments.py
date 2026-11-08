@@ -410,6 +410,7 @@ def _create_orders(verified_items, buyer_uid, delivery, coupon_code, coupon_sell
             "buyerDistrict": _short_text(delivery.get("district")),
             "buyerState": _short_text(delivery.get("state")),
             "buyerPincode": _pincode_or_none(delivery.get("pincode")),
+            "buyerPostOffice": _short_text(delivery.get("postOffice")),
             "deliverySlot": _slot_label(delivery.get("slot")),
             "paymentMethod": payment_method,
             "status": "Pending",
