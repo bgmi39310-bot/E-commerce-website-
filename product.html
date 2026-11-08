@@ -847,7 +847,7 @@
         document.getElementById('buyAddress').value = addr.addressLine || '';
         document.getElementById('buyCity').value = addr.city || '';
         document.getElementById('buyState').value = addr.state || '';
-        if (buyAf) buyAf.refresh(addr.city);
+        if (buyAf) buyAf.refresh(addr.city, addr.postOffice);
     };
 
     window.clearBuyAddressSelection = function() {
@@ -938,8 +938,9 @@
 
         try {
             const geo = buyAf ? buyAf.geo() : null;
-            const extra = geo ? { district: geo.district, state: geo.state || state, pincode } : { state, pincode };
-            const placeBits = [city, geo && geo.block && geo.block.toLowerCase() !== city.toLowerCase() ? geo.block : '', geo ? geo.district : ''].filter(Boolean);
+            const extra = geo ? { district: geo.district, state: geo.state || state, pincode, postOffice: geo.postOffice || '' } : { state, pincode };
+            const po = geo ? (geo.postOffice || '') : '';
+            const placeBits = [city, po && po.toLowerCase() !== city.toLowerCase() ? 'Post ' + po : '', geo && geo.block && geo.block.toLowerCase() !== city.toLowerCase() ? geo.block : '', geo ? geo.district : ''].filter(Boolean);
             const fullAddress = `${address}, ${placeBits.join(', ')}, ${state} ${pincode ? '- ' + pincode : ''}`;
 
             // Price, seller, shop name and stock are all re-derived
