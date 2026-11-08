@@ -1,0 +1,96 @@
+/* ============================================================================
+   DesiMarket theme layer — one polished look for the older pages
+   (product · cart · checkout · login · signup · delivery & seller dashboards).
+   Loaded LAST in <head>, so it restyles without touching each page's own CSS:
+   shapes, shadows, gradients, focus states, spacing. Colours of status buttons
+   (accept / ship / cancel …) keep their meaning.
+   ============================================================================ */
+:root {
+    --brand: #1f3a4d; --brand-2: #0e6f7a; --accent: #ff9900; --ink: #17212b; --muted: #6b7782;
+    --bg: #f2f5f7; --line: #e3e9ed; --good: #1a7f4b; --bad: #c0392b;
+    --shadow: 0 4px 16px rgba(23, 33, 43, .08); --shadow-lg: 0 12px 30px rgba(23, 33, 43, .16);
+}
+html { -webkit-tap-highlight-color: transparent; }
+body { background: var(--bg) !important; color: var(--ink); }
+
+/* ---- header bar ---- */
+header { background: linear-gradient(135deg, #1f3a4d 0%, #0e6f7a 100%) !important; border-radius: 0 0 22px 22px; box-shadow: 0 8px 20px rgba(14, 111, 122, .25); }
+.header-title { letter-spacing: .2px; }
+
+/* ---- cards & panels ---- */
+.card, .auth-box, .total-box, .job-card, .coupon-card, .payment-card, .saved-addr-card, .kyc-status-box, .availability-banner {
+    border-radius: 18px !important; }
+.card, .auth-box, .total-box, .job-card, .coupon-card { border: 1px solid #edf1f4; box-shadow: var(--shadow) !important; }
+.modal-box { border-radius: 24px !important; box-shadow: var(--shadow-lg); }
+.card > h2 { position: relative; padding-left: 14px; font-size: 18px; }
+.card > h2::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 5px; border-radius: 3px; background: linear-gradient(180deg, var(--accent), #ffc861); }
+
+/* ---- form fields ---- */
+input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]), select, textarea {
+    border-radius: 12px !important; border: 1.5px solid #d3dde4 !important; background: #fbfcfd; transition: border-color .15s, box-shadow .15s; }
+input:not([type=checkbox]):not([type=radio]):not([type=file]):focus, select:focus, textarea:focus {
+    outline: none !important; border-color: var(--brand-2) !important; box-shadow: 0 0 0 3px rgba(14, 111, 122, .16) !important; background: #fff; }
+.form-group label, label { font-weight: 700; }
+
+/* ---- buttons: shape + press feel for all ---- */
+button, .btn-primary, .btn-secondary, .btn-buy, .btn-cart, .btn-checkout, .btn-place, .btn-submit-order, .action-btn, .dash-action-btn,
+.btn-claim, .btn-decline, .btn-pickup, .btn-deliver, .btn-accept, .btn-ship, .btn-delivered, .btn-cancel, .btn-delete, .btn-edit, .btn-view, .btn-share,
+.btn-apply-coupon, .btn-wa-share, .btn-group button {
+    border-radius: 12px; font-weight: 800; letter-spacing: .1px; transition: transform .12s, box-shadow .12s, filter .12s; cursor: pointer; }
+button:active, .btn-primary:active, .btn-buy:active, .btn-cart:active, .btn-checkout:active, .btn-place:active, .action-btn:active { transform: scale(.97); }
+
+/* primary (buy / pay / place order / login) = marigold gradient */
+.btn-primary, .btn-buy, .btn-checkout, .btn-place, .btn-submit-order {
+    background: linear-gradient(180deg, #ffb73a 0%, #ff9900 100%) !important; color: #1b1b1b !important; border: 0 !important;
+    box-shadow: 0 6px 16px rgba(255, 153, 0, .35); border-radius: 14px; padding-top: 14px; padding-bottom: 14px; }
+.btn-primary:hover, .btn-buy:hover, .btn-checkout:hover, .btn-place:hover, .btn-submit-order:hover { filter: brightness(1.04); box-shadow: 0 8px 20px rgba(255, 153, 0, .4); }
+.btn-primary:disabled, .btn-place:disabled, .btn-submit-order:disabled { filter: grayscale(.5); opacity: .6; box-shadow: none; }
+
+/* secondary (add to cart, create account) = clean outline */
+.btn-secondary, .btn-cart { background: #fff !important; color: var(--brand) !important; border: 1.5px solid #cfd9e0 !important; box-shadow: none; border-radius: 14px; }
+.btn-secondary:hover, .btn-cart:hover { background: #f1f6f9 !important; }
+
+/* positive delivery / order actions = green */
+.btn-claim, .btn-pickup, .btn-deliver { background: linear-gradient(180deg, #2bad6f, #1a7f4b) !important; color: #fff !important; border: 0 !important; box-shadow: 0 5px 14px rgba(26, 127, 75, .28); }
+.btn-decline { border-radius: 12px; }
+.action-btn { border-radius: 14px; box-shadow: var(--shadow); }
+.btn-apply-coupon { background: var(--brand) !important; color: #fff !important; border: 0 !important; }
+
+/* ---- cart ---- */
+.qty-stepper { border-radius: 12px; overflow: hidden; }
+.qty-stepper button { border-radius: 10px; }
+.total-box { background: linear-gradient(135deg, #fff 0%, #f4fafa 100%); }
+.item-price-row { font-weight: 800; }
+
+/* ---- checkout ---- */
+.payment-card { border: 2px solid #e1e8ed !important; transition: border-color .15s, background .15s, box-shadow .15s; }
+.payment-card.active { border-color: var(--brand-2) !important; background: #eefafa !important; box-shadow: 0 4px 14px rgba(14, 111, 122, .15); }
+.saved-addr-card { border: 2px solid #e1e8ed; }
+.saved-addr-card.selected { border-color: var(--brand-2) !important; background: #eefafa; }
+.default-tag { border-radius: 8px; }
+
+/* ---- login / signup ---- */
+.wrapper { background: radial-gradient(1200px 400px at 50% -80px, rgba(14, 111, 122, .12), transparent); }
+.auth-box { padding: 26px 22px !important; box-shadow: var(--shadow-lg) !important; border: 0; }
+.auth-box h1 { font-weight: 800; letter-spacing: .2px; }
+.role-card { border: 2px solid #e1e8ed !important; border-radius: 16px !important; transition: transform .12s, border-color .15s, background .15s; }
+.role-card:active { transform: scale(.97); }
+.role-card.active { border-color: var(--brand-2) !important; background: linear-gradient(180deg, #f1fbfb, #e3f5f5) !important; box-shadow: 0 5px 16px rgba(14, 111, 122, .18); }
+.role-card .emoji { font-size: 30px; }
+.error-box { border-radius: 12px; }
+
+/* ---- delivery dashboard ---- */
+.availability-banner.available { background: linear-gradient(135deg, #25a266, #1a7f4b) !important; color: #fff; box-shadow: 0 8px 22px rgba(26, 127, 75, .3); }
+.availability-banner.busy { background: linear-gradient(135deg, #7a8791, #5b6770) !important; color: #fff; }
+.availability-banner button { border-radius: 20px; }
+.job-card { padding: 14px; }
+
+/* ---- seller dashboard ---- */
+.form-grid input, .form-grid select, .form-grid textarea { padding: 12px; }
+.file-upload-box { border-radius: 14px !important; }
+.btn-group button, .btn-group-profile button { border-radius: 12px; }
+.coupon-card { padding: 14px; }
+
+/* ---- tables / misc ---- */
+table { border-radius: 12px; overflow: hidden; }
+a { -webkit-tap-highlight-color: transparent; }
