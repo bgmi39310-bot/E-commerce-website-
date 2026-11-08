@@ -88,7 +88,7 @@ export async function loadSellerProfileFromFirestore(db, uid) {
             document.getElementById('shopPhone').value = profile.phone || '';
             document.getElementById('shopLogoFile').value = profile.logo || '';
             document.getElementById('shopAddress').value = profile.address || '';
-            loadedShopExtra = { pincode: profile.pincode || '', block: profile.block || '' };
+            loadedShopExtra = { pincode: profile.pincode || '', block: profile.block || '', postOffice: profile.postOffice || '' };
             const pinField = document.getElementById('shopPincode');
             if (pinField) {
                 pinField.value = profile.pincode || '';
@@ -97,6 +97,7 @@ export async function loadSellerProfileFromFirestore(db, uid) {
                 if (dF) dF.value = profile.district || '';
                 if (!shopAf) shopAf = attachAddressAutofill({ pin: 'shopPincode', state: 'shopState', city: 'shopCity', district: 'shopDistrict' });
                 if (!villagePicker) villagePicker = attachVillagePicker({ input: 'shopVillages', initialPins: profile.deliveryPincodes || [] });
+                if (shopAf && profile.pincode) shopAf.refresh(profile.city, profile.postOffice);
             }
             const cityField = document.getElementById('shopCity');
             if (cityField) cityField.value = profile.city || '';
@@ -174,6 +175,7 @@ export async function saveSellerProfile(db, currentLoggedInUser, loadProfileCall
         state: document.getElementById('shopState') ? document.getElementById('shopState').value.trim() : '',
         district: document.getElementById('shopDistrict') ? document.getElementById('shopDistrict').value.trim() : '',
         block: geo ? (geo.block || '') : (loadedShopExtra.pincode === ownPin ? loadedShopExtra.block : ''),
+        postOffice: geo ? (geo.postOffice || '') : (loadedShopExtra.pincode === ownPin ? loadedShopExtra.postOffice : ''),
         // PINs this shop delivers to (its own PIN + the PINs whose villages were ticked) —
         // lets buyers match by PIN even when a village is spelled differently.
         deliveryPincodes,
