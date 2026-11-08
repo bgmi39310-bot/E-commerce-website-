@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sab Suvidhayein - DesiMarket</title>
+    <meta name="description" content="DesiMarket ki saari suvidhayein ek jagah: kharidari, gaon bazaar, khata, apni dukaan.">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1f3a4d">
+    <link rel="icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="stylesheet" href="khata-ui.css">
+    <link rel="stylesheet" href="ui-kit.css">
+    <link rel="stylesheet" href="hub-ui.css">
+    <script src="pwa-init.js" defer></script>
+    <script src="bottom-nav.js" defer></script>
+</head>
+<body>
+    <header class="k-head">
+        <a href="index.html" aria-label="Home">←</a>
+        <h1>⠿ Sab Suvidhayein</h1>
+    </header>
+
+    <div class="hub-wrap">
+        <div class="hub-hero">
+            <h2 id="hello">Namaste 🙏</h2>
+            <p id="helloSub">Kharidari, gaon bazaar, hisab-kitab aur apni dukaan — sab yahin se.</p>
+            <div id="loginRow" style="margin-top:12px;display:none;">
+                <a class="btn" style="display:inline-block;text-decoration:none;padding:10px 22px;" href="login.html">Login / Signup</a>
+            </div>
+        </div>
+
+        <div class="hub-sec">🛒 Kharidari</div>
+        <div class="hub-grid">
+            <a class="hub-tile t-orange" href="index.html"><span class="hub-ic">🏠</span>Home<small>shop aur products</small></a>
+            <a class="hub-tile t-blue" href="cart.html"><span class="hub-ic">🛒</span>Cart<small>meri tokri</small></a>
+            <a class="hub-tile t-green" href="orders.html"><span class="hub-ic">📦</span>Mere Orders<small>track karein</small></a>
+            <a class="hub-tile t-pink" href="wishlist.html"><span class="hub-ic">❤️</span>Wishlist<small>pasand ki list</small></a>
+            <a class="hub-tile t-teal" href="subscriptions.html"><span class="hub-ic">🔁</span>Roz ka Order<small>doodh, sabzi...</small></a>
+            <a class="hub-tile t-purple" href="messages.html"><span class="hub-ic">💬</span>Messages<small>seller se baat</small></a>
+        </div>
+
+        <div class="hub-sec">🌾 Gaon Bazaar</div>
+        <div class="hub-grid">
+            <a class="hub-tile t-orange" href="bazaar.html#sell"><span class="hub-ic">🐄</span>Mandi<small>pashu, fasal, vahan</small></a>
+            <a class="hub-tile t-green" href="bazaar.html#rent"><span class="hub-ic">🚜</span>Kiraya<small>tractor, JCB, tempo</small></a>
+            <a class="hub-tile t-blue" href="bazaar.html#job"><span class="hub-ic">📋</span>Kaam<small>majdoor chahiye</small></a>
+            <a class="hub-tile t-gold" href="bazaar.html#worker"><span class="hub-ic">👷</span>Majdoor<small>kaam dhoondhiye</small></a>
+            <a class="hub-tile t-purple" href="bazaar.html#mera"><span class="hub-ic">📝</span>Mere Post<small>aur requests</small></a>
+            <a class="hub-tile t-red" href="bazaar.html?new=1"><span class="hub-ic">➕</span>Post Karo<small>bechiye ya kaam dijiye</small></a>
+        </div>
+
+        <div class="hub-sec">📒 Hisab-Kitab</div>
+        <div class="hub-grid two">
+            <a class="hub-tile t-teal" href="khata.html"><span class="hub-ic">📒</span><span>Mera Khata<small>dukaan ka mera hisab</small></span></a>
+            <a class="hub-tile t-orange" href="khata-seller.html"><span class="hub-ic">🧾</span><span>Grahakon ka Khata<small>dukandaar ke liye</small></span></a>
+        </div>
+
+        <div class="hub-sec">🏪 Dukandaar aur Delivery ke liye</div>
+        <div class="hub-grid">
+            <a class="hub-tile t-blue" href="seller-dashboard.html"><span class="hub-ic">🏪</span>Seller Hub<small>meri dukaan</small></a>
+            <a class="hub-tile t-green" href="delivery-dashboard.html"><span class="hub-ic">🛵</span>Delivery Hub<small>delivery ka kaam</small></a>
+            <a class="hub-tile t-pink" href="signup.html?role=seller"><span class="hub-ic">🚀</span>Seller Bano<small>apni dukaan kholiye</small></a>
+        </div>
+
+        <div class="hub-sec">👤 Mera Account</div>
+        <div class="hub-grid">
+            <a class="hub-tile t-purple" href="account.html"><span class="hub-ic">👤</span>Mera Account<small>profile</small></a>
+            <a class="hub-tile t-orange" href="addresses.html"><span class="hub-ic">📍</span>Mere Address<small>delivery pate</small></a>
+            <a class="hub-tile t-red" href="disputes.html"><span class="hub-ic">🛟</span>Shikayat<small>return / dispute</small></a>
+            <a class="hub-tile t-teal" href="terms.html"><span class="hub-ic">📄</span>Terms<small>niyam aur privacy</small></a>
+        </div>
+
+        <div class="hub-note">DesiMarket — apna gaon, apna bazaar 🌾</div>
+    </div>
+
+    <script type="module">
+        import { auth } from './firebase-config.js';
+        import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        onAuthStateChanged(auth, (u) => {
+            const real = u && !u.isAnonymous;
+            document.getElementById('loginRow').style.display = real ? 'none' : 'block';
+            if (real) {
+                const first = (u.displayName || '').split(' ')[0];
+                document.getElementById('hello').textContent = first ? `Namaste, ${first} 🙏` : 'Namaste 🙏';
+            }
+        });
+    </script>
+</body>
+</html>
