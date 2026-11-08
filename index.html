@@ -12,6 +12,8 @@
     <link rel="icon" href="icon-192.png">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="stylesheet" href="shared-ui.css">
+    <link rel="stylesheet" href="hub-ui.css">
+    <script src="bottom-nav.js" defer></script>
     <script src="pwa-init.js" defer></script>
     <script src="click-guard.js" defer></script>
     <!-- Google Analytics (GA4) -->
@@ -58,6 +60,8 @@
         .side-menu { height: 100%; width: 0; position: fixed; z-index: 2000; top: 0; right: 0; background-color: #232f3e; overflow-x: hidden; transition: 0.3s; padding-top: 60px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); }
         .side-menu a { padding: 12px 25px; text-decoration: none; font-size: 17px; color: white; display: block; transition: 0.2s; }
         .side-menu a:hover { background-color: #37475a; }
+        .side-menu .menu-sec { padding: 14px 25px 4px; font-size: 11.5px; font-weight: 800; letter-spacing: .6px; color: #ffb84d; text-transform: uppercase; }
+        .side-menu a { padding: 11px 25px; font-size: 16px; }
         .side-menu .close-btn { position: absolute; top: 10px; right: 20px; font-size: 30px; }
         .menu-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1999; }
 
@@ -193,22 +197,25 @@
     <div class="menu-overlay" id="menuOverlay" onclick="toggleMenu()"></div>
     <div id="sideMenu" class="side-menu">
         <a href="javascript:void(0)" class="close-btn" onclick="toggleMenu()">&times;</a>
+        <div class="menu-sec">🛒 Kharidari</div>
         <a href="index.html"><i class="fas fa-home"></i> Home</a>
         <a href="cart.html"><i class="fas fa-shopping-cart"></i> Cart</a>
         <a href="orders.html"><i class="fas fa-box"></i> <span data-i18n="myOrders">My Orders</span></a>
-        <a href="subscriptions.html"><i class="fas fa-sync-alt"></i> My Subscriptions</a>
-        <a href="khata.html"><i class="fas fa-book"></i> Mera Khata (Hisab)</a>
-        <a href="bazaar.html"><i class="fas fa-store"></i> Gaon Bazaar</a>
         <a href="wishlist.html"><i class="fas fa-heart"></i> <span data-i18n="myWishlist">My Wishlist</span></a>
+        <a href="subscriptions.html"><i class="fas fa-sync-alt"></i> Roz ka Order</a>
         <a href="messages.html"><i class="fas fa-comment-dots"></i> <span data-i18n="myMessages">My Messages</span></a>
-        <hr style="border: 0.5px solid #444;">
-        <a href="account.html"><i class="fas fa-user-circle"></i> My Account</a>
-        <a href="javascript:void(0)" id="menuEnablePush" style="display:none;"><i class="fas fa-bell"></i> Notification chalu karo</a>
+        <div class="menu-sec">🌾 Gaon Bazaar &amp; Hisab</div>
+        <a href="bazaar.html"><i class="fas fa-store"></i> Gaon Bazaar (mandi, kiraya, kaam)</a>
+        <a href="khata.html"><i class="fas fa-book"></i> Mera Khata (Hisab)</a>
+        <div class="menu-sec">🏪 Meri Dukaan</div>
         <a href="seller-dashboard.html" id="menuSellerHub"><i class="fas fa-store"></i> <span data-i18n="sellerHub">Seller Hub (डैशबोर्ड)</span></a>
         <a href="signup.html?role=seller" id="menuBecomeSeller"><i class="fas fa-rocket"></i> <span data-i18n="becomeSeller">Become a Seller</span></a>
         <a href="delivery-dashboard.html" id="menuDeliveryHub"><i class="fas fa-truck"></i> Delivery Partner Hub</a>
         <a href="delivery-dashboard.html" id="menuBecomeDelivery"><i class="fas fa-motorcycle"></i> Become a Delivery Partner</a>
-        <hr style="border: 0.5px solid #444;">
+        <div class="menu-sec">👤 Mera Account</div>
+        <a href="account.html"><i class="fas fa-user-circle"></i> My Account</a>
+        <a href="javascript:void(0)" id="menuEnablePush" style="display:none;"><i class="fas fa-bell"></i> Notification chalu karo</a>
+        <a href="suvidha.html"><i class="fas fa-th-large"></i> Sab Suvidhayein</a>
         <a href="terms.html"><i class="fas fa-file-contract"></i> <span data-i18n="termsPrivacy">Terms & Privacy</span></a>
     </div>
 
@@ -218,6 +225,16 @@
         <p id="heroSubtitle" data-i18n="heroSubtitle">Shop directly from verified local vendors near you</p>
     </div>
     <div id="heroDots" style="display:none; justify-content:center; gap:6px; padding:8px 0; background:white;"></div>
+
+    <!-- Quick access: the big features, one tap away -->
+    <div class="hub-wrap" style="padding-top:12px;padding-bottom:2px;">
+        <div class="hub-grid four">
+            <a class="hub-tile t-orange" href="bazaar.html"><span class="hub-ic">🌾</span>Gaon Bazaar</a>
+            <a class="hub-tile t-teal" href="khata.html"><span class="hub-ic">📒</span>Mera Khata</a>
+            <a class="hub-tile t-green" href="subscriptions.html"><span class="hub-ic">🔁</span>Roz ka Order</a>
+            <a class="hub-tile t-purple" href="suvidha.html"><span class="hub-ic">⠿</span>Sab Suvidhayein</a>
+        </div>
+    </div>
 
     <div class="trust-strip">
         <span><i class="fas fa-shield-alt"></i> <span data-i18n="verifiedSellers">Verified Sellers</span></span>
@@ -796,6 +813,8 @@
         const MY_PIN_KEY = 'dm_my_pin';
         let myVillage = (localStorage.getItem(MY_VILLAGE_KEY) || '').trim();
         let myPin = (localStorage.getItem(MY_PIN_KEY) || '').trim();
+        const MY_PO_KEY = 'dm_my_po';
+        let myPo = (localStorage.getItem(MY_PO_KEY) || '').trim();     // post office (separate from the village)
         const villageAf = attachAddressAutofill({ pin: 'villagePin', state: 'villageState', city: 'villageInput' });
         let showAllSellersMode = false;
         let myLat = null; // set only after the person taps "Sort by Distance" and allows location
@@ -819,7 +838,7 @@
         window.startEditVillage = function() {
             document.getElementById('villageInput').value = myVillage.startsWith('PIN ') ? '' : myVillage;
             document.getElementById('villagePin').value = myPin;
-            if (villageAf && myPin) villageAf.refresh(myVillage);
+            if (villageAf && myPin) villageAf.refresh(myVillage, myPo);
             document.getElementById('villageDisplay').style.display = 'none';
             document.getElementById('villageEditRow').style.display = 'flex';
         };
@@ -834,6 +853,9 @@
             myPin = pinOk ? pin : '';
             localStorage.setItem(MY_VILLAGE_KEY, myVillage);
             localStorage.setItem(MY_PIN_KEY, myPin);
+            const gNow = villageAf ? villageAf.geo() : null;
+            myPo = gNow ? (gNow.postOffice || '') : '';
+            localStorage.setItem(MY_PO_KEY, myPo);
             showAllSellersMode = false;
             renderVillageBar();
             applySellerVillageFilter();
@@ -882,7 +904,7 @@
             } else {
                 const villageNorm = normalizePlace(myVillage);
                 filtered = allSellers.filter(s =>
-                    sellerCoversVillage(s, villageNorm) || sellerCoversPin(s) || followedSellerIds.has(s.id) || s.id === currentBuyerUid
+                    sellerCoversVillage(s, villageNorm) || (myPo && sellerCoversVillage(s, normalizePlace(myPo))) || sellerCoversPin(s) || followedSellerIds.has(s.id) || s.id === currentBuyerUid
                 );
             }
 
