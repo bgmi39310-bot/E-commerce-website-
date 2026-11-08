@@ -98,7 +98,7 @@ export async function openSubscribeModal({ db, product, productId, selectedVaria
     const pick = (name) => wrap.querySelector(`input[name="${name}"]:checked`).value;
 
     const subAf = attachAddressAutofill({ pin: 'subPincode', state: 'subState', city: 'subCity' });
-    if (subAf && addr.pincode) subAf.refresh(addr.city);
+    if (subAf && addr.pincode) subAf.refresh(addr.city, addr.postOffice);
     wrap.querySelector('#subGo').onclick = async (ev) => {
         const btn = ev.currentTarget;
         const phone = val('subPhone');
@@ -118,7 +118,7 @@ export async function openSubscribeModal({ db, product, productId, selectedVaria
                     paymentMethod: pick('subPay'),
                     selectedSize: selectedVariants ? selectedVariants.size : null,
                     selectedColor: selectedVariants ? selectedVariants.color : null,
-                    delivery: { name: val('subName'), phone, address: val('subAddress'), city: val('subCity'), district: (subAf && subAf.geo() ? subAf.geo().district : ''), state: val('subState'), pincode: val('subPincode'), slot: val('subSlot') }
+                    delivery: { name: val('subName'), phone, address: val('subAddress'), city: val('subCity'), district: (subAf && subAf.geo() ? subAf.geo().district : ''), postOffice: (subAf && subAf.geo() ? subAf.geo().postOffice : ''), state: val('subState'), pincode: val('subPincode'), slot: val('subSlot') }
                 })
             });
             const data = await res.json().catch(() => ({}));
