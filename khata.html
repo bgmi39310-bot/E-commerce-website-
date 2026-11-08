@@ -11,8 +11,10 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="stylesheet" href="shared-ui.css">
     <link rel="stylesheet" href="khata-ui.css">
+    <link rel="stylesheet" href="ui-kit.css">
     <script src="pwa-init.js" defer></script>
     <script src="click-guard.js" defer></script>
+    <script src="bottom-nav.js" defer></script>
 </head>
 <body>
     <header class="k-head">
@@ -27,7 +29,7 @@
             <div style="font-size:12.5px;color:#666;margin-bottom:8px;">Dukandaar se 6 akshar ka code lijiye aur yahan likhiye. Uske baad aap apna poora hisab kabhi bhi dekh sakte hain.</div>
             <div style="display:flex;gap:8px;">
                 <input id="codeInput" maxlength="6" placeholder="ABC123" autocapitalize="characters"
-                       style="flex:1;padding:10px;border:1.5px solid #ccd;border-radius:8px;font-size:18px;letter-spacing:3px;text-transform:uppercase;">
+                       style="flex:1;min-width:0;padding:10px;border:1.5px solid #ccd;border-radius:10px;font-size:18px;letter-spacing:3px;text-transform:uppercase;">
                 <button class="btn" style="flex:0 0 auto;padding:10px 18px;" onclick="linkCode(this)">Jodo</button>
             </div>
         </div>
