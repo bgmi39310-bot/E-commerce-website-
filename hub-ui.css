@@ -1,0 +1,25 @@
+/* Tile hubs: Sab Suvidhayein page, Seller Home, home-page quick access.
+   Self-contained (hub-* class names) so it can be dropped into any page. */
+.hub-wrap { max-width: 640px; margin: 0 auto; padding: 14px 14px 20px; }
+.hub-sec { margin: 20px 2px 9px; font-size: 12.5px; font-weight: 800; letter-spacing: .6px; color: #5b6b78; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+.hub-sec::after { content: ''; flex: 1; height: 1px; background: #dde4e9; }
+.hub-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.hub-grid.two { grid-template-columns: repeat(2, 1fr); }
+.hub-grid.four { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.hub-tile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 14px 6px 11px; text-align: center; text-decoration: none; cursor: pointer;
+    background: #fff; color: #17212b; border: 1px solid #edf1f4; border-radius: 18px; box-shadow: 0 3px 12px rgba(23, 33, 43, .07);
+    font-size: 12.5px; font-weight: 700; line-height: 1.25; transition: transform .14s, box-shadow .14s; -webkit-tap-highlight-color: transparent; }
+.hub-tile:active { transform: scale(.95); box-shadow: 0 1px 4px rgba(23, 33, 43, .1); }
+.hub-tile small { display: block; font-weight: 500; font-size: 10.8px; color: #6b7782; margin-top: 1px; }
+.hub-ic { width: 50px; height: 50px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 26px; background: var(--tb, #fff1d6); }
+.hub-grid.two .hub-tile { flex-direction: row; text-align: left; gap: 12px; padding: 13px 12px; font-size: 13.5px; }
+.hub-grid.four .hub-tile { padding: 11px 2px 9px; font-size: 11.5px; border-radius: 16px; }
+.hub-grid.four .hub-ic { width: 44px; height: 44px; font-size: 23px; border-radius: 14px; }
+.t-orange { --tb: #fff1d6; } .t-green { --tb: #e2f6ea; } .t-blue { --tb: #e3eeff; } .t-pink { --tb: #ffe6f0; }
+.t-purple { --tb: #ece6ff; } .t-teal { --tb: #daf3f2; } .t-red { --tb: #fde6e3; } .t-gold { --tb: #fff4c9; }
+.hub-badge { position: absolute; top: 7px; right: 9px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #e63946; color: #fff; font-size: 10.5px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+.hub-hero { background: linear-gradient(135deg, #1f3a4d 0%, #0e6f7a 100%); color: #fff; border-radius: 22px; padding: 18px 16px; box-shadow: 0 10px 26px rgba(14, 111, 122, .28); position: relative; overflow: hidden; }
+.hub-hero::after { content: ''; position: absolute; right: -34px; top: -34px; width: 130px; height: 130px; border-radius: 50%; background: rgba(255, 255, 255, .07); }
+.hub-hero h2 { margin: 0 0 4px; font-size: 20px; color: #fff; } .hub-hero p { margin: 0; font-size: 13px; opacity: .92; line-height: 1.5; color: #fff; }
+.hub-note { font-size: 12px; color: #6b7782; text-align: center; margin-top: 22px; line-height: 1.6; }
+@media (min-width: 640px) { .hub-grid { grid-template-columns: repeat(4, 1fr); } }
