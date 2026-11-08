@@ -54,6 +54,7 @@
     .form-row .form-group { flex: 1; }
     .btn-save-addr { width: 100%; background: #ffd814; border: 1px solid #fcd200; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 6px; }
 </style>
+    <script src="bottom-nav.js" defer></script>
 </head>
 <body>
 
@@ -175,7 +176,7 @@
                 </div>
                 <div class="addr-text">
                     ${escapeHtml(a.name)}, ${escapeHtml(a.phone)}<br>
-                    ${escapeHtml(a.addressLine)}, ${escapeHtml(a.city)}${a.district ? ', ' + escapeHtml(a.district) : ''}, ${escapeHtml(a.state)} ${a.pincode ? '- ' + escapeHtml(a.pincode) : ''}
+                    ${escapeHtml(a.addressLine)}, ${escapeHtml(a.city)}${a.postOffice && a.postOffice.toLowerCase() !== (a.city || '').toLowerCase() ? ', Post ' + escapeHtml(a.postOffice) : ''}${a.district ? ', ' + escapeHtml(a.district) : ''}, ${escapeHtml(a.state)} ${a.pincode ? '- ' + escapeHtml(a.pincode) : ''}
                 </div>
                 <div class="addr-actions">
                     ${!a.isDefault ? `<button class="btn-default" onclick="makeDefault('${a.id}')">Set as Default</button>` : ''}
@@ -223,8 +224,8 @@
         document.getElementById('addrLine').value = addr.addressLine || '';
         document.getElementById('addrCity').value = addr.city || '';
         document.getElementById('addrState').value = addr.state || '';
-        editingExtra = { pincode: addr.pincode || '', district: addr.district || '', block: addr.block || '' };
-        if (af) af.refresh(addr.city);
+        editingExtra = { pincode: addr.pincode || '', district: addr.district || '', block: addr.block || '', postOffice: addr.postOffice || '' };
+        if (af) af.refresh(addr.city, addr.postOffice);
         pickedAddrLat = typeof addr.lat === 'number' ? addr.lat : null;
         pickedAddrLng = typeof addr.lng === 'number' ? addr.lng : null;
         document.getElementById('addrLocationStatus').textContent = pickedAddrLat
@@ -277,6 +278,7 @@
             village: city,
             district: (geo ? geo.district : (editingExtra.pincode === pinNow ? editingExtra.district : '')) || '',
             block: (geo ? geo.block : (editingExtra.pincode === pinNow ? editingExtra.block : '')) || '',
+            postOffice: (geo ? geo.postOffice : (editingExtra.pincode === pinNow ? editingExtra.postOffice : '')) || '',
             state: document.getElementById('addrState').value.trim(),
             lat: pickedAddrLat,
             lng: pickedAddrLng
