@@ -129,6 +129,7 @@ def create_subscription():
         "paymentMethod": payment_method,
         "delivery": {"name": name, "phone": phone, "address": address, "city": city,
                      "district": str(delivery_in.get("district") or "").strip()[:60] or None,
+                     "postOffice": str(delivery_in.get("postOffice") or "").strip()[:60] or None,
                      "state": str(delivery_in.get("state") or "").strip()[:60] or None,
                      "pincode": (str(delivery_in.get("pincode") or "").strip()
                                  if str(delivery_in.get("pincode") or "").strip().isdigit()
