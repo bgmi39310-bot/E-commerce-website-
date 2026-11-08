@@ -108,9 +108,9 @@
                 <p class="save-msg" id="saveMsg">Profile updated successfully!</p>
             `;
 
-            existingExtra = { pincode: existing.pincode || '', block: existing.block || '' };
+            existingExtra = { pincode: existing.pincode || '', block: existing.block || '', postOffice: existing.postOffice || '' };
             profileAf = attachAddressAutofill({ pin: 'pPincode', state: 'pState', city: 'pCity', district: 'pDistrict' });
-            if (profileAf && existing.pincode) profileAf.refresh(existing.city);
+            if (profileAf && existing.pincode) profileAf.refresh(existing.city, existing.postOffice);
             document.getElementById('saveBtn').addEventListener('click', saveProfile);
         }
 
@@ -145,6 +145,7 @@
                 district: document.getElementById('pDistrict').value.trim(),
                 city: document.getElementById('pCity').value.trim(),
                 pincode: document.getElementById('pPincode').value.trim(),
+                postOffice: (() => { const g = profileAf && profileAf.geo(); const pin = document.getElementById('pPincode').value.trim(); return g ? (g.postOffice || '') : (existingExtra.pincode === pin ? existingExtra.postOffice : ''); })(),
                 block: (() => { const g = profileAf && profileAf.geo(); const pin = document.getElementById('pPincode').value.trim(); return g ? (g.block || '') : (existingExtra.pincode === pin ? existingExtra.block : ''); })(),
                 photo: document.getElementById('pPhoto').value.trim(),
                 updatedAt: new Date()
