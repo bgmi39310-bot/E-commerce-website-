@@ -5,7 +5,7 @@
 // their own save code. This module only
 //   1. watches the PIN input; at 6 digits it asks the backend who that PIN is,
 //   2. fills State (and District / Block if the page has those inputs),
-//   3. shows a "Gaon / Post Office" dropdown whose pick fills the City/Village input.
+//   3. shows a "Post Office" dropdown (stored separately from the village the person types).
 // Nothing long has to be typed, so spellings stay clean (and sellers' delivery
 // villages match buyers' villages exactly).
 //
@@ -28,6 +28,8 @@ function ensureStyles() {
         .pa-chip { padding:5px 10px; border-radius:14px; border:1.5px solid #232f3e; background:#fff; font-size:12.5px; font-weight:600; cursor:pointer; color:#232f3e; }
         .pa-chip.on { background:#232f3e; color:#fff; }
         .pa-pin { width:100%; padding:9px; border:1px solid #ccc; border-radius:6px; font-size:16px; letter-spacing:3px; box-sizing:border-box; }
+        .pa-lbl { font-weight:700; margin:8px 0 2px; } .pa-same { display:flex; gap:6px; align-items:center; margin-top:6px; font-size:13px; font-weight:600; }
+        .pa-same input { width:auto !important; min-height:auto !important; } .pa-hint { font-size:12px; color:#666; margin-top:4px; }
         .pa-all { margin-top:6px; background:none; border:0; color:#2456b3; font-weight:700; font-size:12.5px; cursor:pointer; padding:2px 0; }
     `;
     document.head.appendChild(s);
@@ -54,6 +56,11 @@ export function findOffice(offices, wanted) {
 }
 
 // ---------------------------------------------------------------- single address
+// Village and Post Office are TWO separate things (many villages share one post office):
+//   * the page's existing "City / Village" input stays free text — the person writes their gaon
+//   * a "Post Office" dropdown (from the PIN) records the post office separately; a tick box
+//     "Mera gaon bhi yahi hai" copies the post-office name into the village box for those whose
+//     village and post office have the same name.
 export function attachAddressAutofill(cfg) {
     ensureStyles();
     const pinEl = $(cfg.pin), stateEl = $(cfg.state), cityEl = $(cfg.city);
@@ -68,19 +75,26 @@ export function attachAddressAutofill(cfg) {
     const box = document.createElement('div');
     box.className = 'pa-box';
     box.style.display = 'none';
-    box.innerHTML = '<div class="pa-info"></div><select class="pa-vill" style="display:none;"></select>';
+    box.innerHTML = `<div class="pa-info"></div>
+        <div class="pa-po-wrap" style="display:none;">
+            <div class="pa-lbl">📮 Post Office chuniye (jahan se aapki daak aati hai)</div>
+            <select class="pa-po"></select>
+            <label class="pa-same"><input type="checkbox" class="pa-samechk"> Mera gaon bhi yahi hai (post office wale naam ka)</label>
+            <div class="pa-hint">Gaon aur post office alag ho sakte hain — apne gaon ka naam "City / Village" me khud likhiye.</div>
+        </div>`;
     const anchor = pinEl.closest('.form-row') || pinEl.closest('.form-group') || pinEl;   // seller/delivery forms keep inputs directly in a grid
     box.style.gridColumn = '1 / -1';
     box.style.flex = '1 1 100%';
     anchor.insertAdjacentElement('afterend', box);
-    const info = box.querySelector('.pa-info'), sel = box.querySelector('.pa-vill');
+    const info = box.querySelector('.pa-info'), poWrap = box.querySelector('.pa-po-wrap');
+    const sel = box.querySelector('.pa-po'), same = box.querySelector('.pa-samechk');
 
     let geo = null, seq = 0;
 
-    async function lookup(pin, wantedCity) {
+    async function lookup(pin, wantedCity, wantedPo) {
         const mine = ++seq;
         box.style.display = 'block';
-        sel.style.display = 'none';
+        poWrap.style.display = 'none';
         info.innerHTML = '⏳ PIN jaanch ho rahi hai...';
         try {
             const g = await fetchPin(pin);
@@ -90,13 +104,16 @@ export function attachAddressAutofill(cfg) {
             if (districtEl) districtEl.value = g.district;
             if (blockEl) blockEl.value = g.block || '';
             info.innerHTML = `<span class="pa-ok">✅ ${esc(g.state)} › ${esc(g.district)}${g.block ? ' › ' + esc(g.block) : ''}</span>`;
-            sel.innerHTML = '<option value="">— Apna gaon / post office chuniye —</option>'
-                + g.offices.map(o => `<option value="${esc(o.name)}">${esc(o.name)}${o.type ? ' (' + esc(o.type) + ')' : ''}</option>`).join('')
-                + '<option value="__other">Anya — khud likhiye</option>';
-            sel.style.display = g.offices.length ? 'block' : 'none';
-            if (!g.offices.length) info.innerHTML += '<div class="pa-bad">Gaon ki list abhi nahi mili — apna gaon/shehar neeche khud likhiye.</div>';
-            const hit = findOffice(g.offices, wantedCity !== undefined ? wantedCity : cityEl.value);
-            if (hit) { sel.value = hit.name; cityEl.value = hit.name; }
+            if (g.offices.length) {
+                sel.innerHTML = '<option value="">— Post office chuniye —</option>'
+                    + g.offices.map(o => `<option value="${esc(o.name)}">${esc(o.name)}${o.type ? ' (' + esc(o.type) + ')' : ''}</option>`).join('');
+                poWrap.style.display = 'block';
+                const po = findOffice(g.offices, wantedPo !== undefined ? wantedPo : '');
+                if (po) sel.value = po.name;
+                same.checked = !!(sel.value && cityEl.value.trim().toLowerCase() === sel.value.toLowerCase());
+            } else {
+                info.innerHTML += '<div class="pa-bad">Post office ki list abhi nahi mili — gaon/shehar neeche khud likhiye.</div>';
+            }
             if (cfg.onGeo) cfg.onGeo(g);
         } catch (e) {
             if (mine !== seq) return;
@@ -111,22 +128,25 @@ export function attachAddressAutofill(cfg) {
         if (v.length === 6) lookup(v);
         else { geo = null; seq++; box.style.display = 'none'; }
     });
-    sel.addEventListener('change', () => {
-        if (sel.value === '__other') { cityEl.value = ''; cityEl.focus(); }
-        else if (sel.value) cityEl.value = sel.value;
+    sel.addEventListener('change', () => { if (same.checked && sel.value) cityEl.value = sel.value; });
+    same.addEventListener('change', () => {
+        if (same.checked && sel.value) cityEl.value = sel.value;
+        else if (same.checked) { same.checked = false; info.innerHTML += '<div class="pa-bad">Pehle post office chuniye.</div>'; }
     });
+    cityEl.addEventListener('input', () => { if (same.checked && cityEl.value.trim().toLowerCase() !== sel.value.toLowerCase()) same.checked = false; });
 
     return {
         // call after you set pinEl.value programmatically (e.g. editing a saved address / tapping a saved one)
-        refresh(city) { const v = pinEl.value.trim(); if (/^\d{6}$/.test(v)) lookup(v, city); else { box.style.display = 'none'; } },
-        geo: () => (geo ? { pincode: pinEl.value.trim(), state: geo.state, district: geo.district, block: geo.block || '', lat: geo.lat ?? null, lng: geo.lng ?? null } : null),
+        refresh(city, postOffice) { const v = pinEl.value.trim(); if (/^\d{6}$/.test(v)) lookup(v, city, postOffice); else { box.style.display = 'none'; } },
+        geo: () => (geo ? { pincode: pinEl.value.trim(), state: geo.state, district: geo.district, block: geo.block || '',
+                            postOffice: sel.value || '', lat: geo.lat ?? null, lng: geo.lng ?? null } : null),
     };
 }
 
 // ---------------------------------------------------------------- many villages (seller / delivery partner)
 // `input` is the page's existing comma-separated villages text input — it stays the source
 // of truth, so the page's save code needs no change except (optionally) reading getPins().
-export function attachVillagePicker({ input, label = '📮 PIN code daaliye — us PIN ke gaon niche aa jayenge, chhoone se chuniye', initialPins = [] }) {
+export function attachVillagePicker({ input, label = '📮 PIN code daaliye — us PIN ke post office / gaon niche aa jayenge, chhoone se chuniye (apna gaon list me na ho to niche khud likhiye)', initialPins = [] }) {
     ensureStyles();
     const inputEl = $(input);
     if (!inputEl) return null;
