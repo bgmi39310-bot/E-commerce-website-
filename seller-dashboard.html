@@ -166,6 +166,8 @@
         .bar-Returned { background: #6c757d; }
         .bar-count { width: 22px; text-align: right; font-weight: bold; color: #333; }
     </style>
+    <link rel="stylesheet" href="hub-ui.css">
+    <style>.dash-hidden-section { display:none !important; } #sellerHome { margin-bottom: 14px; }</style>
 </head>
 <body>
 
@@ -197,9 +199,39 @@
     <div class="container">
         <button id="backToDashboardBtn" onclick="backToDashboard()" style="display:none; background:#232f3e; color:white; border:none; padding:10px 16px; border-radius:6px; font-size:13.5px; font-weight:bold; cursor:pointer; margin-bottom:16px;">⬅️ Back to Dashboard</button>
 
+        <!-- Seller Home: every seller tool as a tile, grouped (replaces hunting through the ⋮ menu) -->
+        <div id="sellerHome">
+            <div class="hub-hero">
+                <h2>🏪 Meri Dukaan</h2>
+                <p>Products, orders, hisab aur kamai — sab ek jagah. Neeche tile dabaiye.</p>
+            </div>
+            <div class="hub-sec">📦 Dukaan aur Products</div>
+            <div class="hub-grid four">
+                <div class="hub-tile t-blue" onclick="showDashboardSection('shopProfileSection')"><span class="hub-ic">👤</span>Shop Profile</div>
+                <div class="hub-tile t-green" onclick="showDashboardSection('addProductSection')"><span class="hub-ic">➕</span>Naya Product</div>
+                <div class="hub-tile t-orange" onclick="showDashboardSection('productsSection')"><span class="hub-ic">📋</span>Mere Products</div>
+                <div class="hub-tile t-purple" onclick="showDashboardSection('bulkUploadSection')"><span class="hub-ic">📤</span>Bulk Upload</div>
+            </div>
+            <div class="hub-sec">💰 Hisab aur Kamai</div>
+            <div class="hub-grid four">
+                <a class="hub-tile t-teal" href="khata-seller.html"><span class="hub-ic">📒</span>Khata<small>roz ka hisab</small></a>
+                <div class="hub-tile t-gold" onclick="showDashboardSection('payoutSection')"><span class="hub-ic">💰</span>Kamai</div>
+                <div class="hub-tile t-blue" onclick="showDashboardSection('analyticsSection')"><span class="hub-ic">📊</span>Analytics</div>
+                <div class="hub-tile t-pink" onclick="showDashboardSection('couponsSection')"><span class="hub-ic">🎟️</span>Coupons</div>
+            </div>
+            <div class="hub-sec">🌾 Aur Suvidhayein</div>
+            <div class="hub-grid four">
+                <a class="hub-tile t-orange" href="bazaar.html#mera"><span class="hub-ic">🌾</span>Gaon Bazaar<small>mere post</small></a>
+                <a class="hub-tile t-green" href="delivery-dashboard.html"><span class="hub-ic">🛵</span>Delivery<small>hub</small></a>
+                <div class="hub-tile t-red" onclick="showDashboardSection('kycSection')"><span class="hub-ic">🪪</span>KYC<small>verification</small></div>
+                <a class="hub-tile t-purple" href="suvidha.html"><span class="hub-ic">⠿</span>Sab<small>suvidhayein</small></a>
+            </div>
+            <div class="hub-sec">📥 Aaj ke kaam — orders, return, sawal</div>
+        </div>
+
         <!-- 1. Shop Profile Section -->
         <div class="card dash-hidden-section" id="shopProfileSection">
-            <h2>1. Seller / Shop Profile</h2>
+            <h2>Seller / Shop Profile</h2>
             <div id="sellerIdDisplay" style="background: #e9ecef; padding: 10px; border-radius: 5px; margin-bottom: 15px; font-weight: bold; color: #333; border: 1px dashed #232f3e; font-size: 14px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
                 <span id="sellerIdText">Unique Seller ID: Loading...</span>
                 <button onclick="copySellerId()" style="background:#232f3e; color:white; border:none; padding:6px 10px; border-radius:5px; font-size:12px; cursor:pointer; white-space:nowrap;">📋 Copy</button>
@@ -275,7 +307,7 @@
 
         <!-- 2. Add New Product Section -->
         <div class="card dash-hidden-section" id="addProductSection">
-            <h2>2. Add New Product</h2>
+            <h2>Add New Product</h2>
             <div class="form-grid">
                 <input type="text" id="pName" placeholder="Product Name">
                 <input type="number" id="pPrice" placeholder="Price per unit (₹)">
@@ -352,7 +384,7 @@
 
         <!-- 3. Customer Orders Management Section -->
         <div class="card" id="ordersSection">
-            <h2>3. Customer Orders Management</h2>
+            <h2>📦 Customer Orders</h2>
             <div class="tab-buttons">
                 <button class="tab-btn active" onclick="filterOrdersMain('Pending')" id="tabPending">⏳ Pending</button>
                 <button class="tab-btn" onclick="filterOrdersMain('Accepted')" id="tabAccepted">✅ Accepted</button>
@@ -372,20 +404,20 @@
 
         <!-- 4. My Listed Products Hub -->
         <div class="card dash-hidden-section" id="productsSection">
-            <h2>4. My Listed Products Hub (Manage Your Inventory)</h2>
+            <h2>My Listed Products Hub (Manage Your Inventory)</h2>
             <div id="myProductsContainer"><p>Loading your listed products...</p></div>
         </div>
 
         <!-- 5. Shop Analytics -->
         <div class="card dash-hidden-section" id="analyticsSection">
-            <h2>5. 📊 Shop Analytics</h2>
+            <h2>📊 Shop Analytics</h2>
             <button onclick="downloadReportMain()" class="action-btn" style="width:auto; padding:8px 16px; margin-bottom:14px; font-size:13px;">⬇️ Download Sales Report (CSV)</button>
             <div id="analyticsContainer"><p>Loading analytics...</p></div>
         </div>
 
         <!-- 6. Discount Coupons -->
         <div class="card dash-hidden-section" id="couponsSection">
-            <h2>6. 🎟️ Discount Coupons</h2>
+            <h2>🎟️ Discount Coupons</h2>
             <div class="form-grid" style="margin-bottom:16px;">
                 <input type="text" id="couponCode" placeholder="Coupon Code (e.g. SAVE20)" style="text-transform:uppercase;">
                 <select id="couponType">
@@ -402,25 +434,25 @@
 
         <!-- 7. Return / Refund Requests -->
         <div class="card" id="returnsSection">
-            <h2>7. ↩️ Return / Refund Requests</h2>
+            <h2>↩️ Return / Refund Requests</h2>
             <div id="returnsContainer"><p>Loading return requests...</p></div>
         </div>
 
         <!-- 8. Earnings / Payout Summary -->
         <div class="card dash-hidden-section" id="payoutSection">
-            <h2>8. 💰 Earnings Summary</h2>
+            <h2>💰 Earnings Summary</h2>
             <div id="payoutContainer"><p>Loading earnings...</p></div>
         </div>
 
         <!-- 9. Seller Verification (KYC) -->
         <div class="card dash-hidden-section" id="kycSection">
-            <h2>9. 🪪 Seller Verification (KYC)</h2>
+            <h2>🪪 Seller Verification (KYC)</h2>
             <div id="kycContainer"><p>Loading verification status...</p></div>
         </div>
 
         <!-- 10. Customer Questions -->
         <div class="card" id="questionsSection">
-            <h2>10. 💬 Customer Questions</h2>
+            <h2>💬 Customer Questions</h2>
             <div id="qaSellerContainer"><p>Loading questions...</p></div>
         </div>
     </div>
@@ -580,7 +612,7 @@
         });
 
         const ALL_SECONDARY_SECTION_IDS = ['shopProfileSection', 'addProductSection', 'bulkUploadSection', 'productsSection', 'analyticsSection', 'couponsSection', 'payoutSection', 'kycSection'];
-        const PRIMARY_SECTION_IDS = ['ordersSection', 'returnsSection', 'questionsSection'];
+        const PRIMARY_SECTION_IDS = ['sellerHome', 'ordersSection', 'returnsSection', 'questionsSection'];
 
         // Selecting an item from "⋮" now SWAPS the view entirely — hides the
         // always-visible Orders/Returns/Questions too, shows only the picked
