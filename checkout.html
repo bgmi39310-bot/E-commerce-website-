@@ -200,7 +200,7 @@
             document.getElementById('cAddress').value = addr.addressLine || '';
             document.getElementById('cCity').value = addr.city || '';
             document.getElementById('cState').value = addr.state || '';
-            if (af) af.refresh(addr.city);
+            if (af) af.refresh(addr.city, addr.postOffice);
         };
 
         window.clearAddressSelection = function() {
@@ -475,8 +475,9 @@
             btn.innerText = 'Placing order...';
 
             const geo = af ? af.geo() : null;
-            const extra = geo ? { district: geo.district, state: geo.state || state, pincode } : { state, pincode };
-            const placeBits = [city, geo && geo.block && geo.block.toLowerCase() !== city.toLowerCase() ? geo.block : '', geo ? geo.district : ''].filter(Boolean);
+            const extra = geo ? { district: geo.district, state: geo.state || state, pincode, postOffice: geo.postOffice || '' } : { state, pincode };
+            const po = geo ? (geo.postOffice || '') : '';
+            const placeBits = [city, po && po.toLowerCase() !== city.toLowerCase() ? 'Post ' + po : '', geo && geo.block && geo.block.toLowerCase() !== city.toLowerCase() ? geo.block : '', geo ? geo.district : ''].filter(Boolean);
             const fullAddress = `${address}, ${placeBits.join(', ')}, ${state}${pincode ? ' - ' + pincode : ''}`;
 
             if (selectedPayment === 'RAZORPAY') {
