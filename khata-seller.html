@@ -11,6 +11,8 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="stylesheet" href="shared-ui.css">
     <link rel="stylesheet" href="khata-ui.css">
+    <link rel="stylesheet" href="ui-kit.css">
+    <link rel="stylesheet" href="hub-ui.css">
     <script src="pwa-init.js" defer></script>
     <script src="click-guard.js" defer></script>
 </head>
@@ -27,13 +29,11 @@
             <div class="big" id="totalPending">₹0</div>
             <div class="small" id="custCount"></div>
         </div>
-        <div class="row-btns">
-            <button class="btn alt" onclick="openAddCustomer()">➕ Naya grahak</button>
-            <button class="btn" onclick="openDaily()">⚡ Aaj ka sabko lagao</button>
-        </div>
-        <div class="row-btns">
-            <button class="btn alt" onclick="openReport()">📊 Report</button>
-            <button class="btn alt" onclick="remindAll(this)">🔔 Sabko yaad dilao</button>
+        <div class="hub-grid four" style="margin-bottom:12px;">
+            <div class="hub-tile t-orange" onclick="openDaily()"><span class="hub-ic">⚡</span>Aaj ka sabko<small>ek tap me</small></div>
+            <div class="hub-tile t-green" onclick="openAddCustomer()"><span class="hub-ic">➕</span>Naya grahak</div>
+            <div class="hub-tile t-blue" onclick="openReport()"><span class="hub-ic">📊</span>Report</div>
+            <div class="hub-tile t-pink" onclick="remindAll(this)"><span class="hub-ic">🔔</span>Yaad dilao<small>sabko</small></div>
         </div>
         <input class="search" id="searchBox" type="search" placeholder="🔍 Naam ya phone se dhoondhiye" oninput="setQuery(this.value)">
         <div class="chips" id="chips"></div>
