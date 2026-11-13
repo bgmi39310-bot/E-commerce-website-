@@ -41,8 +41,8 @@ export function resizedImageUrl(url, width) {
 // fails to load. No single or double quotes inside it on purpose, so it's
 // safe to drop into either onerror="this.src='...'" or src="...".
 export const NO_IMAGE_PLACEHOLDER =
-    'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"%3E' +
-    '%3Crect width="200" height="200" fill="%23f0f0f0"/%3E' +
-    '%3Ctext x="50%25" y="50%25" font-family="sans-serif" font-size="16" fill="%23999" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E' +
+    'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E' +
+    '%3Crect width=%22200%22 height=%22200%22 fill=%22%23f0f0f0%22/%3E' +
+    '%3Ctext x=%2250%25%22 y=%2250%25%22 font-family=%22sans-serif%22 font-size=%2216%22 fill=%22%23999%22 text-anchor=%22middle%22 dy=%22.3em%22%3ENo Image%3C/text%3E' +
     '%3C/svg%3E';
 
