@@ -5,15 +5,17 @@ from the browser. On a cache hit these are served entirely from Redis, no
 Firestore read at all; on a miss they fall back to Firestore and refill
 the cache for next time.
 
-product.html's OWN product page deliberately does NOT use these — it keeps
-its direct Firestore getDoc()+onSnapshot() (see product.html), because that
-page needs price/stock to be live and accurate at the exact moment someone
-is deciding to buy, not "fresh as of the last cache refresh". These
-endpoints exist for LISTING pages, where a few seconds/minutes of staleness
-on a page full of products is a fine trade-off for far fewer Firestore
-reads — the actual order is re-verified server-side regardless (see
-routes/payments.py), so a stale price shown while browsing can never
-result in someone actually being charged the wrong amount.
+product.html's own page now ALSO uses GET /api/products/<id> (Redis first). It used to keep a
+direct Firestore getDoc()+onSnapshot(), which cost ~4 Firestore reads on EVERY view of the same
+product and never touched Redis. That is no longer needed: utils/product_sync.py rewrites the
+product's Redis entry within about a second of any seller edit, and the actual order is re-verified
+server-side regardless (see routes/payments.py), so a copy that is a few seconds old can never
+make someone pay the wrong amount. If the backend is slow/asleep, product.html falls back to one
+plain Firestore read, so the page never depends on Redis being up.
+
+Views are counted in Redis (POST /api/products/<id>/view) and written to Firestore in batches by
+utils/views_flusher.py — one write per product per flush instead of one write (plus change-listener
+reads) on every single page view.
 
 Cache freshness: kept live by utils/product_sync.py, which listens for
 Firestore changes and updates/invalidates these same keys the moment a
@@ -391,15 +393,16 @@ def bulk_create_products():
 @products_bp.route("/<product_id>", methods=["GET"])
 def get_product(product_id):
     """
-    A single product, cached. Provided for completeness/future use (e.g. a
-    future related-products widget, search, etc) — product.html's own page
-    intentionally does NOT call this; see module docstring.
+    A single product, served from Redis when cached (zero Firestore reads). Used by product.html.
+    404 if the product no longer exists.
     """
     r = get_redis()
     cache_key = _product_key(product_id)
     cached = _cache_get(r, cache_key)
     if cached is not None:
-        return jsonify({"product": cached, "cached": True})
+        resp = jsonify({"product": cached, "cached": True})
+        resp.headers["Cache-Control"] = "public, max-age=10"       # browsers re-use it for 10 s
+        return resp
 
     doc = db.collection("vendors").document(product_id).get()
     if not doc.exists:
@@ -412,4 +415,35 @@ def get_product(product_id):
         except Exception:
             logger.exception("Could not write product %s to Redis (continuing without caching it)", product_id)
 
-    return jsonify({"product": data, "cached": False})
+    resp = jsonify({"product": data, "cached": False})
+    resp.headers["Cache-Control"] = "public, max-age=10"
+    return resp
+
+
+VIEWS_KEY_PREFIX = "views:"          # views:<productId> -> pending view count (flushed by utils/views_flusher.py)
+
+
+@products_bp.route("/<product_id>/view", methods=["POST"])
+@limiter.limit("120 per minute")
+def count_view(product_id):
+    """
+    Counts one page view. With Redis: one INCR (the same visitor/product counts once per hour), no
+    Firestore access at all — views_flusher writes the totals to Firestore in batches. Without Redis it
+    falls back to the old direct write, so views are never lost.
+    """
+    if not product_id or len(product_id) > 128 or "/" in product_id:
+        return jsonify({"error": "Bad product id."}), 400
+    r = get_redis()
+    if r is not None:
+        try:
+            ip = (request.headers.get("X-Forwarded-For", request.remote_addr or "") or "").split(",")[0].strip()
+            if r.set(f"viewed:{product_id}:{ip}", 1, nx=True, ex=3600):
+                r.incr(VIEWS_KEY_PREFIX + product_id)
+            return jsonify({"success": True}), 202
+        except Exception:
+            logger.exception("Redis view count failed for %s — writing directly", product_id)
+    try:
+        db.collection("vendors").document(product_id).update({"views": firestore.Increment(1)})
+    except Exception:
+        pass                                  # product gone / transient error: a lost view is harmless
+    return jsonify({"success": True}), 202
