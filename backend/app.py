@@ -28,6 +28,7 @@ from utils.order_watchdog import start_order_watchdog
 from utils.push_sender import start_push_sender
 from utils.subscription_runner import start_subscription_runner
 from utils.khata_runner import start_khata_runner
+from utils.views_flusher import start_views_flusher
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -104,6 +105,7 @@ def create_app():
         start_push_sender()
         start_subscription_runner()
         start_khata_runner()
+        start_views_flusher()
 
     threading.Thread(target=_startup_background_tasks, daemon=True).start()
 
