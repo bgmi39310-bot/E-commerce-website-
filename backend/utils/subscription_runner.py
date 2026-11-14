@@ -32,6 +32,7 @@ from routes.payments import (
     _apply_coupon, _build_verified_items, _create_orders, _reserve_stock,
 )
 from routes.subscriptions import FREQUENCY_DAYS, ist_now
+from utils import diag
 from utils.firebase_admin_init import db
 
 logger = logging.getLogger(__name__)
@@ -119,12 +120,39 @@ def _write_to_khata(sub, order_ids, verified):
         logger.exception("Subscription runner: could not write to khata for %s", sub.get("buyerUid"))
 
 
+_warned_index = False
+
+
+def _due_candidates(today):
+    """
+    Active subscriptions whose next order date has arrived (nextRunDate <= today) — usually zero or a
+    few documents. Needs the composite index subscriptions(status, nextRunDate) (firestore.indexes.json);
+    until it exists we fall back to scanning every active subscription (works, but re-reads them all
+    on each pass).
+    """
+    global _warned_index
+    try:
+        docs = list(db.collection("subscriptions").where("status", "==", "active")
+                    .where("nextRunDate", "<=", today).stream())
+        diag.record("subscription_runner", query="cheap (index in use)", docsRead=len(docs), everySeconds=CHECK_EVERY_SECONDS)
+        return docs
+    except Exception as e:
+        if not _warned_index:
+            _warned_index = True
+            logger.warning("Subscription runner: cheap query needs the subscriptions(status, nextRunDate) "
+                           "index — scanning all active subscriptions until it is created. (%s)", e)
+        docs = list(db.collection("subscriptions").where("status", "==", "active").stream())
+        diag.record("subscription_runner", query="FULL SCAN — create the subscriptions(status, nextRunDate) index",
+                    docsRead=len(docs), everySeconds=CHECK_EVERY_SECONDS)
+        return docs
+
+
 def run_due_subscriptions(now_ist=None):
     """One pass. Returns the subscription ids it placed an order for."""
     now_ist = now_ist or ist_now()
     today = now_ist.date().isoformat()
     placed = []
-    for snap in db.collection("subscriptions").where("status", "==", "active").stream():
+    for snap in _due_candidates(today):
         if not is_due(snap.to_dict() or {}, now_ist):
             continue
         try:
