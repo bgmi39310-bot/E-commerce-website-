@@ -23,7 +23,7 @@ import logging
 import threading
 import time
 
-from utils.cache import get_redis
+from utils.cache import get_redis, retry_if_disconnected
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +78,7 @@ def _loop():
     while True:
         time.sleep(CHECK_EVERY_SECONDS)
         try:
+            retry_if_disconnected()       # self-heal if the start-up Redis connection had failed
             _tick()
         except Exception:
             logger.exception("Cache keeper loop error (will keep running)")
