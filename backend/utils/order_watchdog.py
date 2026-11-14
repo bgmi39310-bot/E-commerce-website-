@@ -27,6 +27,7 @@ from datetime import datetime, timedelta, timezone
 
 from firebase_admin import firestore
 
+from utils import diag
 from utils.firebase_admin_init import db
 
 logger = logging.getLogger(__name__)
@@ -36,7 +37,16 @@ try:
 except ValueError:
     AUTO_CANCEL_MINUTES = 30
 
-CHECK_EVERY_SECONDS = 300      # look every 5 minutes
+# How often to look. Every look reads the Pending orders it finds (Firestore bills per document read),
+# so this is a cost knob: orders only auto-cancel after AUTO_CANCEL_MINUTES anyway, so looking every
+# 10 minutes cancels them at most ~10 minutes late. Override with ORDER_WATCHDOG_INTERVAL_SECONDS.
+try:
+    CHECK_EVERY_SECONDS = max(60, int(os.environ.get("ORDER_WATCHDOG_INTERVAL_SECONDS", "600")))
+except ValueError:
+    CHECK_EVERY_SECONDS = 600
+# Only orders created within this many days are looked at. Pending orders that can never be
+# auto-cancelled (e.g. paid online but never accepted) would otherwise be re-read on EVERY pass, forever.
+PENDING_WINDOW_DAYS = 7
 FIRST_CHECK_DELAY_SECONDS = 60  # and once, a minute after the server starts
 _SAFE_PAYMENT_STATUSES = (None, "", "Cash on Delivery", "UPI on Delivery")
 
@@ -117,6 +127,34 @@ def _notify(uid, title, body, link):
         logger.exception("Order watchdog: could not notify %s", uid)
 
 
+_warned_index = False
+
+
+def _pending_candidates(cutoff, now):
+    """
+    Pending orders old enough to cancel (older than the cutoff) but not ancient. Needs the composite
+    index orders(status, createdAt) — see firestore.indexes.json. Until that index exists Firestore
+    refuses the query, and we fall back to reading every Pending order (works, just costs more reads).
+    """
+    global _warned_index
+    try:
+        q = (db.collection("orders").where("status", "==", "Pending")
+             .where("createdAt", "<=", cutoff)
+             .where("createdAt", ">=", now - timedelta(days=PENDING_WINDOW_DAYS)))
+        docs = list(q.stream())
+        diag.record("order_watchdog", query="cheap (index in use)", docsRead=len(docs), everySeconds=CHECK_EVERY_SECONDS)
+        return docs
+    except Exception as e:
+        if not _warned_index:
+            _warned_index = True
+            logger.warning("Order watchdog: cheap query needs the orders(status, createdAt) index — "
+                           "reading all Pending orders instead until it is created. (%s)", e)
+        docs = list(db.collection("orders").where("status", "==", "Pending").stream())
+        diag.record("order_watchdog", query="FULL SCAN — create the orders(status, createdAt) index",
+                    docsRead=len(docs), everySeconds=CHECK_EVERY_SECONDS)
+        return docs
+
+
 def scan_once(now=None):
     """One pass. Returns the ids of the orders it cancelled."""
     if AUTO_CANCEL_MINUTES <= 0:
@@ -124,7 +162,7 @@ def scan_once(now=None):
     now = now or datetime.now(timezone.utc)
     cutoff = now - timedelta(minutes=AUTO_CANCEL_MINUTES)
     cancelled = []
-    for snap in db.collection("orders").where("status", "==", "Pending").stream():
+    for snap in _pending_candidates(cutoff, now):
         order = snap.to_dict() or {}
         created = order.get("createdAt")
         if created is None or created > cutoff or not is_safe_to_cancel(order):
