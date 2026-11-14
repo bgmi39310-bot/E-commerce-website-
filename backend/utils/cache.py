@@ -33,6 +33,7 @@ an HTTP request at all — worst case, caching just silently stays off.
 import os
 import logging
 import threading
+import time
 
 import redis
 
@@ -42,7 +43,7 @@ _client = None
 _lock = threading.Lock()
 
 
-def _connect():
+def _connect(quiet=False):
     url = os.environ.get("REDIS_URL")
     if not url:
         logger.warning(
@@ -62,8 +63,11 @@ def _connect():
         client.ping()
         logger.info("Connected to Redis.")
         return client
-    except Exception:
-        logger.exception("Could not connect to Redis at REDIS_URL — continuing without cache/rate limiting.")
+    except Exception as e:
+        if quiet:
+            logger.warning("Redis still not reachable (%s) — will retry.", type(e).__name__)
+        else:
+            logger.exception("Could not connect to Redis at REDIS_URL — continuing without cache/rate limiting.")
         return None
 
 
@@ -79,6 +83,35 @@ def init_redis():
     client = _connect()
     with _lock:
         _client = client
+
+
+_last_retry = 0.0
+
+
+def retry_if_disconnected(min_interval=60):
+    """
+    The ONE start-up connection attempt can fail for a passing reason (Upstash waking up, a network blip),
+    and without this the app would then run WITHOUT Redis until the next restart — every listing and product
+    request falling through to Firestore. Call this from a BACKGROUND thread (it can block for a few seconds);
+    it retries at most once per `min_interval` seconds, and only when REDIS_URL is set.
+    Returns True if Redis is connected afterwards.
+    """
+    global _client, _last_retry
+    if not os.environ.get("REDIS_URL"):
+        return False
+    with _lock:
+        if _client is not None:
+            return True
+    now = time.time()
+    if now - _last_retry < min_interval:
+        return False
+    _last_retry = now
+    client = _connect(quiet=True)
+    with _lock:
+        _client = client
+    if client is not None:
+        logger.info("Redis reconnected after the start-up attempt had failed.")
+    return client is not None
 
 
 def get_redis():
