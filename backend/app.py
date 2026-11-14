@@ -1,7 +1,7 @@
 import os
 import logging
 import threading
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -19,7 +19,8 @@ from routes.coupons import coupons_bp
 from routes.khata import khata_bp
 from routes.bazaar import bazaar_bp
 from routes.geo import geo_bp
-from utils.cache import init_redis
+from utils.cache import init_redis, get_redis
+from utils import diag
 from utils.limiter import limiter
 from utils.product_sync import start_product_sync
 from utils.seller_sync import start_seller_sync
@@ -112,7 +113,15 @@ def create_app():
     @app.route("/")
     @app.route("/api/health")
     def health():
-        return jsonify({"status": "ok", "service": "vande-market-backend"})
+        # Cheap on purpose (UptimeRobot hits this): no Firestore reads here.
+        redis_state = ("connected" if get_redis() is not None
+                       else "NOT connected" if os.environ.get("REDIS_URL") else "REDIS_URL is not set")
+        out = {"status": "ok", "service": "vande-market-backend", "redis": redis_state}
+        if request.args.get("debug") == "1":
+            # What each background job did on its last pass (and whether its cheap Firestore query is
+            # really in use or fell back to a full scan because an index is missing).
+            out["background"] = diag.snapshot()
+        return jsonify(out)
 
     @app.errorhandler(404)
     def not_found(_e):
